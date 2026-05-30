@@ -29,7 +29,7 @@ class RepoAnalysisTask(Base):
     __tablename__ = "repo_analysis_tasks"
 
     repo_id = Column(String(36), ForeignKey("git_repositories.id"), primary_key=True, comment="代码仓ID")
-    scan_status = Column(String(32), nullable=False, default=RepoAnalysisStatus.IDLE.value, index=True, comment="扫描任务状态")
+    scan_status = Column(String(32), nullable=False, default=RepoAnalysisStatus.IDLE.value, comment="扫描任务状态")
     last_error = Column(Text, nullable=True, comment="最近错误")
     last_scan_started_at = Column(DateTime, nullable=True, comment="最近扫描开始时间")
     last_scan_finished_at = Column(DateTime, nullable=True, comment="最近扫描结束时间")
@@ -48,9 +48,9 @@ class RepoFileAnalysisState(Base):
     __tablename__ = "repo_file_analysis_state"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="ID")
-    repo_id = Column(String(36), ForeignKey("git_repositories.id"), nullable=False, index=True, comment="代码仓ID")
-    file_path = Column(String(500), nullable=False, index=True, comment="相对路径")
-    status = Column(String(32), nullable=False, default=FileAnalysisStatus.PENDING.value, index=True, comment="状态")
+    repo_id = Column(String(36), ForeignKey("git_repositories.id"), nullable=False, comment="代码仓ID")
+    file_path = Column(String(500), nullable=False, comment="相对路径")
+    status = Column(String(32), nullable=False, default=FileAnalysisStatus.PENDING.value, comment="状态")
     last_error = Column(Text, nullable=True, comment="最近错误")
     last_started_at = Column(DateTime, nullable=True, comment="最近开始分析时间")
     last_finished_at = Column(DateTime, nullable=True, comment="最近结束分析时间")

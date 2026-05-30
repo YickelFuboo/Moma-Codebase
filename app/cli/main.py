@@ -18,3 +18,7 @@ cli.add_command(analyze)
 cli.add_command(search)
 cli.add_command(worker)
 cli.add_command(migrate)
+
+
+if __name__ == "__main__":
+    cli()

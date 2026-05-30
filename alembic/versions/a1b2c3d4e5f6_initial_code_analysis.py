@@ -65,7 +65,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('repo_id')
     )
     op.create_index('idx_repo_analysis_task_scan_status', 'repo_analysis_tasks', ['scan_status'], unique=False)
-    op.create_index(op.f('ix_repo_analysis_tasks_scan_status'), 'repo_analysis_tasks', ['scan_status'], unique=False)
 
     op.create_table(
         'repo_file_analysis_state',
@@ -84,19 +83,12 @@ def upgrade() -> None:
     )
     op.create_index('idx_repo_file_analysis_dispatch', 'repo_file_analysis_state', ['repo_id', 'status'], unique=False)
     op.create_index('idx_repo_file_analysis_lookup', 'repo_file_analysis_state', ['repo_id', 'file_path'], unique=False)
-    op.create_index(op.f('ix_repo_file_analysis_state_file_path'), 'repo_file_analysis_state', ['file_path'], unique=False)
-    op.create_index(op.f('ix_repo_file_analysis_state_repo_id'), 'repo_file_analysis_state', ['repo_id'], unique=False)
-    op.create_index(op.f('ix_repo_file_analysis_state_status'), 'repo_file_analysis_state', ['status'], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_repo_file_analysis_state_status'), table_name='repo_file_analysis_state')
-    op.drop_index(op.f('ix_repo_file_analysis_state_repo_id'), table_name='repo_file_analysis_state')
-    op.drop_index(op.f('ix_repo_file_analysis_state_file_path'), table_name='repo_file_analysis_state')
     op.drop_index('idx_repo_file_analysis_lookup', table_name='repo_file_analysis_state')
     op.drop_index('idx_repo_file_analysis_dispatch', table_name='repo_file_analysis_state')
     op.drop_table('repo_file_analysis_state')
-    op.drop_index(op.f('ix_repo_analysis_tasks_scan_status'), table_name='repo_analysis_tasks')
     op.drop_index('idx_repo_analysis_task_scan_status', table_name='repo_analysis_tasks')
     op.drop_table('repo_analysis_tasks')
     op.drop_index('idx_user_provider', table_name='git_authorities')

@@ -1,20 +1,13 @@
 import logging
-from app.config.settings import settings, APP_NAME, APP_VERSION
-from app.infrastructure.database import Base, close_db, get_db_session
+from app.config.settings import APP_NAME, APP_VERSION
+from app.infrastructure.database import close_db
+from app.infrastructure.database.migrate import upgrade_head
 from app.infrastructure.vector_store import VECTOR_STORE_CONN
 from app.code_analysis.services.file_analysis_service import FileAnalysisService
 from app.code_analysis.services.lsp.lsp_service import CodeLSPService
 from app.logger import setup_logging
 
 _runtime_started = False
-
-
-async def ensure_sqlite_schema() -> None:
-    if settings.database_type.lower() != "sqlite":
-        return
-    async with get_db_session() as session:
-        conn = await session.connection()
-        await conn.run_sync(Base.metadata.create_all)
 
 
 async def startup(start_scheduler: bool = False) -> None:
@@ -24,7 +17,7 @@ async def startup(start_scheduler: bool = False) -> None:
         if start_scheduler:
             FileAnalysisService.start_global_scheduler()
         return
-    await ensure_sqlite_schema()
+    upgrade_head()
     if start_scheduler:
         FileAnalysisService.start_global_scheduler()
     _runtime_started = True
