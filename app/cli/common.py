@@ -6,26 +6,53 @@ import click
 from app.infrastructure.database import get_db_session
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository
 from app.repo_mgmt.services.repo_resolver import RepoResolver
-from app.runtime import shutdown, startup
+from app.runtime import begin_long_session, end_long_session, ensure_scheduler, init_runtime, is_long_session, release_runtime
 
 DEFAULT_USER_ID = "default"
 T = TypeVar("T")
+_session_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+def begin_session(loop: asyncio.AbstractEventLoop) -> None:
+    global _session_loop
+    _session_loop = loop
+    begin_long_session()
+
+
+def end_session() -> None:
+    global _session_loop
+    _session_loop = None
+    end_long_session()
+
+
+def is_session_active() -> bool:
+    return is_long_session()
 
 
 def echo_json(data: Any) -> None:
     click.echo(json.dumps(data, ensure_ascii=False, indent=2, default=str))
 
 
-def run_async(coro_factory: Callable[[], Coroutine[Any, Any, T]]) -> T:
-    return asyncio.run(_run_with_startup(coro_factory()))
+def run_async(
+    coro_factory: Callable[[], Coroutine[Any, Any, T]],
+    *,
+    scheduler: bool = False,
+) -> T:
+    coro = _invoke(coro_factory(), scheduler=scheduler)
+    if _session_loop is not None and is_long_session() and _session_loop.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, _session_loop).result()
+    return asyncio.run(coro)
 
 
-async def _run_with_startup(coro: Coroutine[Any, Any, T]) -> T:
-    await startup(start_scheduler=False)
+async def _invoke(coro: Coroutine[Any, Any, T], *, scheduler: bool) -> T:
+    await init_runtime()
+    if scheduler:
+        await ensure_scheduler()
     try:
         return await coro
     finally:
-        await shutdown()
+        if not is_long_session():
+            await release_runtime()
 
 
 async def get_repo_by_path(path: str, user_id: str = DEFAULT_USER_ID) -> GitRepository:

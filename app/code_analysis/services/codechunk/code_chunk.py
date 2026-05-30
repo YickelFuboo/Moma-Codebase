@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 from app.config.settings import settings
+from app.utils.common import strip_utf8_bom
 
 
 _TRIVIAL_PY_ACCESSOR = re.compile(
@@ -55,7 +56,7 @@ class CodeChunkService:
     def _read_source_file(abs_path: str) -> str:
         """从磁盘读取源码全文（UTF-8，非法字节忽略）。"""
         with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()
+            return strip_utf8_bom(f.read())
 
     @staticmethod
     def _slice_source_text(text: str, *, file_ext: str = ".py") -> List[LineTextChunk]:

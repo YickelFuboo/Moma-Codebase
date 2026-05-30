@@ -13,8 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, and_, or_
 from app.config.settings import settings
 from app.repo_mgmt.schemes.git_repo_mgmt import CreateRepositoryFromUrl, UpdateRepository
-from app.repo_mgmt.services.remote_git_service import RemoteGitService
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository
+
+
+def _remote_git():
+    from app.repo_mgmt.services.remote_git_service import RemoteGitService
+    return RemoteGitService
 
 
 class GitRepositoryService:
@@ -33,8 +37,8 @@ class GitRepositoryService:
             await GitRepositoryService._validate_url_repository(create_data.repository_url)
             
             # 从URL解析仓库信息
-            provider = RemoteGitService.get_git_provider(create_data.repository_url)
-            repo_organization, repo_name = RemoteGitService.get_git_url_info(create_data.repository_url)
+            provider = _remote_git().get_git_provider(create_data.repository_url)
+            repo_organization, repo_name = _remote_git().get_git_url_info(create_data.repository_url)
             
             # 检查仓库是否已存在
             existing_repo = await session.execute(
@@ -238,8 +242,8 @@ class GitRepositoryService:
             
             # 解析git URL获取provider和organization（允许无远端URL的本地仓）
             if repo_url:
-                git_provider = RemoteGitService.get_git_provider(repo_url) or "local"
-                organization, _ = RemoteGitService.get_git_url_info(repo_url)
+                git_provider = _remorepote_git().get_git_provider(repo_url) or "local"
+                organization, _ = _remote_git().get_git_url_info(repo_url)
             else:
                 git_provider = "local"
                 organization = "local"
@@ -354,8 +358,8 @@ class GitRepositoryService:
 
             if update_data.repository_url is not None:
                 repo_url=update_data.repository_url.strip()
-                provider=RemoteGitService.get_git_provider(repo_url)
-                organization,repo_name=RemoteGitService.get_git_url_info(repo_url)
+                provider=_remote_git().get_git_provider(repo_url)
+                organization,repo_name=_remote_git().get_git_url_info(repo_url)
                 repository.repository_url=repo_url
                 repository.git_provider=provider or "local"
                 repository.organization=organization
@@ -395,7 +399,7 @@ class GitRepositoryService:
                     return
             
             # 使用GitService切换分支
-            success = RemoteGitService.checkout_branch(repository.local_path, new_branch)
+            success = _remote_git().checkout_branch(repository.local_path, new_branch)
             if success:
                 logging.info(f"Successfully switched repository {repository.repository_name} to branch {new_branch}")
             else:

@@ -1,27 +1,35 @@
+import importlib
 import logging
 import os
-from typing import Dict, List, Optional, Type
-from dataclasses import dataclass, asdict
-from datetime import datetime
 import traceback
+from typing import Dict, List, Optional, Type
 from app.utils.common import normalize_path
-from .analyzers.python_analyzer import PythonAnalyzer
-from .analyzers.java_analyzer import JavaAnalyzer
-from .analyzers.go_analyzer import GoAnalyzer
-from .analyzers.cpp_analyzer import CppAnalyzer
-from .analyzers.c_analyzer import CAnalyzer
-from .analyzers.js_analyzer import JsAnalyzer
 from .analyzers.base import LanguageAnalyzer
 from .model import FileInfo, FolderInfo, Language
 
-_ANALYZER_BY_LANG: Dict[Language, Type[LanguageAnalyzer]] = {
-    Language.PYTHON: PythonAnalyzer,
-    Language.JAVA: JavaAnalyzer,
-    Language.GO: GoAnalyzer,
-    Language.CPP: CppAnalyzer,
-    Language.C: CAnalyzer,
-    Language.JAVASCRIPT: JsAnalyzer,
+# 按语言懒加载，避免 Windows/debugpy 下一次性加载全部 tree-sitter 原生 DLL
+_ANALYZER_CLASS_BY_LANG: Dict[Language, tuple[str, str]] = {
+    Language.PYTHON: ("app.code_analysis.services.codeast.analyzers.python_analyzer", "PythonAnalyzer"),
+    Language.JAVA: ("app.code_analysis.services.codeast.analyzers.java_analyzer", "JavaAnalyzer"),
+    Language.GO: ("app.code_analysis.services.codeast.analyzers.go_analyzer", "GoAnalyzer"),
+    Language.CPP: ("app.code_analysis.services.codeast.analyzers.cpp_analyzer", "CppAnalyzer"),
+    Language.C: ("app.code_analysis.services.codeast.analyzers.c_analyzer", "CAnalyzer"),
+    Language.JAVASCRIPT: ("app.code_analysis.services.codeast.analyzers.js_analyzer", "JsAnalyzer"),
 }
+_analyzer_class_cache: Dict[Language, Type[LanguageAnalyzer]] = {}
+
+
+def _get_analyzer_class(language: Language) -> Optional[Type[LanguageAnalyzer]]:
+    if language in _analyzer_class_cache:
+        return _analyzer_class_cache[language]
+    spec = _ANALYZER_CLASS_BY_LANG.get(language)
+    if not spec:
+        return None
+    module_name, class_name = spec
+    module = importlib.import_module(module_name)
+    analyzer_class = getattr(module, class_name)
+    _analyzer_class_cache[language] = analyzer_class
+    return analyzer_class
 
 
 class FileAstAnalyzer:
@@ -57,12 +65,22 @@ class FileAstAnalyzer:
             language = self._detect_language()
             if language == Language.UNKNOWN:
                 return None
-            analyzer_class = _ANALYZER_BY_LANG.get(language)
+            analyzer_class = _get_analyzer_class(language)
             if not analyzer_class:
                 return None
             analyzer = analyzer_class(self.base_path, self.file_path)
             return await analyzer.analyze_file(source)
-            
+
+        except OSError as e:
+            if getattr(e, "winerror", None) == 1114:
+                logging.error(
+                    "tree-sitter 原生库加载失败(WinError 1114)，file_path=%s；"
+                    "分析 .py/.java 可尝试关闭调试器后运行，或安装 VC++ 运行库",
+                    self.file_path,
+                )
+            else:
+                logging.error("Error in analyze_file: %s, file_path: %s", e, self.file_path)
+            return None
         except Exception as e:
             logging.error(f"Error in analyze_file: {str(e)}, file_path: {self.file_path}")
             logging.error(f"Error type: {type(e)}")

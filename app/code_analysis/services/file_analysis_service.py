@@ -13,7 +13,7 @@ from app.code_analysis.services.codegraph.graph_creator import CodeGraphGenerato
 from app.code_analysis.services.codevector.code_vector import CodeVectorService
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
-from app.utils.common import normalize_path
+from app.utils.common import normalize_path, strip_utf8_bom
 
 
 class FileAnalysisService:
@@ -87,7 +87,7 @@ class FileAnalysisService:
                 stop_event = FileAnalysisService._scheduler_stop_event
                 if stop_event and stop_event.is_set():
                     return
-                
+
                 repo_ids = await FileAnalysisService._list_repos_with_pending_records()
                 for repo_id in repo_ids:
                     await FileAnalysisService.start_analysis(
@@ -180,7 +180,7 @@ class FileAnalysisService:
                 await asyncio.sleep(0.3)
                 continue
             idle_rounds = 0
-            await FileAnalysisService._process_file_analysis(pending_record.id)
+            await FileAnalysisService._analysis_one_file(pending_record.id)
 
     @staticmethod
     async def _get_one_record_and_mark_running(
@@ -232,7 +232,7 @@ class FileAnalysisService:
             return state
 
     @staticmethod
-    async def _process_file_analysis(
+    async def _analysis_one_file(
         record_id: str,
     ) -> None:
         async with get_db_session() as db:
@@ -261,7 +261,7 @@ class FileAnalysisService:
 
             # 分析文件
             try:
-                ok, err_detail = await FileAnalysisService._analyze_file_all_types(
+                ok, err_detail = await FileAnalysisService._analyze_file(
                     repo_id=record.repo_id,
                     repo_path=repo.local_path,
                     rel_file_path=record.file_path,
@@ -291,14 +291,14 @@ class FileAnalysisService:
                 )
 
     @staticmethod
-    async def _analyze_file_all_types(
+    async def _analyze_file(
         repo_id: str,
         repo_path: str,
         rel_file_path: str,
         abs_file_path: str,
     ) -> tuple[bool, Optional[str]]:
         try:
-            source = Path(abs_file_path).read_text(encoding="utf-8", errors="ignore")
+            source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
             chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
             # 行块向量与 AST 互不依赖：并行以缩短墙钟时间；return_exceptions=True 避免一方失败时取消另一方（防止向量写入被中途取消）
             async def _line_chunk_vectors() -> None:
@@ -390,7 +390,6 @@ class FileAnalysisService:
                         generator.close()
                     except Exception:
                         pass
-
         return {
             "repo_id": repo_id,
             "file_path": normalized_file_path,

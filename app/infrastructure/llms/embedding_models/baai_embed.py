@@ -4,10 +4,7 @@ import threading
 from typing import List, Tuple
 import numpy as np
 import asyncio
-import torch
 import logging
-from FlagEmbedding import FlagModel
-from huggingface_hub import snapshot_download
 from .base import BaseEmbedding
 from ..utils import truncate
 
@@ -37,6 +34,9 @@ class BAAIEmbedding(BaseEmbedding):
             logging.info(f"BAAI Embedding model initialized: {model_name}")
 
             if not BAAIEmbedding._model or model_name != BAAIEmbedding.model_name:
+                import torch
+                from FlagEmbedding import FlagModel
+                from huggingface_hub import snapshot_download
                 try:
                     model_path = self._get_model_cache_path(model_name)
                     

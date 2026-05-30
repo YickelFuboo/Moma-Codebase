@@ -1,37 +1,71 @@
 import logging
+
 from app.config.settings import APP_NAME, APP_VERSION
 from app.infrastructure.database import close_db
 from app.infrastructure.database.migrate import upgrade_head
-from app.infrastructure.vector_store import VECTOR_STORE_CONN
-from app.code_analysis.services.file_analysis_service import FileAnalysisService
-from app.code_analysis.services.lsp.lsp_service import CodeLSPService
 from app.logger import setup_logging
 
-_runtime_started = False
+_runtime_inited = False
+_schema_migrated = False
+_long_session = False
 
 
-async def startup(start_scheduler: bool = False) -> None:
-    global _runtime_started
+def begin_long_session() -> None:
+    global _long_session
+    _long_session = True
+
+
+def end_long_session() -> None:
+    global _long_session
+    _long_session = False
+
+
+def is_long_session() -> bool:
+    return _long_session
+
+
+async def init_runtime() -> None:
+    """轻量初始化：日志、数据库迁移（所有 CLI 命令共用）。"""
+    global _runtime_inited, _schema_migrated
     setup_logging()
-    if _runtime_started:
-        if start_scheduler:
-            FileAnalysisService.start_global_scheduler()
-        return
-    upgrade_head()
-    if start_scheduler:
-        FileAnalysisService.start_global_scheduler()
-    _runtime_started = True
-    logging.info("%s v%s 运行环境已就绪", APP_NAME, APP_VERSION)
+    if not _schema_migrated:
+        upgrade_head()
+        _schema_migrated = True
+    if not _runtime_inited:
+        _runtime_inited = True
+        logging.info("%s v%s 运行环境已就绪", APP_NAME, APP_VERSION)
+
+
+async def ensure_scheduler() -> None:
+    """启动文件分析全局调度器（幂等，等同原 main 启动阶段）。"""
+    from app.code_analysis.services.file_analysis_service import FileAnalysisService
+    FileAnalysisService.start_global_scheduler()
+
+
+async def startup() -> None:
+    await init_runtime()
+    await ensure_scheduler()
+
+
+async def release_runtime() -> None:
+    """释放 DB 连接（短命令退出时用；REPL 长会话中不调用）。"""
+    await close_db()
 
 
 async def shutdown() -> None:
-    global _runtime_started
+    global _runtime_inited
+    end_long_session()
+    from app.code_analysis.services.file_analysis_service import FileAnalysisService
+    from app.code_analysis.services.lsp.lsp_service import CodeLSPService
+    from app.infrastructure.vector_store import get_vector_store_conn
+
     await FileAnalysisService.stop_global_scheduler()
     await CodeLSPService.close_all()
-    if VECTOR_STORE_CONN and hasattr(VECTOR_STORE_CONN, "close"):
+    conn = get_vector_store_conn()
+    if conn and hasattr(conn, "close"):
         try:
-            await VECTOR_STORE_CONN.close()
+            await conn.close()
         except Exception as e:
             logging.warning("关闭向量存储连接时出错: %s", e)
     await close_db()
-    _runtime_started = False
+    _runtime_inited = False

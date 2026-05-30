@@ -46,10 +46,11 @@ class Settings(BaseSettings):
     # =============================================================================
     # 向量存储配置 - Vector Store
     # =============================================================================
-    # 向量存储引擎类型 (elasticsearch, opensearch)
-    vector_store_engine: str = Field(default="elasticsearch", description="向量存储引擎类型", env="VECTOR_STORE_ENGINE")
-    # 向量存储映射文件名称
+    # 向量存储引擎类型 (lancedb, elasticsearch, opensearch)
+    vector_store_engine: str = Field(default="lancedb", description="向量存储引擎类型", env="VECTOR_STORE_ENGINE")
+    # 向量存储映射文件名称（elasticsearch/opensearch 使用）
     vector_store_mapping: str = Field(default="es_doc_mapping.json", description="向量存储映射文件名称", env="VECTOR_STORE_MAPPING")
+    lancedb_uri: str = Field(default="", description="LanceDB 本地目录，空则使用 {RUNTIME_DATA_DIR}/lancedb", env="LANCEDB_URI")
     
     # Elasticsearch配置
     es_hosts: str = Field(default="https://localhost:9200", description="Elasticsearch主机地址", env="ES_HOSTS")
@@ -116,13 +117,19 @@ class Settings(BaseSettings):
             return f"sqlite+aiosqlite:///{norm_path}"
 
     @property
+    def resolved_lancedb_uri(self) -> str:
+        if self.lancedb_uri.strip():
+            return os.path.abspath(self.lancedb_uri.strip())
+        return os.path.abspath(str(Path(self.runtime_data_dir) / "lancedb"))
+
+    @property
     def app_name(self) -> str:
         """应用名称(用于JWT issuer等)"""
         return APP_NAME
 
 
 # 全局配置实例
-settings = Settings() 
+settings = Settings()
 
 
 # 全局配置常量

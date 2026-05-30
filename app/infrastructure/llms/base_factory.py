@@ -295,9 +295,7 @@ class BaseModelFactory(ABC, Generic[T]):
                         return instance
         
         # 获取模型类
-        model_class = self._models[provider]
-        if not model_class:
-            raise ValueError(f"未知的模型类: {provider}")
+        model_class = self._get_model_class(provider)
         
         # 创建模型实例
         instance = model_class(
@@ -317,6 +315,12 @@ class BaseModelFactory(ABC, Generic[T]):
 
         return instance
     
+    def _get_model_class(self, provider: str) -> Type[T]:
+        model_class = self._models.get(provider)
+        if not model_class:
+            raise ValueError(f"未知的模型类: {provider}")
+        return model_class
+
     def _is_model_blocked(self, provider: str, model: str) -> bool:
         """判断模型是否处于熔断状态"""
         k = (provider, model)

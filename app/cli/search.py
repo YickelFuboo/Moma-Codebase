@@ -6,7 +6,7 @@ from app.code_analysis.services.codegraph.graph_search import CodeGraphSearch
 
 @click.group()
 def search() -> None:
-    """代码检索与图谱查询"""
+    """代码检索与图谱查询（支持一次性与交互模式）"""
 
 
 @search.command("similar")

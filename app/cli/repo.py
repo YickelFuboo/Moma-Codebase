@@ -14,7 +14,7 @@ from app.repo_mgmt.services.repo_resolver import RepoResolver
 
 @click.group()
 def repo() -> None:
-    """代码仓登记与管理"""
+    """代码仓登记与管理（支持一次性与交互模式）"""
 
 
 @repo.command("add")

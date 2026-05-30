@@ -116,6 +116,7 @@ class RepoAnalysisService:
             existing_graph_task = RepoAnalysisService._running_graph_tasks.get(repo_id)
             if not existing_graph_task or existing_graph_task.done():
                 async def _run_graph() -> None:
+                    generator = None
                     try:
                         generator = CodeGraphGenerator(
                             repo_id=repo_id,
@@ -126,10 +127,11 @@ class RepoAnalysisService:
                     except Exception as e:
                         logging.warning("代码图谱生成失败 repo_id=%s error=%s", repo_id, e)
                     finally:
-                        try:
-                            generator.close()
-                        except Exception:
-                            pass
+                        if generator:
+                            try:
+                                generator.close()
+                            except Exception:
+                                pass
 
                 RepoAnalysisService._running_graph_tasks[repo_id] = asyncio.create_task(_run_graph())
 
@@ -140,7 +142,7 @@ class RepoAnalysisService:
             "target_rel_path": normalized_target_rel_path,
             "is_directory": is_directory,
             "info": "scan is running",
-        } 
+        }
 
     @staticmethod
     async def _assert_scan_is_running(db, repo_id: str) -> None:
@@ -574,6 +576,10 @@ class RepoAnalysisService:
                 total += count
                 by_status[status] = by_status.get(status, 0) + count
             scan = await RepoAnalysisService.get_scan_status(repo_id)
+            in_memory_scan = (
+                repo_id in RepoAnalysisService._running_scan_tasks
+                and not RepoAnalysisService._running_scan_tasks[repo_id].done()
+            )
             analysis_summary = {
                 "total_files": total,
                 "pending_files": by_status.get(FileAnalysisStatus.PENDING.value, 0),
@@ -581,6 +587,7 @@ class RepoAnalysisService:
                 "completed_files": by_status.get(FileAnalysisStatus.COMPLETED.value, 0),
                 "failed_files": by_status.get(FileAnalysisStatus.FAILED.value, 0),
                 "skipped_files": by_status.get(FileAnalysisStatus.SKIPPED.value, 0),
+                "scan_active_in_process": in_memory_scan,
             }
             return {
                 "repo_id": repo_id,

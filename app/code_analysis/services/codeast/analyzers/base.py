@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+from app.utils.common import strip_utf8_bom
 from ..model import FileInfo
 
 
@@ -12,7 +13,7 @@ class LanguageAnalyzer(ABC):
     def _read_source_file(self) -> str:
         """与 CodeChunkService 一致：UTF-8，非法字节忽略。"""
         with open(self.file_path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()
+            return strip_utf8_bom(f.read())
 
     @abstractmethod
     async def analyze_file(self, source: Optional[str] = None) -> Optional[FileInfo]:

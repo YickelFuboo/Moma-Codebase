@@ -4,7 +4,7 @@ from app.infrastructure.database.migrate import upgrade_head
 
 @click.command("migrate")
 def migrate() -> None:
-    """执行数据库迁移（alembic upgrade head）"""
+    """执行数据库迁移（alembic upgrade head；支持一次性与交互模式）"""
     try:
         upgrade_head()
         click.echo("数据库迁移完成")

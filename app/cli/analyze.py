@@ -1,17 +1,26 @@
 import click
-from app.cli.common import echo_json, get_repo_by_path, run_async
+from app.cli.common import echo_json, get_repo_by_path, is_session_active, run_async
 from app.code_analysis.services.repo_analysis_service import RepoAnalysisService
 
 
-@click.group()
+class _AnalyzeGroup(click.Group):
+    """analyze 子命令仅允许在 pcb 交互模式中使用。"""
+
+    def invoke(self, ctx: click.Context) -> object:
+        if ctx.invoked_subcommand is not None and not is_session_active():
+            raise click.ClickException("analyze 命令请在 pcb 交互模式中使用（直接运行 pcb 进入）")
+        return super().invoke(ctx)
+
+
+@click.group(cls=_AnalyzeGroup)
 def analyze() -> None:
-    """代码仓分析任务"""
+    """代码仓分析任务（需在 pcb 交互模式中使用）"""
 
 
 @analyze.command("start")
 @click.option("--path", required=True, help="已登记的本地代码仓目录")
 def analyze_start(path: str) -> None:
-    """启动全仓扫描与分析"""
+    """登记仓库扫描（写入待分析表，由后台调度器消费）"""
 
     async def _start() -> None:
         repo = await get_repo_by_path(path)

@@ -46,6 +46,12 @@ def normalize_path(path: str) -> str:
     """规范化路径，统一使用正斜杠"""
     return path.replace("\\", "/")
 
+def strip_utf8_bom(text: str) -> str:
+    """去除 UTF-8 BOM（U+FEFF），避免 ast.parse 等解析器报 SyntaxError。"""
+    if text.startswith("\ufeff"):
+        return text[1:]
+    return text
+
 def increase_md_heading_levels(content: str, levels: int = 1) -> str:
     """将 markdown 标题层级整体增加 levels 级（# -> ##，## -> ###，最多 6 级）。"""
     if not content or levels <= 0:

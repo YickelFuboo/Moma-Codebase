@@ -21,10 +21,7 @@ class EmbeddingModelFactory(BaseModelFactory[BaseEmbedding]):
     
     @property
     def _models(self) -> Dict[str, Type[BaseEmbedding]]:
-        from .baai_embed import BAAIEmbedding
-
         return {
-            "baai": BAAIEmbedding,
             "openai": OpenAIEmbed,
             "azure": OpenAIEmbed,
             "baichuan": OpenAIEmbed,
@@ -42,6 +39,12 @@ class EmbeddingModelFactory(BaseModelFactory[BaseEmbedding]):
             "voyage": VoyageEmbed,
             "huggingface": HuggingFaceEmbed,
         }
+
+    def _get_model_class(self, provider: str) -> Type[BaseEmbedding]:
+        if provider == "baai":
+            from .baai_embed import BAAIEmbedding
+            return BAAIEmbedding
+        return super()._get_model_class(provider)
 
     def __init__(self):
         super().__init__("embedding_models.json")
