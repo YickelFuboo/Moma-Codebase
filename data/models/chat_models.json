@@ -1,0 +1,195 @@
+{
+  "_comment": "LLM聊天模型配置文件。实例可选 timeout_connect/timeout_read/timeout_write/timeout_pool(秒)，默认 connect=30 read=300 write=120 pool=30",
+  "default": {
+    "provider": "huoshanfangzhou",
+    "model": "glm-4.7"
+  },
+  "models": {
+    "openai": {
+      "description": "OpenAI GPT系列模型",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "",
+      "is_valid": 0,
+      "instances": {
+        "gpt-4o": {
+          "description": "OpenAI GPT-4o 通用版本",
+          "context_limit": null,
+          "max_tokens": 4096
+        },
+        "gpt-4o-mini": {
+          "description": "OpenAI GPT-4o Mini 轻量版本",
+          "context_limit": null,
+          "max_tokens": 4096
+        },
+        "gpt-4-turbo": {
+          "description": "OpenAI GPT-4 Turbo",
+          "context_limit": null,
+          "max_tokens": 4096
+        }
+      }
+    },
+    "deepseek": {
+      "description": "DeepSeek系列模型",
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key": "sk-d58716e57320414dbc3cb0630fa63573",
+      "is_valid": 1,
+      "instances": {
+        "deepseek-chat": {
+          "description": "DeepSeek Chat 最新版本",
+          "context_limit": 100000,
+          "max_tokens": 8192,
+          "timeout_read": 360
+        },
+        "deepseek-reasoner": {
+          "description": "DeepSeek Reasoner 推理专用模型",
+          "context_limit": 100000,
+          "max_tokens": 8192,
+          "timeout_read": 720
+        }
+      }
+    },
+    "qwen": {
+      "description": "阿里云通义千问系列模型",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_key": "",
+      "is_valid": 0,
+      "instances": {
+        "qwen-max": {
+          "description": "通义千问Max 最强版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "qwen-plus": {
+          "description": "通义千问Plus 增强版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        }
+      }
+    },
+    "siliconflow": {
+      "description": "SiliconFlow系列模型",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key": "sk-fpjtzotykpynqzkajwbkzozdryscztuuhlaqjwwqtwkvluql",
+      "is_valid": 1,
+      "instances": {
+        "llama-3.3-70b-instruct": {
+          "description": "LLaMA 3.3 70B指令版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "llama-3.3-8b-instruct": {
+          "description": "LLaMA 3.3 8B指令版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "deepseek-ai/DeepSeek-V3.2": {
+          "description": "DeepSeek V3.2 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "Qwen/Qwen3.5-122B-A10B": {
+          "description": "Qwen3.5 122B A10B 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "zai-org/GLM-4.6": {
+          "description": "GLM-4.6 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "zai-org/GLM-4.5": {
+          "description": "GLM-5 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "Pro/MiniMaxAI/MiniMax-M2.5": {
+          "description": "MiniMax-M2.5 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        }
+      }
+    },
+    "claude": {
+      "description": "Anthropic Claude系列模型",
+      "base_url": "https://api.anthropic.com",
+      "api_key": "",
+      "is_valid": 0,
+      "instances": {
+        "claude-3.5-sonnet-20241022": {
+          "description": "Claude 3.5 Sonnet 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "claude-3.5-sonnet": {
+          "description": "Claude 3.5 Sonnet 通用版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        }
+      }
+    },
+    "zhipu": {
+      "description": "智谱AI系列模型",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "api_key": "d9d27a1a5fe84f1489e009ee0bfaba87.v6n1LcdOlRzy67lS",
+      "is_valid": 1,
+      "instances": {
+        "glm-5": {
+          "description": "智谱AI GLM-5 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "glm-4.7": {
+          "description": "智谱AI GLM-4.7 最新版本",
+          "context_limit": null,
+          "max_tokens": 4096
+        },
+        "glm-4.5": {
+          "description": "智谱AI GLM-4.5 最新版本",
+          "context_limit": null,
+          "max_tokens": 4096
+        }
+      }
+    },
+    "huoshanfangzhou": {
+      "description": "火山方舟系列模型",
+      "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "api_key": "5f868cab-df97-4768-8700-a90e310b5430",
+      "is_valid": 1,
+      "instances": {
+        "minimax-m2.5": {
+          "description": "火山方舟MiniMax-M2.5 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "glm-4.7": {
+          "description": "火山方舟Qwen-Max 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "deepseek-v3.2": {
+          "description": "火山方舟DeepSeek-V3.2 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        },
+        "kimi-k2.5": {
+          "description": "火山方舟Kimi-K2.5 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        }
+      }
+    },
+    "MiniMax": {
+      "description": "MiniMax系列模型",
+      "base_url": "https://api.minimaxi.com/v1",
+      "api_key": "",
+      "is_valid": 0,
+      "instances": {
+        "minimax-m2.5": {
+          "description": "MiniMax-M2.5 最新版本",
+          "context_limit": null,
+          "max_tokens": 8192
+        }
+      }
+    }
+  }
+}
