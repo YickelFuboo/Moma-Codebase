@@ -8,10 +8,9 @@ import tarfile
 import brotli
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, and_, or_
-from fastapi import UploadFile
 from app.config.settings import settings
 from app.repo_mgmt.schemes.git_repo_mgmt import CreateRepositoryFromUrl, UpdateRepository
 from app.repo_mgmt.services.remote_git_service import RemoteGitService
@@ -96,7 +95,7 @@ class GitRepositoryService:
         user_id: str, 
         name: str, 
         description: str, 
-        file: UploadFile) -> GitRepository:
+        file: Any) -> GitRepository:
         """通过上传压缩包创建仓库"""
         try:
             # 检查仓库是否已存在

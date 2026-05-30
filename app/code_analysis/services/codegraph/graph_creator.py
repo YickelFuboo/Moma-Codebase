@@ -13,25 +13,36 @@ class CodeGraphGenerator:
         self.repo_id = repo_id
         self.repo_name = repo_name
         self.repo_local_path = repo_local_path
-        
-        self.db_client = Neo4jService(
-            settings.neo4j_uri,
-            settings.neo4j_user,
-            settings.neo4j_password
-        )
+        self.db_client = None
+        if settings.code_graph_enabled:
+            self.db_client = Neo4jService(
+                settings.neo4j_uri,
+                settings.neo4j_user,
+                settings.neo4j_password,
+            )
 
     def close(self) -> None:
         if self.db_client:
             self.db_client.close()
+            self.db_client = None
 
     async def delete_repo_graph(self) -> None:
+        if not settings.code_graph_enabled:
+            return
         self.db_client.delete_repo_nodes(self.repo_id)
 
     async def delete_file_graph(self, rel_file_path: str) -> None:
+        if not settings.code_graph_enabled:
+            return
         self.db_client.delete_file_nodes(self.repo_id, normalize_path(rel_file_path))
 
     async def generate_graph(self, clean_stale: bool = False):
         """生成或更新完整的代码知识图谱"""
+        if not settings.code_graph_enabled:
+            logging.info("CODE_GRAPH_ENABLED=false，跳过图谱生成 repo_id=%s", self.repo_id)
+            return
+        if not self.db_client:
+            return
         start_time = local_now_iso()
 
         # 创建或更新项目节点
@@ -55,16 +66,9 @@ class CodeGraphGenerator:
         return root_folder
 
     async def update_files(self, file_paths: List[str]):
-        """增量更新指定文件
-        
-        处理流程：
-        1. 删除每个文件相关的所有节点（函数、类、方法等）
-        2. 重新分析文件生成新的节点
-        3. 保存新的节点到图谱
-        
-        Args:
-            file_paths: 需要更新的文件路径列表
-        """
+        """增量更新指定文件"""
+        if not settings.code_graph_enabled or not self.db_client:
+            return
         for file_path in file_paths:
             if not os.path.isfile(file_path):
                 continue
@@ -89,16 +93,9 @@ class CodeGraphGenerator:
                 continue
 
     async def update_folders(self, folder_paths: List[str]):
-        """增量更新指定文件夹
-        
-        处理流程：
-        1. 删除每个文件夹相关的所有节点（包括子文件夹、文件、函数、类、方法等）
-        2. 重新分析文件夹生成新的节点
-        3. 保存新的节点到图谱
-        
-        Args:
-            folder_paths: 需要更新的文件夹路径列表
-        """
+        """增量更新指定文件夹"""
+        if not settings.code_graph_enabled or not self.db_client:
+            return
         for folder_path in folder_paths:
             if not os.path.isdir(folder_path):
                 continue

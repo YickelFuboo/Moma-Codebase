@@ -10812,7 +10812,6 @@ files = [
 ]
 
 [package.dependencies]
-cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"cryptography\""}
 ecdsa = "!=0.15"
 pyasn1 = ">=0.5.0"
 rsa = ">=4.0,<4.1.1 || >4.1.1,<4.4 || >4.4,<5.0"
@@ -15227,4 +15226,4 @@ reference = "aliyun"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "860fe3e4b7eb3ec6240e70ce5f72fdce934fa34db95570c5cebd037ad714c503"
+content-hash = "d50ff4c946b8a4c2c27129664db509b3ea5b1851926496f03d660493e39f2d9f"

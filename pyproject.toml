@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "Pando-CodeBase-Plugin"
 version = "0.1.0"
-description = "代码仓分析服务"
+description = "代码仓分析 CLI 工具"
 authors = ["Your Name <your.email@example.com>"]
 packages = [{include = "app"}]
 
@@ -10,15 +10,10 @@ python = ">=3.10,<3.13"
 
 
 # =============================================================================
-# 服务框架
+# CLI / 核心
 # =============================================================================
-fastapi = "0.116.2"
-uvicorn = "0.23.1"
 pydantic = ">=2.9.0,<2.10.0"
 pydantic-settings = "2.10.1"
-python-multipart = "0.0.20"
-python-jose = {extras = ["cryptography"], version = "3.5.0"}
-PyJWT = "2.9.0"
 aiohttp = "3.12.15"
 GitPython = "3.1.45"
 jina = "3.34.0"
@@ -228,4 +223,4 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 priority = "supplemental"
 
 [tool.poetry.scripts]
-start = "app.main:main"
+pcb = "app.cli.main:cli"

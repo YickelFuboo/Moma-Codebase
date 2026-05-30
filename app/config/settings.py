@@ -63,8 +63,9 @@ class Settings(BaseSettings):
     os_password: str = Field(default="admin", description="OpenSearch密码", env="OS_PASSWORD")
 
     # =============================================================================
-    # 图数据库配置
+    # 图数据库 / CodeGraph
     # =============================================================================
+    code_graph_enabled: bool = Field(default=True, description="是否启用代码依赖图谱（Neo4j CodeGraph）", env="CODE_GRAPH_ENABLED")
     neo4j_uri: str = Field(default="neo4j://localhost:7687", description="图数据库URI", env="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", description="图数据库用户名", env="NEO4J_USER")
     neo4j_password: str = Field(default="neo4jneo4j", description="图数据库密码", env="NEO4J_PASSWORD")

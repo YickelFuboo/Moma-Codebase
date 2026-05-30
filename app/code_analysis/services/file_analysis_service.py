@@ -11,6 +11,7 @@ from app.code_analysis.services.codeast.ast_analyzer import FileAstAnalyzer
 from app.code_analysis.services.codechunk.code_chunk import CodeChunkService
 from app.code_analysis.services.codegraph.graph_creator import CodeGraphGenerator
 from app.code_analysis.services.codevector.code_vector import CodeVectorService
+from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.utils.common import normalize_path
 
@@ -376,16 +377,19 @@ class FileAnalysisService:
         )
 
         # 删除 codegraph 中该文件对应数据
-        try:
-            generator = CodeGraphGenerator(repo_id,"","")
-            await generator.delete_file_graph(normalized_file_path)
-        except Exception as e:
-            logging.warning("删除文件 codegraph 数据失败 repo_id=%s file_path=%s error=%s", repo_id, normalized_file_path, e)
-        finally:
+        if settings.code_graph_enabled:
+            generator = None
             try:
-                generator.close()
-            except Exception:
-                pass
+                generator = CodeGraphGenerator(repo_id, "", "")
+                await generator.delete_file_graph(normalized_file_path)
+            except Exception as e:
+                logging.warning("删除文件 codegraph 数据失败 repo_id=%s file_path=%s error=%s", repo_id, normalized_file_path, e)
+            finally:
+                if generator:
+                    try:
+                        generator.close()
+                    except Exception:
+                        pass
 
         return {
             "repo_id": repo_id,

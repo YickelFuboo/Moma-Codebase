@@ -10,6 +10,7 @@ from app.repo_mgmt.models.git_repo_mgmt import GitRepository
 from app.code_analysis.services.codegraph.graph_creator import CodeGraphGenerator
 from app.code_analysis.services.file_analysis_service import FileAnalysisService
 from app.code_analysis.services.codevector.code_vector import CodeVectorService
+from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.utils.common import normalize_path
 
@@ -111,20 +112,26 @@ class RepoAnalysisService:
         RepoAnalysisService._running_scan_tasks[repo_id] = scanning_task
 
         # 同步启动代码图谱生成（后台任务，不阻塞扫描启动返回）
-        existing_graph_task = RepoAnalysisService._running_graph_tasks.get(repo_id)
-        if not existing_graph_task or existing_graph_task.done():
-            async def _run_graph() -> None:
-                try:
-                    generator = CodeGraphGenerator(
-                        repo_id=repo_id,
-                        repo_name=str(repo_id),
-                        repo_local_path=repo_path or "",
-                    )
-                    await generator.generate_graph(clean_stale=True)
-                except Exception as e:
-                    logging.warning("代码图谱生成失败 repo_id=%s error=%s", repo_id, e)
+        if settings.code_graph_enabled:
+            existing_graph_task = RepoAnalysisService._running_graph_tasks.get(repo_id)
+            if not existing_graph_task or existing_graph_task.done():
+                async def _run_graph() -> None:
+                    try:
+                        generator = CodeGraphGenerator(
+                            repo_id=repo_id,
+                            repo_name=str(repo_id),
+                            repo_local_path=repo_path or "",
+                        )
+                        await generator.generate_graph(clean_stale=True)
+                    except Exception as e:
+                        logging.warning("代码图谱生成失败 repo_id=%s error=%s", repo_id, e)
+                    finally:
+                        try:
+                            generator.close()
+                        except Exception:
+                            pass
 
-            RepoAnalysisService._running_graph_tasks[repo_id] = asyncio.create_task(_run_graph())
+                RepoAnalysisService._running_graph_tasks[repo_id] = asyncio.create_task(_run_graph())
 
         return {
             "repo_id": repo_id,
@@ -660,13 +667,16 @@ class RepoAnalysisService:
             logging.warning("删除 repo 向量数据失败 repo_id=%s error=%s", repo_id, e)
 
         # 删除 codegraph 中该 repo 的全部数据
-        try:
-            generator = CodeGraphGenerator(repo_id,"","")
-            await generator.delete_repo_graph()
-        except Exception as e:
-            logging.warning("删除 repo codegraph 数据失败 repo_id=%s error=%s", repo_id, e)
-        finally:
+        if settings.code_graph_enabled:
+            generator = None
             try:
-                generator.close()
-            except Exception:
-                pass
+                generator = CodeGraphGenerator(repo_id, "", "")
+                await generator.delete_repo_graph()
+            except Exception as e:
+                logging.warning("删除 repo codegraph 数据失败 repo_id=%s error=%s", repo_id, e)
+            finally:
+                if generator:
+                    try:
+                        generator.close()
+                    except Exception:
+                        pass

@@ -9,10 +9,20 @@ from .neo4j_service import Neo4jService
 class CodeGraphSearch:
     def __init__(self):
         """初始化查询工具"""
-        self.db_client = Neo4jService(
-            settings.neo4j_uri,
-            settings.neo4j_user,
-            settings.neo4j_password
+        self.db_client = None
+        if settings.code_graph_enabled:
+            self.db_client = Neo4jService(
+                settings.neo4j_uri,
+                settings.neo4j_user,
+                settings.neo4j_password,
+            )
+
+    @staticmethod
+    def _disabled_response() -> QueryResponse:
+        return QueryResponse(
+            result=False,
+            content={},
+            message="CodeGraph 未启用，请在 env 中设置 CODE_GRAPH_ENABLED=true",
         )
     
     def __enter__(self):
@@ -25,6 +35,8 @@ class CodeGraphSearch:
     
     async def query_dependents_of_file(self, repo_id: str, file_path: str) -> QueryResponse:
         """查询依赖本文件的其他文件列表。"""
+        if not settings.code_graph_enabled:
+            return self._disabled_response()
         try:
             normalized_file_path = normalize_path(os.path.normpath(file_path))
             dependents: List[str] = self.db_client.query_dependents_of_file(repo_id, normalized_file_path)
@@ -41,6 +53,8 @@ class CodeGraphSearch:
 
     async def query_dependented_of_file(self, repo_id: str, file_path: str) -> QueryResponse:
         """查询本文件被依赖（即本文件依赖的其他文件列表）。"""
+        if not settings.code_graph_enabled:
+            return self._disabled_response()
         try:
             normalized_file_path = normalize_path(os.path.normpath(file_path))
             dependented: List[str] = self.db_client.query_dependented_of_file(repo_id, normalized_file_path)
@@ -57,6 +71,8 @@ class CodeGraphSearch:
 
     async def query_file_summary(self, repo_id: str, file_paths: List[str]) -> QueryResponse:
         """查询文件内容概述（包含类/方法/顶层函数清单）。"""
+        if not settings.code_graph_enabled:
+            return self._disabled_response()
         try:
             normalized_paths = [normalize_path(os.path.normpath(p)) for p in file_paths]
             records = self.db_client.query_file_summary(repo_id, normalized_paths)
