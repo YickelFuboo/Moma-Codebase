@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "Pando-CodeBase-Plugin"
+name = "MOMA-RepoBase"
 version = "0.1.0"
 description = "代码仓分析 CLI 工具"
 authors = ["Your Name <your.email@example.com>"]
@@ -223,4 +223,4 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 priority = "supplemental"
 
 [tool.poetry.scripts]
-pcb = "app.cli.main:cli"
+mrb = "app.cli.main:cli"

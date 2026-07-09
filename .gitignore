@@ -51,8 +51,8 @@ config.toml
 !config.template.toml
 
 # ai 信息
-.Pando/
-.pando/
+.MOMA-RepoBase/
+.moma-repobase/
 .Agent/
 .agent/
 

@@ -37,7 +37,7 @@ def build_cli() -> click.Group:
     @click.pass_context
     @click.version_option(APP_VERSION, prog_name=APP_NAME)
     def cli(ctx: click.Context) -> None:
-        """Pando CodeBase 代码仓分析工具"""
+        """MOMA RepoBase 代码仓分析工具"""
         if ctx.invoked_subcommand is None:
             from app.cli.shell import run_shell
             run_shell()

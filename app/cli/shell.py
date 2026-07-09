@@ -20,7 +20,7 @@ def _split_cli_line(line: str) -> list[str]:
 
 def _run_cli_line(line: str) -> None:
     try:
-        _get_cli().main(args=_split_cli_line(line), prog_name="pcb", standalone_mode=True)
+        _get_cli().main(args=_split_cli_line(line), prog_name="mrb", standalone_mode=True)
     except SystemExit as exc:
         if exc.code not in (0, None):
             print(f"[exit {exc.code}]", file=sys.stderr)
@@ -34,19 +34,19 @@ async def _async_main() -> None:
     await ensure_scheduler()
     loop = asyncio.get_running_loop()
     begin_session(loop)
-    print("Pando CodeBase 交互模式 — 输入命令时可省略 pcb 前缀")
+    print("MOMA RepoBase 交互模式 — 输入命令时可省略 mrb 前缀")
     print("  repo / search / migrate：交互与一次性命令均支持")
     print("  analyze：仅交互模式（本窗口）")
     print("示例：")
     print("  repo list")
     print("  search similar --path F:/myproject --code \"def foo\"")
     print("  analyze start --path F:/myproject")
-    print("一次性用法：poetry run pcb repo list / pcb search similar ...")
+    print("一次性用法：poetry run mrb repo list / mrb search similar ...")
     print("输入 help 查看命令，exit / quit 退出\n")
     try:
         while True:
             try:
-                line = await asyncio.to_thread(input, "pcb> ")
+                line = await asyncio.to_thread(input, "mrb> ")
             except (EOFError, KeyboardInterrupt):
                 print()
                 break
@@ -54,7 +54,7 @@ async def _async_main() -> None:
             if not line or line.lower() in ("exit", "quit"):
                 break
             if line.lower() in ("help", "?"):
-                _get_cli().main(args=["--help"], prog_name="pcb", standalone_mode=True)
+                _get_cli().main(args=["--help"], prog_name="mrb", standalone_mode=True)
                 continue
             await asyncio.to_thread(_run_cli_line, line)
     finally:
