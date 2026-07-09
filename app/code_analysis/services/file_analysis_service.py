@@ -30,15 +30,17 @@ class FileAnalysisService:
     @staticmethod
     def start_global_scheduler(
         interval_seconds: float = 2.0,
-        worker_count: int = 2,
+        worker_count: Optional[int] = None,
     ) -> bool:
         """启动全局调度循环。
         Args:
             interval_seconds: 调度间隔时间(秒)。
-            worker_count: 每仓worker数量。
+            worker_count: 每仓worker数量；None 时使用 settings.code_analysis_file_worker_count。
         Returns:
             bool: 是否启动成功。
         """
+        if worker_count is None:
+            worker_count = settings.code_analysis_file_worker_count
         scheduler_task = FileAnalysisService._scheduler_task
         if scheduler_task and not scheduler_task.done(): # 如果调度任务正在运行，则返回False
             return False
@@ -50,6 +52,7 @@ class FileAnalysisService:
                 worker_count=worker_count,
             )
         )
+        logging.info("文件分析调度器已启动 worker_count=%s interval=%ss", worker_count, interval_seconds)
         return True
 
     @staticmethod
@@ -300,6 +303,13 @@ class FileAnalysisService:
         try:
             source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
             chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
+            if not settings.code_analysis_symbol_summary_enabled:
+                await CodeVectorService.vectorize_and_store_line_chunks(
+                    repo_id,
+                    rel_file_path,
+                    chunks,
+                )
+                return True, None
             # 行块向量与 AST 互不依赖：并行以缩短墙钟时间；return_exceptions=True 避免一方失败时取消另一方（防止向量写入被中途取消）
             async def _line_chunk_vectors() -> None:
                 await CodeVectorService.vectorize_and_store_line_chunks(

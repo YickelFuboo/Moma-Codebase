@@ -89,6 +89,8 @@ class Settings(BaseSettings):
     code_analysis_line_chunk_overlap_lines: int = Field(default=1, description="行切片滑动重叠行数", env="CODE_ANALYSIS_LINE_CHUNK_OVERLAP_LINES")
     code_analysis_line_chunk_max_lines: int = Field(default=200, description="单行切片经扩展后的最大行数上限", env="CODE_ANALYSIS_LINE_CHUNK_MAX_LINES")
     code_analysis_symbol_summary_llm_concurrency: int = Field(default=4, ge=1, le=32, description="符号摘要阶段 LLM 并发上限", env="CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY")
+    code_analysis_symbol_summary_enabled: bool = Field(default=True, description="是否启用符号 LLM 摘要与符号向量；关闭时仅行片段向量化", env="CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED")
+    code_analysis_file_worker_count: int = Field(default=10, ge=1, le=64, description="单仓库文件分析 worker 并发数", env="CODE_ANALYSIS_FILE_WORKER_COUNT")
 
     repo_storage_path: str = Field(default="./data/repos", description="远程克隆/上传仓库的本地存储根目录", env="REPO_STORAGE_PATH")
     enable_incremental_scan: bool = Field(default=True, description="是否启用定时增量扫描", env="ENABLE_INCREMENTAL_SCAN")
