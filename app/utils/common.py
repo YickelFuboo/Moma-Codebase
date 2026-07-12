@@ -6,7 +6,7 @@ from pathlib import Path
 import tomllib
 
 
-def get_project_meta(package_name: str = "MOMA-RepoBase"):
+def get_project_meta(package_name: str = "MomaCodeBase"):
     """从 pyproject.toml 读取项目元数据"""
     toml_path = Path(__file__).parent.parent.parent / "pyproject.toml"
     if not toml_path.exists():

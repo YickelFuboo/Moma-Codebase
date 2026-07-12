@@ -99,7 +99,7 @@ def setup_logging():
     }
     log_level = level_mapping.get(log_level_str, logging.INFO)
     
-    # 第三方库 HTTP 请求日志默认打到 INFO，会淹没交互式 mrb> 提示符
+    # 第三方库 HTTP 请求日志默认打到 INFO，会淹没交互式 mcb> 提示符
     for noisy_logger in ("httpx", "httpcore", "urllib3", "openai", "anthropic"):
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 

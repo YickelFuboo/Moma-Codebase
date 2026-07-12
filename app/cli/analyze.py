@@ -4,17 +4,17 @@ from app.code_analysis.services.repo_analysis_service import RepoAnalysisService
 
 
 class _AnalyzeGroup(click.Group):
-    """analyze 子命令仅允许在 mrb 交互模式中使用。"""
+    """analyze 子命令仅允许在 mcb 交互模式中使用。"""
 
     def invoke(self, ctx: click.Context) -> object:
         if ctx.invoked_subcommand is not None and not is_session_active():
-            raise click.ClickException("analyze 命令请在 mrb 交互模式中使用（直接运行 mrb 进入）")
+            raise click.ClickException("analyze 命令请在 mcb 交互模式中使用（直接运行 mcb 进入）")
         return super().invoke(ctx)
 
 
 @click.group(cls=_AnalyzeGroup)
 def analyze() -> None:
-    """代码仓分析任务（需在 mrb 交互模式中使用）"""
+    """代码仓分析任务（需在 mcb 交互模式中使用）"""
 
 
 @analyze.command("start")

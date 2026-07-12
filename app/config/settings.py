@@ -11,7 +11,7 @@ APP_NAME = _meta["name"]
 APP_VERSION = _meta["version"]
 APP_DESCRIPTION = _meta["description"]
 APP_BASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_RUNTIME_DATA_DIR = Path.home() / ".moma-repobase"
+DEFAULT_RUNTIME_DATA_DIR = Path.home() / ".moma-codebase"
 
 
 class Settings(BaseSettings):
