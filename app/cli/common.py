@@ -72,6 +72,7 @@ def repo_public_view(repo: GitRepository) -> dict[str, Any]:
     return {
         "path": RepoResolver.normalize_repo_path(repo.local_path) if repo.local_path else None,
         "name": repo.repository_name,
+        "kind": getattr(repo, "kind", None) or "code",
         "description": repo.description or "",
         "git_provider": repo.git_provider,
         "repository_url": repo.repository_url or "",

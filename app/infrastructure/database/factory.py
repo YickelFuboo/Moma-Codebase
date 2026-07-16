@@ -105,7 +105,7 @@ _database_factory = DatabaseFactory()
 
 # 通过以来注释方式使用，通过全局方法方式对外暴漏
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """获取数据库会话 - FastAPI依赖注入使用"""
+    """获取数据库会话（兼容旧依赖注入写法）"""
     global _database_factory
 
     # 使用新的懒加载 + 健康检查机制

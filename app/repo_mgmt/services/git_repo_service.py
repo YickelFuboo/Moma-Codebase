@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, and_, or_
 from app.config.settings import settings
 from app.repo_mgmt.schemes.git_repo_mgmt import CreateRepositoryFromUrl, UpdateRepository
-from app.repo_mgmt.models.git_repo_mgmt import GitRepository
+from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
 
 
 def _remote_git():
@@ -64,6 +64,7 @@ class GitRepositoryService:
                 organization=repo_organization,
                 repository_name=repo_name,
                 description=create_data.description,
+                kind=RepoKind.CODE,
                 branch=create_data.branch,
                 local_path=local_repo_path,
                 is_cloned=False,
@@ -147,6 +148,7 @@ class GitRepositoryService:
                 organization="uploaded",  # 上传方式没有组织
                 repository_name=name,
                 description=description,
+                kind=RepoKind.CODE,
                 branch="main",  # 上传方式默认分支
                 local_path=local_path,
                 is_cloned=False,
@@ -217,19 +219,25 @@ class GitRepositoryService:
     
     @staticmethod
     async def create_repository_from_path(
-        session: AsyncSession, 
-        user_id: str, 
-        name: str, 
-        description: str, 
+        session: AsyncSession,
+        user_id: str,
+        name: str,
+        description: str,
         local_repo_path: str,
-        git_url: str) -> GitRepository:
+        git_url: str,
+        kind: str = RepoKind.CODE,
+    ) -> GitRepository:
         """通过指定路径创建仓库"""
         try:
+            kind_value = (kind or RepoKind.CODE).strip().lower()
+            if kind_value not in RepoKind.VALUES:
+                raise ValueError(f"无效 kind={kind!r}，仅支持: {', '.join(RepoKind.VALUES)}")
+
             # 验证服务端路径
             GitRepositoryService._validate_repo_path(local_repo_path)
-            
-            repo_url=git_url.strip() if git_url else ""
-            
+
+            repo_url = git_url.strip() if git_url else ""
+
             # 检查仓库是否已存在
             existing_repo = await session.execute(
                 select(GitRepository).where(
@@ -239,15 +247,15 @@ class GitRepositoryService:
             )
             if existing_repo.scalar_one_or_none():
                 raise ValueError("仓库已存在")
-            
+
             # 解析git URL获取provider和organization（允许无远端URL的本地仓）
             if repo_url:
-                git_provider = _remorepote_git().get_git_provider(repo_url) or "local"
+                git_provider = _remote_git().get_git_provider(repo_url) or "local"
                 organization, _ = _remote_git().get_git_url_info(repo_url)
             else:
                 git_provider = "local"
                 organization = "local"
-            
+
             # 创建仓库记录
             repository = GitRepository(
                 id=str(uuid.uuid4()),
@@ -257,19 +265,25 @@ class GitRepositoryService:
                 organization=organization,
                 repository_name=name,
                 description=description,
-                branch="main",  # 路径方式默认分支
-                local_path=local_repo_path,  # 直接使用服务端路径
+                kind=kind_value,
+                branch="main",
+                local_path=local_repo_path,
                 is_cloned=False,
                 last_sync_time=None
             )
-            
+
             session.add(repository)
             await session.commit()
             await session.refresh(repository)
-            
-            logging.info(f"Created repository from path: {repository.repository_name} by user {user_id}")
+
+            logging.info(
+                "Created repository from path: %s kind=%s by user %s",
+                repository.repository_name,
+                kind_value,
+                user_id,
+            )
             return repository
-            
+
         except Exception as e:
             logging.error(f"创建路径仓库失败: {str(e)}")
             raise
@@ -428,8 +442,8 @@ class GitRepositoryService:
             
             # 清理该仓库的分析数据（文件分析状态 + 相关向量）
             try:
-                from app.code_analysis.services.repo_analysis_service import RepoAnalysisService
-                await RepoAnalysisService.delete_repo_analysis_data(repository_id)
+                from app.repo_analysis.services.analysis_service import AnalysisService
+                await AnalysisService.delete_repo_analysis_data(repository_id)
             except Exception as e:
                 logging.warning("删除仓库前清理分析数据失败 repo_id=%s error=%s", repository_id,e)
 

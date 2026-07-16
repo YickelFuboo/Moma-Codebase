@@ -38,7 +38,7 @@ async def init_runtime() -> None:
 
 async def ensure_scheduler() -> None:
     """启动文件分析全局调度器（幂等，等同原 main 启动阶段）。"""
-    from app.code_analysis.services.file_analysis_service import FileAnalysisService
+    from app.repo_analysis.services.file_analysis_service import FileAnalysisService
     FileAnalysisService.start_global_scheduler()
 
 
@@ -55,8 +55,8 @@ async def release_runtime() -> None:
 async def shutdown() -> None:
     global _runtime_inited
     end_long_session()
-    from app.code_analysis.services.file_analysis_service import FileAnalysisService
-    from app.code_analysis.services.lsp.lsp_service import CodeLSPService
+    from app.repo_analysis.services.file_analysis_service import FileAnalysisService
+    from app.repo_analysis.services.lsp.lsp_service import CodeLSPService
     from app.infrastructure.vector_store import get_vector_store_conn
 
     await FileAnalysisService.stop_global_scheduler()

@@ -17,8 +17,6 @@ DEFAULT_RUNTIME_DATA_DIR = Path.home() / ".moma-codebase"
 class Settings(BaseSettings):
     """应用配置类"""
 
-    service_host: str = Field(default="0.0.0.0", description="服务主机地址", env="SERVICE_HOST")
-    service_port: int = Field(default=8000, description="服务端口", env="SERVICE_PORT")
     debug: bool = Field(default=False, description="调试模式", env="DEBUG")
     app_log_level: str = Field(default="INFO", description="日志级别", env="APP_LOG_LEVEL")
 
@@ -66,8 +64,13 @@ class Settings(BaseSettings):
     # =============================================================================
     # 图数据库 / CodeGraph
     # =============================================================================
-    code_graph_enabled: bool = Field(default=True, description="是否启用代码依赖图谱（Neo4j CodeGraph）", env="CODE_GRAPH_ENABLED")
-    neo4j_uri: str = Field(default="neo4j://localhost:7687", description="图数据库URI", env="NEO4J_URI")
+    code_graph_enabled: bool = Field(default=True, description="是否启用代码依赖图谱", env="CODE_GRAPH_ENABLED")
+    code_graph_provider: str = Field(
+        default="codegraph",
+        description="CodeGraph 实现：codegraph（开源 CLI，默认）| builtin（自研 Neo4j）",
+        env="CODE_GRAPH_PROVIDER",
+    )
+    neo4j_uri: str = Field(default="neo4j://localhost:7687", description="图数据库URI（builtin 使用）", env="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", description="图数据库用户名", env="NEO4J_USER")
     neo4j_password: str = Field(default="neo4jneo4j", description="图数据库密码", env="NEO4J_PASSWORD")
     neo4j_pool_size: int = Field(default=5, description="连接池大小", env="NEO4J_POOL_SIZE")

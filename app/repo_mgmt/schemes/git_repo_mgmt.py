@@ -57,6 +57,7 @@ class RepositoryInfo(BaseModel):
     organization: str = Field(..., description="组织")
     repository_name: str = Field(..., description="仓库名称")
     description: str = Field(..., description="仓库描述")
+    kind: str = Field(default="code", description="类型: code|lib")
     branch: str = Field(..., description="分支")
     
     # 路径信息

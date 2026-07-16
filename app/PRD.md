@@ -11,7 +11,7 @@
 一、代码仓解析处理
 1）支持对代码仓进行源码片段切面，并进行向量化。后续编码Agent可以基于描述查找代码片段、简介查找可能已需求相关的文件与函数。后续Agent也可以直接需要编码的代码逻辑，直接查找代码仓中是否已有相似的逻辑作为参考。
 2）支持对代码仓中所有类、函数进行使用大模型概要总结，并对概要总向量化存储。后续方面编码Agent根据描述找到可能与需求相关的类、函数以及所在文件。
-3）调用开源软件CodeGraph，对代码仓结构进行解析，并吧CodeGraph的接口封装提供本项目CLI的检索接口。
+3）通过 CodeGraph 对代码仓结构进行解析，并封装为本项目统一图谱能力（Gateway + CLI）。CodeGraph 提供统一入口，由 ENV `CODE_GRAPH_PROVIDER` 选择实现：`codegraph`（开源 CLI，默认）或 `builtin`（自研 Neo4j）。交互 CLI 启动时检查开源 CLI 是否已安装，缺失则尝试自动安装。封装能力覆盖：**文件级依赖方向查询**、**符号级调用关系查询**、**文件符号摘要**，以及图谱生成/增量更新（详见「2.1 CodeGraph 封装能力」）。
 
 二、Lib库解析处理
 对Lib库中的所有接口进行功能、参数等总结，切片存储，方面后续编码Agent根据需要检索可能相关Lib库。
@@ -44,11 +44,65 @@
 
 ## 2. 启动依赖：CodeGraph
 
-本项目依赖开源 **CodeGraph**。在 `mcb` 启动时（进入交互模式，以及执行依赖图谱能力的一次性命令前）须：
+本项目依赖 CodeGraph，并通过 `CodeGraphGateway` 统一对外。配置：
 
-1. 检查运行机是否已安装可用的 CodeGraph；
-2. 若未安装或不可用，自动安装（或引导完成安装）后再继续；
-3. 安装/检测失败时，给出明确错误信息；图谱相关能力不可用时不得静默跳过（除非配置显式关闭图谱，见 env `CODE_GRAPH_ENABLED`）。
+| ENV | 含义 | 默认 |
+|-----|------|------|
+| `CODE_GRAPH_ENABLED` | 是否启用图谱能力 | `true` |
+| `CODE_GRAPH_PROVIDER` | `codegraph`（开源 CLI）或 `builtin`（自研 Neo4j） | `codegraph` |
+
+行为：
+
+1. 进入 `mcb` 交互模式时检查当前 provider 是否就绪；`codegraph` 下若未安装 `codegraph` CLI 则尝试自动安装（`npm i -g @colbymchenry/codegraph`）；
+2. 生成/查询图谱一律经 `CodeGraphGateway`，禁止业务层直接绑定某一实现；
+3. `CODE_GRAPH_ENABLED=false` 时跳过就绪检查与图谱任务；
+4. 默认使用 `codegraph`；`builtin` 作为自研 Neo4j 备选实现，契约与 Gateway 对齐。
+
+## 2.1 CodeGraph 封装能力
+
+对外只暴露 `CodeGraphGateway`；业务与 CLI 不直接调用某一 provider。能力分 **生成** 与 **查询** 两类。
+
+### 生成（Generator）
+
+| 能力 | 说明 | 主要使用方 |
+|------|------|------------|
+| `generate_graph` | 对本仓构建/重建图谱索引 | `analyze` 管线 |
+| `update_files` | 按变更文件增量更新图谱 | 文件级重分析 |
+| `delete_file_graph` / `delete_repo_graph` | 删除文件或整仓图谱数据 | `analyze clear` / `repo delete` |
+
+`codegraph` 实现映射开源 CLI（如 `codegraph init` / 增量 sync）；`builtin` 写 Neo4j。
+
+### 查询（Search）——文件级
+
+| Gateway / Search API | CLI | 语义 | 成功返回（content 示意） |
+|----------------------|-----|------|--------------------------|
+| `query_dependents_of_file(repo_id, file)` | `search dependents --path ... --file ...` | 谁依赖本文件（反向依赖） | `{ "dependents": ["rel/path/a.py", ...] }` |
+| `query_dependented_of_file(repo_id, file)` | `search dependencies --path ... --file ...` | 本文件依赖谁（出边依赖） | `{ "dependented": ["rel/path/b.py", ...] }` |
+| `query_file_summary(repo_id, file_paths)` | （内部/编排用；可按需补 CLI） | 文件内类/方法/函数清单 | `{ "files": { "<path>": { "classes": [...], "functions": [...] } } }` |
+
+说明：路径均为仓内相对路径；查询前目标 Repo 须已登记，且图谱已生成（`analyze` 或等价 init）。
+
+### 查询（Search）——符号级
+
+| Gateway / Search API | CLI | 语义 | 成功返回（content 示意） |
+|----------------------|-----|------|--------------------------|
+| `query_callers_of_symbol(repo_id, symbol)` | `search callers --path ... --symbol ...` | 哪些函数/方法调用了该符号 | `{ "callers": [{ "name", "kind", "file_path", "start_line" }] }` |
+| `query_callees_of_symbol(repo_id, symbol)` | `search callees --path ... --symbol ...` | 该符号调用了哪些函数/方法 | `{ "callees": [{ "name", "kind", "file_path", "start_line" }] }` |
+
+说明：`symbol` 为符号名（如 `create_search`、`CodeGraphGateway`）；`codegraph` 默认实现映射开源 CLI 的 `callers` / `callees`；与文件级 DEPENDS_ON 互补，用于 Agent「从某函数出发追调用链」。
+
+### Provider 职责
+
+| Provider | 默认 | 生成 | 文件级查询 | 符号级查询 |
+|----------|------|------|------------|------------|
+| `codegraph` | 是 | 开源 CLI 索引（`.codegraph/`） | 适配 CLI（如 `node --symbols-only` 等） | `callers` / `callees --json` |
+| `builtin` | 否 | AST + Neo4j | Neo4j `DEPENDS_ON` / 文件摘要 | 与 Gateway 契约对齐；未实现时返回明确错误 |
+
+约定：
+
+1. 查询失败返回 `QueryResponse(result=False, message=...)`，不抛未处理异常冒充空成功。
+2. CLI 查询类输出统一 JSON（stdout），便于编码 Agent 解析。
+3. 场景/回归测试应对上述能力做 **准确率** 校验（Precision/Recall 相对本仓 ground truth），而非仅「有结果即 Pass」。
 
 ## 3. 生成类命令
 
@@ -79,12 +133,14 @@
 
 | 命令 | 能力 | 主要参数 |
 |------|------|----------|
-| `search similar` | 相似代码片段检索 | `--path` + `--code` `[--top-k]` |
-| `search related` | 按关键词/描述找相关类、函数、文件 | `--path` + `--keywords` `[--top-k]` |
+| `search similar` | 相似代码片段检索（向量） | `--path` + `--code` `[--top-k]` |
+| `search related` | 按关键词/描述找相关类、函数、文件（向量） | `--path` + `--keywords` `[--top-k]` |
 | `search api` | 按需求检索公开接口摘要（Lib 侧重，code 也可用） | `--path` + `--query` `[--top-k]` |
 | `search pattern` | 按需求/问题描述检索历史开发模式与经验 | `--path` + `--query` `[--top-k]` |
-| `search dependents` | 查询依赖指定文件的其他文件（CodeGraph，主要 kind=code） | `--path` + `--file` |
-| `search dependencies` | 查询指定文件依赖的其他文件（CodeGraph，主要 kind=code） | `--path` + `--file` |
+| `search dependents` | 查询依赖指定文件的其他文件（CodeGraph 文件级） | `--path` + `--file` |
+| `search dependencies` | 查询指定文件依赖的其他文件（CodeGraph 文件级） | `--path` + `--file` |
+| `search callers` | 查询调用指定符号的函数/方法（CodeGraph 符号级） | `--path` + `--symbol` `[--limit]` |
+| `search callees` | 查询指定符号调用的函数/方法（CodeGraph 符号级） | `--path` + `--symbol` `[--limit]` |
 
 `search pattern` 返回示例形态（示意）：
 
@@ -122,7 +178,7 @@
 
 - 仅通过交互 CLI 或一次性 `mcb ...` 命令调用。
 - 典型流水线：
-  - 代码镜像：`repo add --kind code` → `analyze --path ...` → `search similar|related|...`
+  - 代码镜像：`repo add --kind code` → `analyze --path ...` → `search similar|related|dependents|dependencies|callers|callees|...`
   - 开发模式：`experience analyze --path ...` → `search pattern --path ... --query "..."`
 
 
@@ -152,7 +208,11 @@ app/
 │   │   ├── codechunk/            # 源码切面
 │   │   ├── codesummary/          # 类/函数概要
 │   │   ├── codevector/           # 向量化与向量检索
-│   │   ├── codegraph/            # CodeGraph 封装（依赖开源 CodeGraph）
+│   │   ├── codegraph/            # CodeGraph 统一入口
+│   │   │   ├── gateway.py / base.py / model.py
+│   │   │   └── providers/        # 每个 Provider 独立子目录，均继承 base.CodeGraphProvider
+│   │   │       ├── builtin/      # 自研 AST + Neo4j
+│   │   │       └── codegraph/    # 开源 CLI（默认）
 │   │   ├── codeast/              # AST
 │   │   ├── mr_experience/        # 历史 MR：拉取、需求-变更对齐、经验总结与向量化
 │   │   ├── analysis_service.py   # 源码分析编排

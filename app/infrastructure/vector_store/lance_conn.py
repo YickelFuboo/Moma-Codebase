@@ -289,12 +289,13 @@ class LanceDBConnection(VectorStoreConnection):
             if dense_expr is None:
                 builder = table.search()
             else:
+                search_kwargs = {}
+                if dense_expr.vector_column_name:
+                    search_kwargs["vector_column_name"] = dense_expr.vector_column_name
                 builder = (
-                    table.search(list(dense_expr.embedding_data))
+                    table.search(list(dense_expr.embedding_data), **search_kwargs)
                     .metric("cosine" if dense_expr.distance_type == "cosine" else "l2")
                 )
-                if dense_expr.vector_column_name:
-                    builder = builder.vector_column_name(dense_expr.vector_column_name)
             if where:
                 builder = builder.where(where, prefilter=True)
             if request.select_fields:

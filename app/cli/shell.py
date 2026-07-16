@@ -28,19 +28,24 @@ def _run_cli_line(line: str) -> None:
 
 async def _async_main() -> None:
     from app.cli.common import begin_session, end_session
+    from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
     from app.runtime import ensure_scheduler, init_runtime, shutdown
 
     await init_runtime()
+    try:
+        CodeGraphGateway.ensure_ready()
+    except Exception as exc:
+        print(f"[CodeGraph] 就绪检查失败: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
     await ensure_scheduler()
     loop = asyncio.get_running_loop()
     begin_session(loop)
     print("MomaCodeBase 交互模式 — 输入命令时可省略 mcb 前缀")
-    print("  repo / search / migrate：交互与一次性命令均支持")
-    print("  analyze：仅交互模式（本窗口）")
+    print("  repo / analyze / search / migrate：交互与一次性命令均支持")
     print("示例：")
-    print("  repo list")
+    print("  repo add --path F:/myproject --kind code")
+    print("  analyze --path F:/myproject")
     print("  search similar --path F:/myproject --code \"def foo\"")
-    print("  analyze start --path F:/myproject")
     print("一次性用法：poetry run mcb repo list / mcb search similar ...")
     print("输入 help 查看命令，exit / quit 退出\n")
     try:

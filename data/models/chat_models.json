@@ -2,7 +2,7 @@
   "_comment": "LLM聊天模型配置文件。实例可选 timeout_connect/timeout_read/timeout_write/timeout_pool(秒)，默认 connect=30 read=300 write=120 pool=30",
   "default": {
     "provider": "huoshanfangzhou",
-    "model": "glm-4.7"
+    "model": "glm-5.2"
   },
   "models": {
     "openai": {
@@ -74,37 +74,30 @@
       "instances": {
         "llama-3.3-70b-instruct": {
           "description": "LLaMA 3.3 70B指令版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "llama-3.3-8b-instruct": {
           "description": "LLaMA 3.3 8B指令版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "deepseek-ai/DeepSeek-V3.2": {
           "description": "DeepSeek V3.2 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "Qwen/Qwen3.5-122B-A10B": {
           "description": "Qwen3.5 122B A10B 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "zai-org/GLM-4.6": {
           "description": "GLM-4.6 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "zai-org/GLM-4.5": {
           "description": "GLM-5 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "Pro/MiniMaxAI/MiniMax-M2.5": {
           "description": "MiniMax-M2.5 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         }
       }
@@ -158,23 +151,37 @@
       "instances": {
         "minimax-m2.5": {
           "description": "火山方舟MiniMax-M2.5 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "glm-4.7": {
           "description": "火山方舟Qwen-Max 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "deepseek-v3.2": {
           "description": "火山方舟DeepSeek-V3.2 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         },
         "kimi-k2.5": {
           "description": "火山方舟Kimi-K2.5 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
+        },
+        "minimax-m2.7": {
+          "description": ""
+        },
+        "minimax-m3": {
+          "description": ""
+        },
+        "deepseek-v4-flash": {
+          "description": ""
+        },
+        "deepseek-v4-pro": {
+          "description": ""
+        },
+        "kimi-k2.6": {
+          "description": ""
+        },
+        "glm-5.2": {
+          "description": ""
         }
       }
     },
@@ -186,7 +193,6 @@
       "instances": {
         "minimax-m2.5": {
           "description": "MiniMax-M2.5 最新版本",
-          "context_limit": null,
           "max_tokens": 8192
         }
       }

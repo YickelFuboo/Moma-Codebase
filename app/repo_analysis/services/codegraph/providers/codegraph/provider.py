@@ -1,0 +1,220 @@
+"""开源 codegraph CLI Provider：生成图谱 + 查询适配。"""
+from __future__ import annotations
+import logging
+import os
+from typing import Any, Dict, List, Optional
+from app.repo_analysis.services.codegraph.base import (
+    CodeGraphGeneratorBase,
+    CodeGraphProvider,
+    CodeGraphSearchBase,
+)
+from app.repo_analysis.services.codegraph.model import QueryResponse
+from app.repo_analysis.services.codegraph.providers.codegraph.cli_runner import (
+    CodeGraphCliError,
+    CodeGraphCliRunner,
+)
+from app.repo_analysis.services.codegraph.providers.codegraph.node_parser import NodeOutputParser
+
+
+def find_codegraph_cli() -> Optional[str]:
+    return CodeGraphCliRunner.find_cli()
+
+
+def install_codegraph_cli() -> str:
+    return CodeGraphCliRunner.install_cli()
+
+
+def ensure_codegraph_cli() -> str:
+    return CodeGraphCliRunner.ensure_cli()
+
+
+class _CliGenerator(CodeGraphGeneratorBase):
+    def __init__(self, repo_id: str, repo_name: str, repo_local_path: str, cli: str):
+        self.repo_id = repo_id
+        self.repo_name = repo_name
+        self.repo_local_path = repo_local_path
+        self._cli = cli
+
+    def close(self) -> None:
+        return None
+
+    async def delete_repo_graph(self) -> None:
+        logging.info("codegraph 暂不支持 delete_repo_graph，已跳过 repo_id=%s", self.repo_id)
+
+    async def delete_file_graph(self, rel_file_path: str) -> None:
+        logging.info(
+            "codegraph 暂不支持 delete_file_graph，已跳过 repo_id=%s file=%s",
+            self.repo_id,
+            rel_file_path,
+        )
+
+    async def generate_graph(self, clean_stale: bool = False):
+        if not self.repo_local_path or not os.path.isdir(self.repo_local_path):
+            raise CodeGraphCliError(f"仓库路径不可用: {self.repo_local_path}")
+        logging.info("执行开源 CodeGraph init (cwd=%s)", self.repo_local_path)
+        CodeGraphCliRunner.run(["init"], cwd=self.repo_local_path, check=True)
+        return None
+
+    async def update_files(self, file_paths: List[str]):
+        if not self.repo_local_path or not os.path.isdir(self.repo_local_path):
+            raise CodeGraphCliError(f"仓库路径不可用: {self.repo_local_path}")
+        try:
+            CodeGraphCliRunner.run(["sync"], cwd=self.repo_local_path, check=True)
+        except CodeGraphCliError:
+            await self.generate_graph(clean_stale=False)
+
+
+class _CliSearch(CodeGraphSearchBase):
+    def __init__(self, cli: str):
+        self._cli = cli
+        self._path_cache: Dict[str, str] = {}
+
+    def close(self) -> None:
+        return None
+
+    async def _resolve_repo_path(self, repo_id: str) -> str:
+        cached = self._path_cache.get(repo_id)
+        if cached:
+            return cached
+        from app.infrastructure.database import get_db_session
+        from app.repo_mgmt.services.repo_resolver import RepoResolver
+
+        async with get_db_session() as db:
+            repo = await RepoResolver.get_by_id(db, repo_id)
+        if not repo or not repo.local_path:
+            raise CodeGraphCliError(f"无法根据 repo_id={repo_id} 解析本地路径")
+        path = RepoResolver.normalize_repo_path(repo.local_path)
+        if not os.path.isdir(path):
+            raise CodeGraphCliError(f"仓库本地路径不存在: {path}")
+        self._path_cache[repo_id] = path
+        return path
+
+    def _node_trail_text(self, project_path: str, file_path: str) -> str:
+        rel = NodeOutputParser.normalize_rel_path(file_path)
+        base = os.path.basename(rel)
+        return CodeGraphCliRunner.run_text(
+            ["node", base, "-f", rel, "--symbols-only"],
+            project_path=project_path,
+        )
+
+    def _node_header_text(self, project_path: str, file_path: str) -> str:
+        rel = NodeOutputParser.normalize_rel_path(file_path)
+        return CodeGraphCliRunner.run_text(
+            ["node", "-f", rel, "--symbols-only"],
+            project_path=project_path,
+        )
+
+    @staticmethod
+    def _symbol_hits(payload: Any, key: str) -> List[Dict[str, Any]]:
+        items = []
+        if isinstance(payload, dict):
+            raw = payload.get(key) or []
+        else:
+            raw = []
+        for it in raw:
+            if not isinstance(it, dict):
+                continue
+            items.append(
+                {
+                    "name": it.get("name"),
+                    "kind": it.get("kind"),
+                    "file_path": NodeOutputParser.normalize_rel_path(str(it.get("filePath") or "")),
+                    "start_line": it.get("startLine"),
+                }
+            )
+        return items
+
+    async def query_dependents_of_file(self, repo_id: str, file_path: str) -> QueryResponse:
+        try:
+            project_path = await self._resolve_repo_path(repo_id)
+            trail = self._node_trail_text(project_path, file_path)
+            header = self._node_header_text(project_path, file_path)
+            merged = f"{trail}\n{header}"
+            dependents, _ = NodeOutputParser.parse_file_relations(merged, file_path)
+            return QueryResponse(result=True, content={"dependents": dependents})
+        except Exception as exc:
+            return QueryResponse(result=False, content={}, message=str(exc))
+
+    async def query_dependented_of_file(self, repo_id: str, file_path: str) -> QueryResponse:
+        try:
+            project_path = await self._resolve_repo_path(repo_id)
+            trail = self._node_trail_text(project_path, file_path)
+            _, dependencies = NodeOutputParser.parse_file_relations(trail, file_path)
+            return QueryResponse(result=True, content={"dependented": dependencies})
+        except Exception as exc:
+            return QueryResponse(result=False, content={}, message=str(exc))
+
+    async def query_file_summary(self, repo_id: str, file_paths: List[str]) -> QueryResponse:
+        try:
+            project_path = await self._resolve_repo_path(repo_id)
+            files_summary: Dict[str, object] = {}
+            for file_path in file_paths:
+                rel = NodeOutputParser.normalize_rel_path(file_path)
+                text = self._node_header_text(project_path, rel)
+                files_summary[rel] = NodeOutputParser.parse_file_summary(text, rel)
+            return QueryResponse(result=True, content={"files": files_summary})
+        except Exception as exc:
+            return QueryResponse(result=False, content={}, message=str(exc))
+
+    async def query_callers_of_symbol(
+        self,
+        repo_id: str,
+        symbol: str,
+        limit: int = 20,
+    ) -> QueryResponse:
+        try:
+            project_path = await self._resolve_repo_path(repo_id)
+            payload = CodeGraphCliRunner.run_json(
+                ["callers", symbol, "-l", str(limit)],
+                project_path=project_path,
+            )
+            return QueryResponse(
+                result=True,
+                content={"symbol": symbol, "callers": self._symbol_hits(payload, "callers")},
+            )
+        except Exception as exc:
+            return QueryResponse(result=False, content={}, message=str(exc))
+
+    async def query_callees_of_symbol(
+        self,
+        repo_id: str,
+        symbol: str,
+        limit: int = 20,
+    ) -> QueryResponse:
+        try:
+            project_path = await self._resolve_repo_path(repo_id)
+            payload = CodeGraphCliRunner.run_json(
+                ["callees", symbol, "-l", str(limit)],
+                project_path=project_path,
+            )
+            return QueryResponse(
+                result=True,
+                content={"symbol": symbol, "callees": self._symbol_hits(payload, "callees")},
+            )
+        except Exception as exc:
+            return QueryResponse(result=False, content={}, message=str(exc))
+
+
+class CodeGraphCliProvider(CodeGraphProvider):
+    """开源 codegraph CLI（默认）：检测/安装 codegraph 命令。"""
+
+    name = "codegraph"
+
+    def ensure_ready(self) -> None:
+        from app.config.settings import settings
+        if not settings.code_graph_enabled:
+            return
+        ensure_codegraph_cli()
+
+    def create_generator(
+        self,
+        repo_id: str,
+        repo_name: str,
+        repo_local_path: str,
+    ) -> CodeGraphGeneratorBase:
+        cli = ensure_codegraph_cli()
+        return _CliGenerator(repo_id, repo_name, repo_local_path, cli)
+
+    def create_search(self) -> CodeGraphSearchBase:
+        cli = ensure_codegraph_cli()
+        return _CliSearch(cli)

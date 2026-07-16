@@ -8,6 +8,7 @@ from app.cli.common import (
     run_async,
 )
 from app.infrastructure.database import get_db_session
+from app.repo_mgmt.models.git_repo_mgmt import RepoKind
 from app.repo_mgmt.services.git_repo_service import GitRepositoryService
 from app.repo_mgmt.services.repo_resolver import RepoResolver
 
@@ -19,9 +20,15 @@ def repo() -> None:
 
 @repo.command("add")
 @click.option("--path", required=True, type=click.Path(exists=True, file_okay=False), help="本地代码仓目录")
+@click.option(
+    "--kind",
+    required=True,
+    type=click.Choice(RepoKind.VALUES, case_sensitive=False),
+    help="仓库类型: code=完整项目, lib=公共逻辑库",
+)
 @click.option("--description", default="", show_default=True, help="仓库描述")
-def repo_add(path: str, description: str) -> None:
-    """登记本地代码仓（名称默认为目录名）"""
+def repo_add(path: str, kind: str, description: str) -> None:
+    """登记本地代码仓或 Lib（名称默认为目录名）"""
 
     async def _add() -> None:
         normalized = RepoResolver.normalize_repo_path(path)
@@ -37,6 +44,7 @@ def repo_add(path: str, description: str) -> None:
                 description=description,
                 local_repo_path=normalized,
                 git_url="",
+                kind=kind.lower(),
             )
             echo_json(repo_public_view(repo))
 
