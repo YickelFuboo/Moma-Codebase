@@ -262,14 +262,27 @@ class FileAnalysisService:
                 )
                 return
 
-            # 分析文件
+            # 分析文件（按 kind 分流：lib → 公开接口管线）
             try:
-                ok, err_detail = await FileAnalysisService._analyze_file(
-                    repo_id=record.repo_id,
-                    repo_path=repo.local_path,
-                    rel_file_path=record.file_path,
-                    abs_file_path=abs_file_path,
-                )
+                from app.repo_mgmt.models.git_repo_mgmt import RepoKind
+
+                kind = getattr(repo, "kind", None) or RepoKind.CODE
+                if kind == RepoKind.LIB:
+                    from app.lib_analysis.services.file_processor import LibFileProcessor
+
+                    ok, err_detail = await LibFileProcessor.analyze_file(
+                        repo_id=record.repo_id,
+                        repo_path=repo.local_path,
+                        rel_file_path=record.file_path,
+                        abs_file_path=abs_file_path,
+                    )
+                else:
+                    ok, err_detail = await FileAnalysisService._analyze_file(
+                        repo_id=record.repo_id,
+                        repo_path=repo.local_path,
+                        rel_file_path=record.file_path,
+                        abs_file_path=abs_file_path,
+                    )
                 if ok:
                     await FileAnalysisService._finish_record(
                         db=db,
@@ -380,11 +393,25 @@ class FileAnalysisService:
             )
             await db.commit()
 
-        # 删除向量记录
+        # 删除向量记录（code / lib 分别清理）
         deleted_vectors = await CodeVectorService.delete_file_vector_records(
             repo_id=repo_id,
             rel_file_path=normalized_file_path,
         )
+        try:
+            from app.lib_analysis.services.api_vector import ApiVectorService
+
+            deleted_vectors += await ApiVectorService.delete_file_vector_records(
+                repo_id=repo_id,
+                rel_file_path=normalized_file_path,
+            )
+        except Exception as e:
+            logging.warning(
+                "删除 Lib API 向量失败 repo_id=%s file_path=%s error=%s",
+                repo_id,
+                normalized_file_path,
+                e,
+            )
 
         # 删除 codegraph 中该文件对应数据
         if settings.code_graph_enabled:

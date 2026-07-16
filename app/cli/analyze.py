@@ -18,11 +18,14 @@ def analyze(ctx: click.Context, path: Optional[str]) -> None:
     async def _start() -> None:
         repo = await get_repo_by_path(path)
         kind = getattr(repo, "kind", None) or RepoKind.CODE
-        if kind != RepoKind.CODE:
-            raise click.ClickException(
-                f"当前仓库 kind={kind}，功能一仅支持 kind=code；Lib 解析见后续功能"
-            )
-        result = await AnalysisService.start_scan(repo_id=repo.id)
+        if kind == RepoKind.LIB:
+            from app.lib_analysis.services.analysis_service import LibAnalysisService
+
+            result = await LibAnalysisService.start_scan(repo_id=repo.id)
+        elif kind == RepoKind.CODE:
+            result = await AnalysisService.start_scan(repo_id=repo.id)
+        else:
+            raise click.ClickException(f"不支持的 kind={kind}")
         result.pop("repo_id", None)
         result["path"] = path
         result["kind"] = kind
@@ -41,9 +44,16 @@ def analyze_status(path: str) -> None:
 
     async def _status() -> None:
         repo = await get_repo_by_path(path)
-        summary = await AnalysisService.get_summary(repo.id)
+        kind = getattr(repo, "kind", None) or RepoKind.CODE
+        if kind == RepoKind.LIB:
+            from app.lib_analysis.services.analysis_service import LibAnalysisService
+
+            summary = await LibAnalysisService.get_summary(repo.id)
+        else:
+            summary = await AnalysisService.get_summary(repo.id)
         summary.pop("repo_id", None)
         summary["path"] = path
+        summary["kind"] = kind
         echo_json(summary)
 
     run_async(_status)
@@ -56,9 +66,16 @@ def analyze_stop(path: str) -> None:
 
     async def _stop() -> None:
         repo = await get_repo_by_path(path)
-        result = await AnalysisService.stop_scan(repo.id)
+        kind = getattr(repo, "kind", None) or RepoKind.CODE
+        if kind == RepoKind.LIB:
+            from app.lib_analysis.services.analysis_service import LibAnalysisService
+
+            result = await LibAnalysisService.stop_scan(repo.id)
+        else:
+            result = await AnalysisService.stop_scan(repo.id)
         result.pop("repo_id", None)
         result["path"] = path
+        result["kind"] = kind
         echo_json(result)
 
     run_async(_stop)
@@ -72,7 +89,13 @@ def analyze_clear(path: str) -> None:
 
     async def _clear() -> None:
         repo = await get_repo_by_path(path)
-        await AnalysisService.delete_repo_analysis_data(repo.id)
+        kind = getattr(repo, "kind", None) or RepoKind.CODE
+        if kind == RepoKind.LIB:
+            from app.lib_analysis.services.analysis_service import LibAnalysisService
+
+            await LibAnalysisService.delete_repo_analysis_data(repo.id)
+        else:
+            await AnalysisService.delete_repo_analysis_data(repo.id)
         click.echo(f"已清空分析数据: {path}")
 
     run_async(_clear)

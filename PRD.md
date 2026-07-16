@@ -14,7 +14,7 @@
 3）通过 CodeGraph 对代码仓结构进行解析，并封装为本项目统一图谱能力（Gateway + CLI）。CodeGraph 提供统一入口，由 ENV `CODE_GRAPH_PROVIDER` 选择实现：`codegraph`（开源 CLI，默认）或 `builtin`（自研 Neo4j）。交互 CLI 启动时检查开源 CLI 是否已安装，缺失则尝试自动安装。封装能力覆盖：**文件级依赖方向查询**、**符号级调用关系查询**、**文件符号摘要**，以及图谱生成/增量更新（详见「2.1 CodeGraph 封装能力」）。
 
 二、Lib库解析处理
-对Lib库中的所有接口进行功能、参数等总结，切片存储，方面后续编码Agent根据需要检索可能相关Lib库。
+对 Lib 库中的公开接口进行抽取、功能/参数 LLM 摘要并向量化存储，供编码 Agent 通过 `search api` 按需求检索。当前实现：`kind=lib`；语言 Python/Go/Java；公开规则为语言惯例；不做 CodeGraph；查询仅开放 `search api`。
 
 三、历史 MR 经验沉淀（主要面向 kind=code 的 Repo）
 1）支持对指定 Repo 的历史 Merge Request（MR）进行分析：读取 MR 的需求描述或问题描述，结合 MR 中的实际代码变更，识别与需求**强相关**的修改点（文件、位置、变更角色）。

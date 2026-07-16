@@ -24,6 +24,8 @@ class AnalysisService:
 
     _running_scan_tasks: Dict[str, asyncio.Task] = {}
     _running_graph_tasks: Dict[str, asyncio.Task] = {}
+    LIB_EXTENSIONS = {".py", ".go", ".java"}
+
     CODE_EXTENSIONS = {".py", ".java", ".go", ".cpp", ".c"}
     EXCLUDED_DIRS = {"__pycache__", ".git", ".idea", ".vscode", "venv", "node_modules", "dist", "build", "target", ".pytest_cache", ".mypy_cache", ".coverage", "__tests__", "tests"}
 
@@ -40,6 +42,7 @@ class AnalysisService:
             Dict[str, object]: 扫描结果。
         """
         repo_path: Optional[str] = None
+        repo_kind: str = "code"
         normalized_target_rel_path: Optional[str] = None
         is_directory: Optional[bool] = None
 
@@ -51,6 +54,7 @@ class AnalysisService:
             if not repo.local_path or not os.path.isdir(repo.local_path):
                 raise ValueError("仓库本地路径不存在或不可访问")
             repo_path = repo.local_path
+            repo_kind = (getattr(repo, "kind", None) or "code").strip().lower()
             
             # 获取扫描任务
             task = await db.scalar(select(RepoAnalysisTask).where(RepoAnalysisTask.repo_id == repo_id))
@@ -107,12 +111,17 @@ class AnalysisService:
                 repo_path=repo_path or "",
                 target_rel_path=normalized_target_rel_path,
                 is_directory=is_directory or False,
+                allowed_extensions=(
+                    AnalysisService.LIB_EXTENSIONS
+                    if repo_kind == "lib"
+                    else AnalysisService.CODE_EXTENSIONS
+                ),
             )
         )
         AnalysisService._running_scan_tasks[repo_id] = scanning_task
 
-        # 同步启动代码图谱生成（后台任务，不阻塞扫描启动返回）
-        if settings.code_graph_enabled:
+        # 同步启动代码图谱生成（仅 kind=code；lib 不做 CodeGraph）
+        if settings.code_graph_enabled and repo_kind == "code":
             existing_graph_task = AnalysisService._running_graph_tasks.get(repo_id)
             if not existing_graph_task or existing_graph_task.done():
                 async def _run_graph() -> None:
@@ -204,7 +213,9 @@ class AnalysisService:
         repo_path: str,
         target_rel_path: Optional[str],
         is_directory: bool,
+        allowed_extensions: Optional[Set[str]] = None,
     ) -> None:
+        extensions = allowed_extensions or AnalysisService.CODE_EXTENSIONS
         try:
             async with get_db_session() as db:
                 await AnalysisService._assert_scan_is_running(db, repo_id)
@@ -216,7 +227,9 @@ class AnalysisService:
                 scanned_count = 0
                 async with get_db_session() as db:
                     abs_path = os.path.normpath(os.path.join(repo_path, *target_rel_path.split("/")))
-                    ok = await AnalysisService.update_file_state(db, repo_id, abs_path, target_rel_path)
+                    ok = await AnalysisService.update_file_state(
+                        db, repo_id, abs_path, target_rel_path, allowed_extensions=extensions
+                    )
                     if ok:
                         await AnalysisService._touch_scan_heartbeat(db, repo_id)
                     await db.commit()
@@ -226,6 +239,7 @@ class AnalysisService:
                     repo_id=repo_id,
                     repo_root=repo_path,
                     target_rel_path=target_rel_path,
+                    allowed_extensions=extensions,
                 )
 
                 # 删除排除的子目录下历史状态
@@ -264,6 +278,7 @@ class AnalysisService:
         repo_id: str,
         repo_root: str,
         target_rel_path: Optional[str],
+        allowed_extensions: Optional[Set[str]] = None,
     ) -> Tuple[int, Set[str]]:
         """扫描并更新文件级分析状态。
         Args:
@@ -273,6 +288,7 @@ class AnalysisService:
         Returns:
             Tuple[int, Set[str]]: 本次成功扫描到的代码文件数量；剪枝掉的排除子目录相对路径集合（用于删除其下历史状态，不占全量路径内存）。
         """
+        extensions = allowed_extensions or AnalysisService.CODE_EXTENSIONS
         scanned_code_files = 0
         excluded_dirs: Set[str] = set()
         async with get_db_session() as db:
@@ -298,7 +314,9 @@ class AnalysisService:
                 for filename in files:
                     abs_path = os.path.join(parent_root, filename)
                     rel_path = normalize_path(os.path.relpath(abs_path, repo_root))
-                    ok = await AnalysisService.update_file_state(db, repo_id, abs_path, rel_path)
+                    ok = await AnalysisService.update_file_state(
+                        db, repo_id, abs_path, rel_path, allowed_extensions=extensions
+                    )
                     if not ok:
                         continue
                     direct_file_paths.add(rel_path)
@@ -359,6 +377,7 @@ class AnalysisService:
         repo_id: str,
         abs_file_path: str,
         rel_file_path: str,
+        allowed_extensions: Optional[Set[str]] = None,
     ) -> bool:
         if not os.path.isfile(abs_file_path):
             await db.execute(
@@ -371,7 +390,8 @@ class AnalysisService:
         
         # 过滤非代码文件    
         ext = os.path.splitext(abs_file_path)[1].lower()
-        if ext not in AnalysisService.CODE_EXTENSIONS:
+        extensions = allowed_extensions or AnalysisService.CODE_EXTENSIONS
+        if ext not in extensions:
             await db.execute(
                 delete(RepoFileAnalysisState).where(
                     RepoFileAnalysisState.repo_id == repo_id,
@@ -672,6 +692,13 @@ class AnalysisService:
             await CodeVectorService.delete_repo_vector_records(repo_id)
         except Exception as e:
             logging.warning("删除 repo 向量数据失败 repo_id=%s error=%s", repo_id, e)
+
+        try:
+            from app.lib_analysis.services.api_vector import ApiVectorService
+
+            await ApiVectorService.delete_repo_vector_records(repo_id)
+        except Exception as e:
+            logging.warning("删除 Lib API 向量数据失败 repo_id=%s error=%s", repo_id, e)
 
         # 删除 codegraph 中该 repo 的全部数据
         if settings.code_graph_enabled:
