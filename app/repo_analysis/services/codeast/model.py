@@ -46,6 +46,8 @@ class Language(str, Enum):
     CPP = "cpp"
     C = "c"
     JAVASCRIPT = "javascript"
+    TYPESCRIPT = "typescript"
+    RUST = "rust"
     UNKNOWN = "unknown"
 
 class RelationType:

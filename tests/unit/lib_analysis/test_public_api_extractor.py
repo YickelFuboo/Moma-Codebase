@@ -52,11 +52,27 @@ class TestPublicApiExtractorSkipFile:
     def test_extract_none_file_info(self):
         assert PublicApiExtractor.extract(None) == []
 
-    def test_extract_unknown_language(self):
+    def test_extract_js_export_only(self):
+        source = "export function foo() {}\nfunction hidden() {}\n"
         info = FileInfo(
             name="a.js",
             file_path="a.js",
             language="javascript",
+            functions=[
+                _fn("foo", source="function foo() {}"),
+                _fn("hidden", source="function hidden() {}"),
+            ],
+            classes=[],
+            imports=[],
+        )
+        apis = PublicApiExtractor.extract(info, source=source)
+        assert [a.name for a in apis] == ["foo"]
+
+    def test_extract_unknown_language(self):
+        info = FileInfo(
+            name="a.kt",
+            file_path="a.kt",
+            language="kotlin",
             functions=[_fn("foo")],
             classes=[],
             imports=[],
@@ -226,6 +242,76 @@ class TestPublicApiExtractorJava:
         assert "Api" in names
         assert "Api.call" in names
         assert "Api.hide" not in names
+
+
+class TestPublicApiExtractorCFamily:
+    def test_skips_static(self):
+        file_info = FileInfo(
+            name="io.c",
+            file_path="io.c",
+            language=Language.C.value,
+            functions=[
+                _fn("open_file", source="int open_file(void) { return 0; }"),
+                _fn("hidden", source="static int hidden(void) { return 1; }"),
+            ],
+            classes=[],
+            imports=[],
+        )
+        apis = PublicApiExtractor.extract(file_info)
+        assert [a.name for a in apis] == ["open_file"]
+
+
+class TestPublicApiExtractorJsTs:
+    def test_ts_export(self):
+        source = "export class Client {}\nclass Internal {}\n"
+        file_info = FileInfo(
+            name="client.ts",
+            file_path="client.ts",
+            language=Language.TYPESCRIPT.value,
+            functions=[],
+            classes=[
+                ClassInfo(
+                    name="Client",
+                    full_name="Client",
+                    file_path="client.ts",
+                    node_type=ClassType.CLASS.value,
+                    source_code="class Client {}",
+                    start_line=1,
+                    end_line=1,
+                    methods=[],
+                ),
+                ClassInfo(
+                    name="Internal",
+                    full_name="Internal",
+                    file_path="client.ts",
+                    node_type=ClassType.CLASS.value,
+                    source_code="class Internal {}",
+                    start_line=2,
+                    end_line=2,
+                    methods=[],
+                ),
+            ],
+            imports=[],
+        )
+        apis = PublicApiExtractor.extract(file_info, source=source)
+        assert [a.name for a in apis] == ["Client"]
+
+
+class TestPublicApiExtractorRust:
+    def test_pub_only(self):
+        file_info = FileInfo(
+            name="lib.rs",
+            file_path="lib.rs",
+            language=Language.RUST.value,
+            functions=[
+                _fn("open", source="pub fn open() {}"),
+                _fn("hidden", source="fn hidden() {}"),
+            ],
+            classes=[],
+            imports=[],
+        )
+        apis = PublicApiExtractor.extract(file_info)
+        assert [a.name for a in apis] == ["open"]
 
 
 class TestPublicApiDisplayName:

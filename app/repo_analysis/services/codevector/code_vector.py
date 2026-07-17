@@ -225,7 +225,20 @@ class CodeVectorService:
             s = ln.strip()
             if language == "python" and s.startswith("#"):
                 continue
-            if language in {"java","go","cpp","c"} and (s.startswith("//") or s.startswith("/*") or s.startswith("*") or s.startswith("*/")):
+            if language in {
+                "java",
+                "go",
+                "cpp",
+                "c",
+                "javascript",
+                "typescript",
+                "rust",
+            } and (
+                s.startswith("//")
+                or s.startswith("/*")
+                or s.startswith("*")
+                or s.startswith("*/")
+            ):
                 continue
             out.append(ln)
         return out
@@ -254,13 +267,15 @@ class CodeVectorService:
                         return True
             return False
 
-        if language in {"java","cpp","c"}:
+        if language in {"java", "cpp", "c", "javascript", "typescript", "rust"}:
             if _TRIVIAL_JAVA_CPP_ACCESSOR.match(name) and len(lines) <= 7:
                 non_sig = [it.strip() for it in lines if "(" not in it or ")" not in it]
-                core = [it for it in non_sig if it not in {"{","}","};"}]
+                core = [it for it in non_sig if it not in {"{", "}", "};"}]
                 if len(core) <= 2:
                     joined = " ".join(core)
-                    if _TRIVIAL_JAVA_CPP_SINGLE_RETURN.search(joined) or _TRIVIAL_JAVA_CPP_SINGLE_ASSIGN.search(joined):
+                    if _TRIVIAL_JAVA_CPP_SINGLE_RETURN.search(joined) or _TRIVIAL_JAVA_CPP_SINGLE_ASSIGN.search(
+                        joined
+                    ):
                         return True
             return False
 

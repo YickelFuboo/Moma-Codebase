@@ -46,6 +46,7 @@ async def _async_main() -> None:
     print("  repo add --path F:/myproject --kind code")
     print("  analyze --path F:/myproject")
     print("  experience analyze --path F:/myproject --limit 20")
+    print("  search resolve --path F:/myproject --query \"JWT 鉴权怎么做\"")
     print("  search similar --path F:/myproject --code \"def foo\"")
     print("  search related --path F:/myproject --keywords \"告警,触发\"")
     print("  search chunks --path F:/myproject --query \"告警触发\"")

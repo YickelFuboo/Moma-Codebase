@@ -24,9 +24,47 @@ class AnalysisService:
 
     _running_scan_tasks: Dict[str, asyncio.Task] = {}
     _running_graph_tasks: Dict[str, asyncio.Task] = {}
-    LIB_EXTENSIONS = {".py", ".go", ".java"}
+    LIB_EXTENSIONS = {
+        ".py",
+        ".go",
+        ".java",
+        ".c",
+        ".h",
+        ".cpp",
+        ".cc",
+        ".cxx",
+        ".hpp",
+        ".hh",
+        ".hxx",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".ts",
+        ".tsx",
+        ".rs",
+    }
 
-    CODE_EXTENSIONS = {".py", ".java", ".go", ".cpp", ".c"}
+    CODE_EXTENSIONS = {
+        ".py",
+        ".java",
+        ".go",
+        ".c",
+        ".h",
+        ".cpp",
+        ".cc",
+        ".cxx",
+        ".hpp",
+        ".hh",
+        ".hxx",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".ts",
+        ".tsx",
+        ".rs",
+    }
     EXCLUDED_DIRS = {"__pycache__", ".git", ".idea", ".vscode", "venv", "node_modules", "dist", "build", "target", ".pytest_cache", ".mypy_cache", ".coverage", "__tests__", "tests"}
 
     @staticmethod

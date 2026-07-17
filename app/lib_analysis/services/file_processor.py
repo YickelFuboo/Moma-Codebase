@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 from app.lib_analysis.services.api_extract import PublicApiExtractor
 from app.lib_analysis.services.api_vector import ApiVectorService
+from app.repo_analysis.services.analysis_service import AnalysisService
 from app.repo_analysis.services.codeast.ast_analyzer import FileAstAnalyzer
 from app.utils.common import strip_utf8_bom
 
@@ -23,7 +24,7 @@ class LibFileProcessor:
                 return True, None
 
             ext = Path(abs_file_path).suffix.lower()
-            if ext not in {".py", ".go", ".java"}:
+            if ext not in AnalysisService.LIB_EXTENSIONS:
                 await ApiVectorService.delete_file_vector_records(repo_id, rel_file_path)
                 return True, None
 

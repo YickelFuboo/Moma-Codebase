@@ -57,7 +57,7 @@ class CppAnalyzer(LanguageAnalyzer):
                         func_node = await self._create_function_node(node, content)
                         if func_node:
                             functions.append(func_node)
-                elif node.type == 'class_definition':
+                elif node.type in ('class_specifier', 'struct_specifier', 'class_definition'):
                     class_node = await self._create_class_node(node, content)
                     if class_node:
                         classes.append(class_node)
@@ -124,57 +124,117 @@ class CppAnalyzer(LanguageAnalyzer):
         return sorted(dependent_files)
         
     def _get_function_name(self, node) -> str:
-        """获取函数名"""
+        """获取函数名（identifier 在 function_declarator 下）。"""
         for child in node.children:
-            if child.type == 'identifier':
-                return child.text.decode('utf8')
-        return ''
+            if child.type == "identifier":
+                return child.text.decode("utf8")
+            if child.type in ("function_declarator", "qualified_identifier", "field_identifier"):
+                if child.type == "field_identifier":
+                    return child.text.decode("utf8")
+                for sub in child.children:
+                    if sub.type in ("identifier", "field_identifier", "destructor_name", "operator_name"):
+                        return sub.text.decode("utf8")
+                    if sub.type in ("qualified_identifier", "function_declarator"):
+                        nested = self._get_function_name(sub if sub.type == "function_declarator" else child)
+                        if nested:
+                            return nested
+                        if sub.type == "qualified_identifier":
+                            for q in sub.children:
+                                if q.type in ("identifier", "type_identifier"):
+                                    return q.text.decode("utf8")
+        return ""
         
     async def _create_function_node(self, node, content: str) -> Optional[FunctionInfo]:
         """创建函数节点"""
         func_name = self._get_function_name(node)
         if not func_name:
             return None
-            
-        source_code = content[node.start_byte:node.end_byte]
-        
-        signature = self._get_function_signature(node, content)
-        full_name = func_name  # C++ 函数可能需要命名空间，这里简化处理
-        
+
+        source_code = content[node.start_byte : node.end_byte]
+        signature = f"{func_name}()"
+        for child in node.children:
+            if child.type == "function_declarator":
+                signature = content[child.start_byte : child.end_byte].strip()
+                break
+
         return FunctionInfo(
             name=func_name,
-            full_name=full_name,
+            full_name=func_name,
             signature=signature,
             type=FunctionType.FUNCTION.value,
             file_path=normalize_path(os.path.relpath(self.file_path, self.base_path)),
             source_code=source_code,
             start_line=node.start_point[0] + 1,
             end_line=node.end_point[0] + 1,
-            params=self._get_function_params(node),
-            param_types=self._get_param_types(node),
-            returns=self._get_function_returns(node),
-            return_types=self._get_return_types(node),
-            docstring=self._get_comment(node, content)
+            params=[],
+            param_types=[],
+            returns=[],
+            return_types=[],
+            docstring="",
         )
-        
+
+    def _get_class_name(self, node) -> str:
+        for child in node.children:
+            if child.type in ("type_identifier", "identifier"):
+                return child.text.decode("utf8")
+        return ""
+
+    async def _get_class_methods(self, node, content: str) -> List[FunctionInfo]:
+        methods: List[FunctionInfo] = []
+        for child in node.children:
+            if child.type != "field_declaration_list":
+                continue
+            for item in child.children:
+                if item.type == "function_definition":
+                    fn = await self._create_function_node(item, content)
+                    if fn:
+                        fn.type = FunctionType.METHOD.value
+                        fn.class_name = self._get_class_name(node)
+                        fn.full_name = f"{fn.class_name}.{fn.name}" if fn.class_name else fn.name
+                        methods.append(fn)
+                elif item.type == "declaration" or item.type == "field_declaration":
+                    # 仅声明的方法：从 function_declarator 取名
+                    name = self._get_function_name(item)
+                    if not name or name.startswith("_"):
+                        continue
+                    source_code = content[item.start_byte : item.end_byte]
+                    cls_name = self._get_class_name(node)
+                    methods.append(
+                        FunctionInfo(
+                            name=name,
+                            full_name=f"{cls_name}.{name}" if cls_name else name,
+                            signature=source_code.strip().split("{", 1)[0].strip(),
+                            type=FunctionType.METHOD.value,
+                            file_path=normalize_path(os.path.relpath(self.file_path, self.base_path)),
+                            source_code=source_code,
+                            start_line=item.start_point[0] + 1,
+                            end_line=item.end_point[0] + 1,
+                            params=[],
+                            param_types=[],
+                            returns=[],
+                            return_types=[],
+                            docstring="",
+                            class_name=cls_name,
+                        )
+                    )
+        return methods
+
     async def _create_class_node(self, node, content: str) -> Optional[ClassInfo]:
         """创建类节点"""
         class_name = self._get_class_name(node)
         if not class_name:
             return None
-            
-        source_code = content[node.start_byte:node.end_byte]
-        full_name = class_name  # C++ 类可能需要命名空间，这里简化处理
-        
+
+        source_code = content[node.start_byte : node.end_byte]
         return ClassInfo(
             name=class_name,
-            full_name=full_name,
+            full_name=class_name,
             file_path=normalize_path(os.path.relpath(self.file_path, self.base_path)),
             node_type=ClassType.CLASS.value,
             source_code=source_code,
-            start_line=node.start_point[0],
-            end_line=node.end_point[0],
+            start_line=node.start_point[0] + 1,
+            end_line=node.end_point[0] + 1,
             methods=await self._get_class_methods(node, content),
-            attributes=self._get_class_attributes(node),
-            docstring=self._get_comment(node, content)
-        ) 
+            attributes=[],
+            docstring="",
+        )

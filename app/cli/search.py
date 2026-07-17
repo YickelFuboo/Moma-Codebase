@@ -22,6 +22,40 @@ def search() -> None:
     """代码检索与图谱查询（支持一次性与交互模式）"""
 
 
+@search.command("resolve")
+@click.option("--path", required=True, help="已登记的本地 Repo/Lib 目录")
+@click.option("--query", required=True, help="自然语言描述或代码片段")
+@click.option(
+    "--intent",
+    default="auto",
+    show_default=True,
+    help="auto|similar|related|locate|pattern|experience|api|graph",
+)
+@click.option("--top-k", default=10, show_default=True, help="融合结果条数")
+def search_resolve(path: str, query: str, intent: str, top_k: int) -> None:
+    """统一检索编排：按规则自动选择通道（Agent 主入口）。"""
+
+    async def _resolve() -> None:
+        from app.repo_analysis.services.search_resolve import SearchResolveService
+
+        repo = await get_repo_by_path(path)
+        try:
+            result = await SearchResolveService.resolve(
+                repo_id=repo.id,
+                query=query,
+                top_k=top_k,
+                intent=intent,
+            )
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+        result.pop("repo_id", None)
+        result["path"] = path
+        result["kind"] = getattr(repo, "kind", None) or RepoKind.CODE
+        echo_json(result)
+
+    run_async(_resolve)
+
+
 @search.command("similar")
 @click.option("--path", required=True, help="已登记的本地代码仓目录")
 @click.option("--code", required=True, help="待检索的代码片段")

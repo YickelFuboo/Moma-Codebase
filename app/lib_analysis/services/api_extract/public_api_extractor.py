@@ -11,6 +11,12 @@ from app.utils.common import normalize_path
 class PublicApiExtractor:
     """从 AST FileInfo 中按语言惯例过滤公开接口。"""
 
+    _STATIC_DECL = re.compile(r"\bstatic\b")
+    _EXPORT_DECL = re.compile(r"\bexport\b")
+    _PUB_DECL = re.compile(r"\bpub\b")
+    _JAVA_PUBLIC = re.compile(r"\bpublic\b")
+    _MODULE_EXPORTS = re.compile(r"\bmodule\.exports\b|\bexports\.")
+
     @classmethod
     def should_skip_file(cls, rel_file_path: str) -> bool:
         path = normalize_path(rel_file_path or "").strip("/")
@@ -20,11 +26,13 @@ class PublicApiExtractor:
             if marker in padded:
                 return True
         base = os.path.basename(lower)
-        if base.startswith("test_") and base.endswith(".py"):
+        if base.startswith("test_") and base.endswith((".py", ".rs", ".c", ".cpp", ".cc", ".cxx")):
             return True
-        if base.endswith("_test.py") or base.endswith("_test.go"):
+        if base.endswith("_test.py") or base.endswith("_test.go") or base.endswith("_test.rs"):
             return True
         if base.endswith("test.java") or base.endswith("tests.java"):
+            return True
+        if ".test." in base or ".spec." in base:
             return True
         return False
 
@@ -47,6 +55,16 @@ class PublicApiExtractor:
             return cls._extract_go(file_info)
         if language == Language.JAVA.value:
             return cls._extract_java(file_info)
+        if language == Language.C.value:
+            return cls._extract_c_family(file_info, Language.C.value)
+        if language == Language.CPP.value:
+            return cls._extract_c_family(file_info, Language.CPP.value)
+        if language == Language.JAVASCRIPT.value:
+            return cls._extract_js_family(file_info, source or "", Language.JAVASCRIPT.value)
+        if language == Language.TYPESCRIPT.value:
+            return cls._extract_js_family(file_info, source or "", Language.TYPESCRIPT.value)
+        if language == Language.RUST.value:
+            return cls._extract_rust(file_info)
         return []
 
     @staticmethod
@@ -168,8 +186,6 @@ class PublicApiExtractor:
                 )
         return apis
 
-    _JAVA_PUBLIC = re.compile(r"\bpublic\b")
-
     @classmethod
     def _java_is_public(cls, source_code: Optional[str], name: Optional[str]) -> bool:
         src = (source_code or "").strip()
@@ -180,6 +196,126 @@ class PublicApiExtractor:
             return False
         n = (name or "").strip()
         return bool(n) and not n.startswith("_")
+
+    @classmethod
+    def _extract_c_family(cls, file_info: FileInfo, language: str) -> List[PublicApi]:
+        apis: List[PublicApi] = []
+        for fn in file_info.functions or []:
+            if not cls._c_family_is_public(fn.source_code, fn.name):
+                continue
+            apis.append(cls._from_function(fn, file_info, "function", language))
+        for clz in file_info.classes or []:
+            if not cls._c_family_is_public(clz.source_code, clz.name):
+                continue
+            apis.append(cls._from_class(clz, file_info, language))
+            for method in clz.methods or []:
+                if not cls._c_family_is_public(method.source_code, method.name):
+                    continue
+                apis.append(
+                    cls._from_function(
+                        method,
+                        file_info,
+                        "method",
+                        language,
+                        class_name=clz.name,
+                    )
+                )
+        return apis
+
+    @classmethod
+    def _c_family_is_public(cls, source_code: Optional[str], name: Optional[str]) -> bool:
+        n = (name or "").strip()
+        if not n or n.startswith("_"):
+            return False
+        src = (source_code or "").strip()
+        if not src:
+            return True
+        head = "\n".join(src.splitlines()[:6])
+        return not cls._STATIC_DECL.search(head)
+
+    @classmethod
+    def _extract_js_family(cls, file_info: FileInfo, source: str, language: str) -> List[PublicApi]:
+        file_source = source or ""
+        apis: List[PublicApi] = []
+        for fn in file_info.functions or []:
+            if not cls._js_is_public(fn.source_code, fn.name, file_source):
+                continue
+            apis.append(cls._from_function(fn, file_info, "function", language))
+        for clz in file_info.classes or []:
+            if not cls._js_is_public(clz.source_code, clz.name, file_source):
+                continue
+            apis.append(cls._from_class(clz, file_info, language))
+            for method in clz.methods or []:
+                n = (method.name or "").strip()
+                if not n or n.startswith("_"):
+                    continue
+                apis.append(
+                    cls._from_function(
+                        method,
+                        file_info,
+                        "method",
+                        language,
+                        class_name=clz.name,
+                    )
+                )
+        return apis
+
+    @classmethod
+    def _js_is_public(
+        cls,
+        source_code: Optional[str],
+        name: Optional[str],
+        file_source: str,
+    ) -> bool:
+        n = (name or "").strip()
+        if not n or n.startswith("_"):
+            return False
+        src = (source_code or "").strip()
+        if src and cls._EXPORT_DECL.search("\n".join(src.splitlines()[:6])):
+            return True
+        if re.search(rf"\bexport\b[^\n;{{]*\b{re.escape(n)}\b", file_source):
+            return True
+        if re.search(rf"\b(?:module\.exports|exports)\s*\.\s*{re.escape(n)}\b", file_source):
+            return True
+        if not cls._EXPORT_DECL.search(file_source) and not cls._MODULE_EXPORTS.search(file_source):
+            return True
+        return False
+
+    @classmethod
+    def _extract_rust(cls, file_info: FileInfo) -> List[PublicApi]:
+        apis: List[PublicApi] = []
+        for fn in file_info.functions or []:
+            if not cls._rust_is_public(fn.source_code, fn.name):
+                continue
+            apis.append(cls._from_function(fn, file_info, "function", Language.RUST.value))
+        for clz in file_info.classes or []:
+            if not cls._rust_is_public(clz.source_code, clz.name):
+                continue
+            apis.append(cls._from_class(clz, file_info, Language.RUST.value))
+            for method in clz.methods or []:
+                if not cls._rust_is_public(method.source_code, method.name):
+                    continue
+                apis.append(
+                    cls._from_function(
+                        method,
+                        file_info,
+                        "method",
+                        Language.RUST.value,
+                        class_name=clz.name,
+                    )
+                )
+        return apis
+
+    @classmethod
+    def _rust_is_public(cls, source_code: Optional[str], name: Optional[str]) -> bool:
+        n = (name or "").strip()
+        if not n or n.startswith("_"):
+            return False
+        src = (source_code or "").strip()
+        if not src:
+            return False
+        head = "\n".join(src.splitlines()[:8])
+        return bool(cls._PUB_DECL.search(head))
 
     @classmethod
     def _from_function(

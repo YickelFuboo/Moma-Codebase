@@ -279,7 +279,25 @@ class CodeChunkService:
                 return True
             return False
 
-        if file_ext in {".java", ".go", ".cpp", ".c", ".h", ".hpp"}:
+        if file_ext in {
+            ".java",
+            ".go",
+            ".cpp",
+            ".cc",
+            ".cxx",
+            ".c",
+            ".h",
+            ".hpp",
+            ".hh",
+            ".hxx",
+            ".js",
+            ".jsx",
+            ".mjs",
+            ".cjs",
+            ".ts",
+            ".tsx",
+            ".rs",
+        }:
             if len(lines) <= 7 and _TRIVIAL_JAVA_GO_CPP_SETTER_GETTER.search(chunk_text):
                 return True
             if len(lines) <= 3 and _TRIVIAL_SINGLE_LINE_RETURN.search(chunk_text):

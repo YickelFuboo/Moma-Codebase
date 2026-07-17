@@ -15,6 +15,8 @@ _ANALYZER_CLASS_BY_LANG: Dict[Language, tuple[str, str]] = {
     Language.CPP: ("app.repo_analysis.services.codeast.analyzers.cpp_analyzer", "CppAnalyzer"),
     Language.C: ("app.repo_analysis.services.codeast.analyzers.c_analyzer", "CAnalyzer"),
     Language.JAVASCRIPT: ("app.repo_analysis.services.codeast.analyzers.js_analyzer", "JsAnalyzer"),
+    Language.TYPESCRIPT: ("app.repo_analysis.services.codeast.analyzers.ts_analyzer", "TsAnalyzer"),
+    Language.RUST: ("app.repo_analysis.services.codeast.analyzers.rust_analyzer", "RustAnalyzer"),
 }
 _analyzer_class_cache: Dict[Language, Type[LanguageAnalyzer]] = {}
 
@@ -43,15 +45,24 @@ class FileAstAnalyzer:
         """根据文件扩展名检测编程语言"""
         ext = os.path.splitext(self.file_path)[1].lower()
         ext_map = {
-            '.py': Language.PYTHON,
-            '.java': Language.JAVA,
-            '.go': Language.GO,
-            '.cpp': Language.CPP,
-            '.c': Language.C,
-            '.js': Language.JAVASCRIPT,
-            '.jsx': Language.JAVASCRIPT,
-            '.mjs': Language.JAVASCRIPT,
-            '.cjs': Language.JAVASCRIPT,
+            ".py": Language.PYTHON,
+            ".java": Language.JAVA,
+            ".go": Language.GO,
+            ".cpp": Language.CPP,
+            ".cc": Language.CPP,
+            ".cxx": Language.CPP,
+            ".hpp": Language.CPP,
+            ".hh": Language.CPP,
+            ".hxx": Language.CPP,
+            ".c": Language.C,
+            ".h": Language.C,
+            ".js": Language.JAVASCRIPT,
+            ".jsx": Language.JAVASCRIPT,
+            ".mjs": Language.JAVASCRIPT,
+            ".cjs": Language.JAVASCRIPT,
+            ".ts": Language.TYPESCRIPT,
+            ".tsx": Language.TYPESCRIPT,
+            ".rs": Language.RUST,
         }
         return ext_map.get(ext, Language.UNKNOWN)
     
@@ -134,8 +145,27 @@ class FolderAstAnalyzer:
 
             try:
                 if os.path.isfile(item_path) and item_path.endswith(
-                    ('.py', '.java', '.go', '.cpp', '.c', '.js', '.jsx', '.mjs', '.cjs')
-                ) and not item_path.startswith('__'):
+                    (
+                        ".py",
+                        ".java",
+                        ".go",
+                        ".cpp",
+                        ".cc",
+                        ".cxx",
+                        ".c",
+                        ".h",
+                        ".hpp",
+                        ".hh",
+                        ".hxx",
+                        ".js",
+                        ".jsx",
+                        ".mjs",
+                        ".cjs",
+                        ".ts",
+                        ".tsx",
+                        ".rs",
+                    )
+                ) and not item_path.startswith("__"):
                     # 分析所有支持的文件类型
                     file_ast_analyzer = FileAstAnalyzer(self.base_path, item_path)
                     file_info = await file_ast_analyzer.analyze_file()

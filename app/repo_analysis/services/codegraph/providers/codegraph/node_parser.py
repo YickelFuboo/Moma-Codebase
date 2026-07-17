@@ -62,7 +62,29 @@ class NodeOutputParser:
         if "/" not in path and "\\" not in path:
             return False
         lower = path.lower()
-        return any(lower.endswith(ext) for ext in (".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java"))
+        return any(
+            lower.endswith(ext)
+            for ext in (
+                ".py",
+                ".ts",
+                ".tsx",
+                ".js",
+                ".jsx",
+                ".mjs",
+                ".cjs",
+                ".go",
+                ".java",
+                ".rs",
+                ".c",
+                ".h",
+                ".cpp",
+                ".cc",
+                ".cxx",
+                ".hpp",
+                ".hh",
+                ".hxx",
+            )
+        )
 
     @classmethod
     def parse_file_relations(cls, text: str, self_path: str) -> Tuple[List[str], List[str]]:

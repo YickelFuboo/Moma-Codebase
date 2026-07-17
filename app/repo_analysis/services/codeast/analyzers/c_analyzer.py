@@ -127,70 +127,72 @@ class CAnalyzer(LanguageAnalyzer):
         return sorted(dependent_files)
         
     def _get_function_name(self, node) -> str:
-        """获取函数名"""
+        """获取函数名（identifier 在 function_declarator 下）。"""
         for child in node.children:
-            if child.type == 'identifier':
-                return child.text.decode('utf8')
-        return ''
+            if child.type == "identifier":
+                return child.text.decode("utf8")
+            if child.type == "function_declarator":
+                for sub in child.children:
+                    if sub.type == "identifier":
+                        return sub.text.decode("utf8")
+                    if sub.type == "function_declarator":
+                        nested = self._get_function_name(sub)
+                        if nested:
+                            return nested
+        return ""
         
     def _get_struct_name(self, node) -> str:
         """获取结构体名"""
         for child in node.children:
-            if child.type == 'identifier':
-                return child.text.decode('utf8')
-        return ''
-        
+            if child.type in ("identifier", "type_identifier"):
+                return child.text.decode("utf8")
+        return ""
+
     async def _create_function_node(self, node, content: str) -> Optional[FunctionInfo]:
         """创建函数节点"""
         func_name = self._get_function_name(node)
         if not func_name:
             return None
-            
-        source_code = content[node.start_byte:node.end_byte]
-        
-        # 生成函数签名（只包含类型，不包含参数名）
-        param_types = self._get_param_types(node) if hasattr(self, '_get_param_types') else []
-        return_types = self._get_return_types(node) if hasattr(self, '_get_return_types') else []
-        param_signature = ", ".join(param_types) if param_types else ""
-        return_type_str = return_types[0] if return_types else "void"
-        signature = f"{func_name}({param_signature}) -> {return_type_str}"
-        
-        full_name = func_name  # C 函数没有命名空间
-        
+
+        source_code = content[node.start_byte : node.end_byte]
+        signature = f"{func_name}()"
+        for child in node.children:
+            if child.type == "function_declarator":
+                signature = content[child.start_byte : child.end_byte].strip()
+                break
+
         return FunctionInfo(
             name=func_name,
-            full_name=full_name,
+            full_name=func_name,
             signature=signature,
             type=FunctionType.FUNCTION.value,
             file_path=normalize_path(os.path.relpath(self.file_path, self.base_path)),
             source_code=source_code,
             start_line=node.start_point[0] + 1,
             end_line=node.end_point[0] + 1,
-            params=self._get_function_params(node),
-            param_types=self._get_param_types(node),
-            returns=self._get_function_returns(node),
-            return_types=self._get_return_types(node),
-            docstring=self._get_comment(node, content)
+            params=[],
+            param_types=[],
+            returns=[],
+            return_types=[],
+            docstring="",
         )
-        
+
     async def _create_struct_node(self, node, content: str) -> Optional[ClassInfo]:
         """创建结构体节点"""
         struct_name = self._get_struct_name(node)
         if not struct_name:
             return None
-            
-        source_code = content[node.start_byte:node.end_byte]
-        full_name = struct_name  # C 结构体没有命名空间
-        
+
+        source_code = content[node.start_byte : node.end_byte]
         return ClassInfo(
             name=struct_name,
-            full_name=full_name,
+            full_name=struct_name,
             file_path=normalize_path(os.path.relpath(self.file_path, self.base_path)),
             node_type=ClassType.STRUCT.value,
             source_code=source_code,
-            start_line=node.start_point[0],
-            end_line=node.end_point[0],
-            methods=[],  # C的struct没有方法
-            attributes=self._get_struct_fields(node),
-            docstring=self._get_comment(node, content)
-        ) 
+            start_line=node.start_point[0] + 1,
+            end_line=node.end_point[0] + 1,
+            methods=[],
+            attributes=[],
+            docstring="",
+        )

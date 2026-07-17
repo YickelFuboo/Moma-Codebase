@@ -133,11 +133,12 @@
 
 | 命令 | 能力 | 主要参数 |
 |------|------|----------|
+| `search resolve` | **统一编排入口（Agent 主路径）**：规则路由 similar/related/pattern/api/graph | `--path` + `--query` `[--intent]` `[--top-k]` |
 | `search similar` | 相似代码片段检索（向量） | `--path` + `--code` `[--top-k]` |
-| `search related` | 相关位置检索（符号摘要/行块向量 + 名称精确匹配融合） | `--path` + `--keywords` `[--top-k]` |
-| `search chunks` | 仅行块向量检索（人工调试；Agent 优先 related） | `--path` + `--query` `[--top-k]` |
-| `search symbols` | 仅符号摘要向量检索（人工调试；Agent 优先 related） | `--path` + `--query` `[--top-k]` |
-| `search api` | 按需求检索公开接口摘要（Lib 侧重，code 也可用） | `--path` + `--query` `[--top-k]` |
+| `search related` | 相关位置检索（符号摘要 + CodeGraph） | `--path` + `--keywords` `[--top-k]` |
+| `search chunks` | 仅行块向量检索（人工调试；Agent 优先 resolve/similar） | `--path` + `--query` `[--top-k]` |
+| `search symbols` | 仅符号摘要向量检索（人工调试；Agent 优先 resolve/related） | `--path` + `--query` `[--top-k]` |
+| `search api` | 按需求检索公开接口摘要（仅 kind=lib） | `--path` + `--query` `[--top-k]` |
 | `search pattern` | 按需求/问题描述检索历史开发模式与经验 | `--path` + `--query` `[--top-k]` |
 | `search dependents` | 查询依赖指定文件的其他文件（CodeGraph 文件级） | `--path` + `--file` |
 | `search dependencies` | 查询指定文件依赖的其他文件（CodeGraph 文件级） | `--path` + `--file` |
@@ -146,6 +147,13 @@
 | `inspect chunks` | 只读验收切片（行块）数据（仅 kind=code） | `--path` `[--target]` `[--limit]` `[--full-content]` `[--export]` |
 | `inspect graph` | 只读验收文件级依赖（仅 kind=code） | `--path` `[--target]` `[--limit]` `[--export]` |
 | `inspect apis` | 只读验收 Lib 公开接口（仅 kind=lib） | `--path` `[--file]` `[--limit]` `[--export]` |
+
+`search resolve` 约定：
+- 不传 `--intent` 或 `--intent auto`：按 query 规则自动选择通道。
+- `--intent` 可选：`similar` / `related`（别名 `locate`） / `pattern`（别名 `experience`） / `api` / `graph`。
+- `kind=lib` 默认仅走 `api`；`kind=code` 不可强制 `api`。
+- 返回 `intent`、`channels_used`、融合 `items` 与分通道 `sections`；单通道失败不拖垮整次查询。
+- 专用子命令仍保留，供人工调试或强制单通道。
 
 `inspect` 约定：`--target` / `--file` 不填=全仓/全库；填了=相对子目录前缀或单文件；默认 `--limit 500`，`0`=不限制；输出 JSON，可选 `--export` 写文件；未分析时报明确错误。
 
