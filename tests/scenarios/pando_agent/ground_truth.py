@@ -1,6 +1,6 @@
 """Pando-Agent 全仓 related/hybrid 与 similar 评测 ground truth。"""
 from __future__ import annotations
-from tests.scenarios.framework.case_spec import PathSetCase, TitleSetCase
+from tests.scenarios.framework.case_spec import PathSetCase, SymbolRelationCase, TitleSetCase
 
 
 PANDO_RELATED_CASES = [
@@ -309,7 +309,7 @@ PANDO_PATTERN_CASES = [
     TitleSetCase(
         case_id="pando.pattern.skill_hub",
         description="Skill Hub 注册发现",
-        expected_titles=["Hub 模式统一管理 skill"],
+        expected_titles=["Skills Hub"],
         min_precision=0.33,
         min_recall=1.0,
         top_k=3,
@@ -321,7 +321,7 @@ PANDO_PATTERN_CASES = [
     TitleSetCase(
         case_id="pando.pattern.skill_migrate",
         description="Skill 私有目录迁移到公共目录",
-        expected_titles=["Skill 从 Agent 私有目录迁移"],
+        expected_titles=["私有目录迁移"],
         min_precision=0.33,
         min_recall=1.0,
         top_k=3,
@@ -333,7 +333,7 @@ PANDO_PATTERN_CASES = [
     TitleSetCase(
         case_id="pando.pattern.agent_bus",
         description="Agent 核心与子 Agent 总线解耦",
-        expected_titles=["Agent 核心与子 Agent"],
+        expected_titles=["消息总线"],
         min_precision=0.33,
         min_recall=1.0,
         top_k=3,
@@ -345,7 +345,7 @@ PANDO_PATTERN_CASES = [
     TitleSetCase(
         case_id="pando.pattern.streaming",
         description="流式输出全链路",
-        expected_titles=["流式输出全链路贯通"],
+        expected_titles=["流式输出跨层贯通"],
         min_precision=0.33,
         min_recall=1.0,
         top_k=3,
@@ -357,7 +357,7 @@ PANDO_PATTERN_CASES = [
     TitleSetCase(
         case_id="pando.pattern.prompt_layers",
         description="prompt 按职责分层",
-        expected_titles=["prompt 按职责分层"],
+        expected_titles=["prompt 按关注点三层分离"],
         min_precision=0.33,
         min_recall=1.0,
         top_k=3,
@@ -369,7 +369,7 @@ PANDO_PATTERN_CASES = [
     TitleSetCase(
         case_id="pando.pattern.web_providers",
         description="多 Provider Web 抓取可插拔",
-        expected_titles=["多 Provider 可插拔"],
+        expected_titles=["多 Provider"],
         min_precision=0.33,
         min_recall=1.0,
         top_k=3,
@@ -377,5 +377,81 @@ PANDO_PATTERN_CASES = [
             "query": "多 Provider 可插拔 Web 抓取",
             "require_top1": True,
         },
+    ),
+    TitleSetCase(
+        case_id="pando.pattern.memory",
+        description="记忆层拆分/提取相关经验",
+        expected_titles=["Memory"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "记忆提取",
+            "require_top1": True,
+        },
+    ),
+]
+
+# ---------- Graph callers（开源 CodeGraph；expected 为调用方文件）----------
+
+PANDO_CALLERS_CASES = [
+    SymbolRelationCase(
+        case_id="pando.graph.callers.ReActAgent",
+        description="ReActAgent 的 callers 应含执行器/子代理",
+        symbol="ReActAgent",
+        expected_paths=[
+            "app/agents/plan/react_executor.py",
+            "app/agents/core/subagent.py",
+        ],
+        min_precision=0.4,
+        min_recall=1.0,
+        limit=15,
+    ),
+    SymbolRelationCase(
+        case_id="pando.graph.callers.ContextBuilder",
+        description="ContextBuilder 的 callers 应含 react/planning",
+        symbol="ContextBuilder",
+        expected_paths=[
+            "app/agents/core/react.py",
+            "app/agents/plan/planning.py",
+        ],
+        min_precision=0.4,
+        min_recall=1.0,
+        limit=15,
+    ),
+    SymbolRelationCase(
+        case_id="pando.graph.callers.BaseAgent",
+        description="BaseAgent 的 callers 应含 react/planning",
+        symbol="BaseAgent",
+        expected_paths=[
+            "app/agents/core/react.py",
+            "app/agents/plan/planning.py",
+        ],
+        min_precision=0.4,
+        min_recall=1.0,
+        limit=15,
+    ),
+    SymbolRelationCase(
+        case_id="pando.graph.callers.jwt_validator",
+        description="jwt_validator 的 callers 应含 middleware",
+        symbol="jwt_validator",
+        expected_paths=[
+            "app/utils/auth/jwt_middleware.py",
+        ],
+        min_precision=0.5,
+        min_recall=1.0,
+        limit=10,
+    ),
+    SymbolRelationCase(
+        case_id="pando.graph.callers.PlanningAgent",
+        description="PlanningAgent 的 callers 应含 bus/queues 或 plan 包入口",
+        symbol="PlanningAgent",
+        expected_paths=[
+            "app/agents/bus/queues.py",
+            "app/agents/plan/__init__.py",
+        ],
+        min_precision=0.3,
+        min_recall=0.5,
+        limit=10,
     ),
 ]

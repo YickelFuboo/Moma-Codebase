@@ -104,6 +104,34 @@ class TestPatternSummarizerExtract:
         assert pattern.scenario
         assert pattern.patterns
         assert pattern.quality_score == pytest.approx(0.82)
+        assert pattern.plan
+        assert pattern.anchors
+        assert pattern.relevant_files == ["app/agents/skills/foo.py"]
+
+    def test_build_patterns_fills_relevant_files_from_commit(self):
+        data = {
+            "extractable": True,
+            "experiences": [
+                {
+                    "title": "鉴权校验集中化",
+                    "scenario": "接入 JWT 校验时",
+                    "patterns": ["统一 Token 校验入口"],
+                    "quality_score": 0.8,
+                }
+            ],
+        }
+        patterns = PatternSummarizer._build_patterns(
+            data,
+            "sha",
+            "msg",
+            files=[
+                FileChange(path="app/utils/auth/jwt_validator.py", status="M", additions=20, deletions=2),
+                FileChange(path="README.md", status="M", additions=1, deletions=0),
+            ],
+        )
+        assert len(patterns) == 1
+        assert patterns[0].relevant_files[0].endswith("jwt_validator.py")
+        assert any("auth" in a for a in patterns[0].anchors)
 
 
 class TestPatternSummarizerReusability:

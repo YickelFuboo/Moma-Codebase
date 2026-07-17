@@ -14,6 +14,7 @@ from app.repo_analysis.services.codegraph.providers.codegraph.cli_runner import 
     CodeGraphCliRunner,
 )
 from app.repo_analysis.services.codegraph.providers.codegraph.node_parser import NodeOutputParser
+from app.repo_analysis.services.codegraph.graph_result_normalizer import GraphResultNormalizer
 
 
 def find_codegraph_cli() -> Optional[str]:
@@ -131,22 +132,36 @@ class _CliSearch(CodeGraphSearchBase):
         return items
 
     async def query_dependents_of_file(self, repo_id: str, file_path: str) -> QueryResponse:
+        warn = GraphResultNormalizer.unsupported_file_message(file_path)
         try:
             project_path = await self._resolve_repo_path(repo_id)
             trail = self._node_trail_text(project_path, file_path)
             header = self._node_header_text(project_path, file_path)
             merged = f"{trail}\n{header}"
             dependents, _ = NodeOutputParser.parse_file_relations(merged, file_path)
-            return QueryResponse(result=True, content={"dependents": dependents})
+            cleaned = GraphResultNormalizer.clean_paths(dependents, exclude=file_path)
+            msg = warn or ("" if cleaned else "未解析到 dependents（可能索引不足或该文件无入边）")
+            return QueryResponse(
+                result=True,
+                content={"dependents": cleaned, "warning": warn},
+                message=msg,
+            )
         except Exception as exc:
             return QueryResponse(result=False, content={}, message=str(exc))
 
     async def query_dependented_of_file(self, repo_id: str, file_path: str) -> QueryResponse:
+        warn = GraphResultNormalizer.unsupported_file_message(file_path)
         try:
             project_path = await self._resolve_repo_path(repo_id)
             trail = self._node_trail_text(project_path, file_path)
             _, dependencies = NodeOutputParser.parse_file_relations(trail, file_path)
-            return QueryResponse(result=True, content={"dependented": dependencies})
+            cleaned = GraphResultNormalizer.clean_paths(dependencies, exclude=file_path)
+            msg = warn or ("" if cleaned else "未解析到 dependencies（可能索引不足或该文件无出边）")
+            return QueryResponse(
+                result=True,
+                content={"dependented": cleaned, "warning": warn},
+                message=msg,
+            )
         except Exception as exc:
             return QueryResponse(result=False, content={}, message=str(exc))
 
@@ -154,11 +169,19 @@ class _CliSearch(CodeGraphSearchBase):
         try:
             project_path = await self._resolve_repo_path(repo_id)
             files_summary: Dict[str, object] = {}
+            warnings: List[str] = []
             for file_path in file_paths:
                 rel = NodeOutputParser.normalize_rel_path(file_path)
+                warn = GraphResultNormalizer.unsupported_file_message(rel)
+                if warn:
+                    warnings.append(warn)
                 text = self._node_header_text(project_path, rel)
                 files_summary[rel] = NodeOutputParser.parse_file_summary(text, rel)
-            return QueryResponse(result=True, content={"files": files_summary})
+            return QueryResponse(
+                result=True,
+                content={"files": files_summary, "warnings": warnings},
+                message="; ".join(warnings) if warnings else "",
+            )
         except Exception as exc:
             return QueryResponse(result=False, content={}, message=str(exc))
 
@@ -168,18 +191,45 @@ class _CliSearch(CodeGraphSearchBase):
         symbol: str,
         limit: int = 20,
     ) -> QueryResponse:
+        sym = (symbol or "").strip()
+        if not sym:
+            return QueryResponse(
+                result=False,
+                content={},
+                message="symbol 为空，无法查询 callers；请提供符号名或改用 related",
+            )
         try:
             project_path = await self._resolve_repo_path(repo_id)
             payload = CodeGraphCliRunner.run_json(
-                ["callers", symbol, "-l", str(limit)],
+                ["callers", sym, "-l", str(max(limit * 2, limit))],
                 project_path=project_path,
+            )
+            callers = GraphResultNormalizer.clean_symbol_hits(
+                self._symbol_hits(payload, "callers"),
+                limit=limit,
+            )
+            msg = (
+                ""
+                if callers
+                else GraphResultNormalizer.missing_symbol_message(sym, "callers")
             )
             return QueryResponse(
                 result=True,
-                content={"symbol": symbol, "callers": self._symbol_hits(payload, "callers")},
+                content={"symbol": sym, "callers": callers},
+                message=msg,
             )
         except Exception as exc:
-            return QueryResponse(result=False, content={}, message=str(exc))
+            if GraphResultNormalizer.is_symbol_not_found_error(exc):
+                return QueryResponse(
+                    result=True,
+                    content={"symbol": sym, "callers": []},
+                    message=GraphResultNormalizer.missing_symbol_message(sym, "callers"),
+                )
+            return QueryResponse(
+                result=False,
+                content={},
+                message=f"callers 查询失败: {exc}；可降级 related/similar",
+            )
 
     async def query_callees_of_symbol(
         self,
@@ -187,18 +237,45 @@ class _CliSearch(CodeGraphSearchBase):
         symbol: str,
         limit: int = 20,
     ) -> QueryResponse:
+        sym = (symbol or "").strip()
+        if not sym:
+            return QueryResponse(
+                result=False,
+                content={},
+                message="symbol 为空，无法查询 callees；请提供符号名或改用 related",
+            )
         try:
             project_path = await self._resolve_repo_path(repo_id)
             payload = CodeGraphCliRunner.run_json(
-                ["callees", symbol, "-l", str(limit)],
+                ["callees", sym, "-l", str(max(limit * 2, limit))],
                 project_path=project_path,
+            )
+            callees = GraphResultNormalizer.clean_symbol_hits(
+                self._symbol_hits(payload, "callees"),
+                limit=limit,
+            )
+            msg = (
+                ""
+                if callees
+                else GraphResultNormalizer.missing_symbol_message(sym, "callees")
             )
             return QueryResponse(
                 result=True,
-                content={"symbol": symbol, "callees": self._symbol_hits(payload, "callees")},
+                content={"symbol": sym, "callees": callees},
+                message=msg,
             )
         except Exception as exc:
-            return QueryResponse(result=False, content={}, message=str(exc))
+            if GraphResultNormalizer.is_symbol_not_found_error(exc):
+                return QueryResponse(
+                    result=True,
+                    content={"symbol": sym, "callees": []},
+                    message=GraphResultNormalizer.missing_symbol_message(sym, "callees"),
+                )
+            return QueryResponse(
+                result=False,
+                content={},
+                message=f"callees 查询失败: {exc}；可降级 related/similar",
+            )
 
 
 class CodeGraphCliProvider(CodeGraphProvider):

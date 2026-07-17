@@ -48,6 +48,7 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
 
     _loop = None
     _vector_ready: bool = False
+    _graph_ready: bool = False
     _session_repo_id = None
     _session_repo_path = None
 
@@ -149,8 +150,38 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
                 )
                 if cls.ENABLE_CODE_GRAPH:
                     await cls._wait_code_graph(repo_id)
+                    PandoAgentScenarioSession._graph_ready = True
                 PandoAgentScenarioSession._vector_ready = True
             return repo_id
+
+    @classmethod
+    async def ensure_graph_ready(cls) -> str:
+        """仅保证 CodeGraph 索引可用（不强制向量 analyze）。"""
+        async with cls._async_lock():
+            repo_id = await cls.ensure_repo()
+            if not PandoAgentScenarioSession._graph_ready:
+                from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
+
+                CodeGraphGateway.ensure_ready()
+                await cls._wait_code_graph(repo_id)
+                PandoAgentScenarioSession._graph_ready = True
+            return repo_id
+
+    @classmethod
+    async def query_callers(cls, symbol: str, limit: int = 30):
+        repo_id = await cls.ensure_graph_ready()
+        from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
+
+        with CodeGraphGateway.create_search() as search:
+            return await search.query_callers_of_symbol(repo_id, symbol, limit=limit)
+
+    @classmethod
+    async def query_dependents(cls, file_path: str):
+        repo_id = await cls.ensure_graph_ready()
+        from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
+
+        with CodeGraphGateway.create_search() as search:
+            return await search.query_dependents_of_file(repo_id, file_path)
 
     @classmethod
     async def _wait_code_graph(cls, repo_id: str, *, timeout_sec: float = 1800) -> None:
@@ -187,6 +218,7 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
     async def shutdown_runtime(cls) -> None:
         await super().shutdown_runtime()
         PandoAgentScenarioSession._vector_ready = False
+        PandoAgentScenarioSession._graph_ready = False
         PandoAgentScenarioSession._session_repo_id = None
         PandoAgentScenarioSession._session_repo_path = None
         if PandoAgentScenarioSession._loop is not None and not PandoAgentScenarioSession._loop.is_closed():

@@ -15,12 +15,72 @@ class PatternVectorService:
 
     @staticmethod
     def build_embed_text(pattern: ExperiencePattern) -> str:
+        file_tokens = []
+        for fp in list(pattern.relevant_files or []) + list(pattern.anchors or []):
+            norm = str(fp or "").replace("\\", "/")
+            if not norm:
+                continue
+            file_tokens.append(norm)
+            stem = norm.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            if stem:
+                file_tokens.append(stem)
+            for part in norm.split("/"):
+                if part and part not in {"app", "src"} and len(part) >= 2:
+                    file_tokens.append(part)
         parts = [
             pattern.title,
             pattern.scenario,
             f"模式：{'；'.join(pattern.patterns)}",
+            f"步骤：{'；'.join(pattern.plan)}" if pattern.plan else "",
+            f"锚点：{' '.join(pattern.anchors)}" if pattern.anchors else "",
+            f"相关文件：{' '.join(pattern.relevant_files)}" if pattern.relevant_files else "",
+            f"关键词：{' '.join(dict.fromkeys(file_tokens))}" if file_tokens else "",
         ]
         return "\n".join(p for p in parts if p).strip()
+
+    @staticmethod
+    def lexical_boost(query: str, item: Dict[str, object]) -> float:
+        """短词/弱 query 的词面加分，提升 jwt/鉴权 等命中。"""
+        q = (query or "").strip().casefold()
+        if not q:
+            return 0.0
+        tokens = [t for t in re.split(r"[\s,/\\_\-]+", q) if len(t) >= 2]
+        if len(q) >= 2 and q not in tokens:
+            tokens.insert(0, q)
+        blob = " ".join(
+            [
+                str(item.get("title") or ""),
+                str(item.get("scenario") or ""),
+                " ".join(str(x) for x in (item.get("patterns") or [])),
+                " ".join(str(x) for x in (item.get("plan") or [])),
+                " ".join(str(x) for x in (item.get("anchors") or [])),
+                " ".join(str(x) for x in (item.get("relevant_files") or [])),
+            ]
+        ).casefold()
+        if not blob:
+            return 0.0
+        hits = 0
+        for t in tokens:
+            if t in blob:
+                hits += 1
+        if hits <= 0:
+            return 0.0
+        # 短 query 词面命中权重大一些
+        weight = 0.35 if len(q) <= 8 else 0.2
+        return min(0.6, hits * weight)
+
+    @staticmethod
+    def rerank_by_query(query: str, items: List[Dict[str, object]]) -> List[Dict[str, object]]:
+        ranked: List[Dict[str, object]] = []
+        for it in items:
+            row = dict(it)
+            base = float(row.get("similarity") or 0.0)
+            boost = PatternVectorService.lexical_boost(query, row)
+            row["_lexical_boost"] = boost
+            row["similarity"] = base + boost
+            ranked.append(row)
+        ranked.sort(key=lambda x: float(x.get("similarity") or 0.0), reverse=True)
+        return ranked
 
     @staticmethod
     def _pattern_key(pattern: ExperiencePattern) -> str:
@@ -100,10 +160,10 @@ class PatternVectorService:
                     embedding_data=rows[0],
                     embedding_data_type="float",
                     distance_type="cosine",
-                    topn=top_k,
+                    topn=max(top_k * 3, 15),
                 )
             ],
-            limit=top_k,
+            limit=max(top_k * 3, 15),
         )
         result = await VECTOR_STORE_CONN.search([space], request)
         docs = VECTOR_STORE_CONN.get_source(result) if result else []
@@ -111,7 +171,7 @@ class PatternVectorService:
         for doc in docs:
             payload = PatternVectorService._parse_summary(doc.get("summary"))
             items.append(PatternVectorService._item_from_payload(payload, doc))
-        return items
+        return PatternVectorService.rerank_by_query(q, items)[: max(1, top_k)]
 
     @staticmethod
     def _item_from_payload(payload: dict, doc: dict) -> Dict[str, object]:

@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import List
+from typing import List, Optional
 from app.infrastructure.llms import llm_factory
 from app.repo_analysis.services.mr_experience.change_filter import ChangeFilter
 from app.repo_analysis.services.mr_experience.models import (
@@ -41,7 +41,7 @@ quality_score 按「未来复用性」打分，不是按「本次改动大小」
 
 输入 JSON 含 commit_message 与 files（path/status/churn/hint_action）。
 
-输出严格 JSON（不要 markdown 代码块），每条经验仅 4 个字段：
+输出严格 JSON（不要 markdown 代码块），每条经验字段如下：
 {
   "extractable": true,
   "skip_reason": "",
@@ -50,6 +50,9 @@ quality_score 按「未来复用性」打分，不是按「本次改动大小」
       "title": "短标题（抽象场景，不要复述 commit message）",
       "scenario": "什么情况下适用",
       "patterns": ["可复用的架构/约定/决策"],
+      "plan": ["可执行步骤1", "步骤2"],
+      "anchors": ["关键目录或模块锚点，如 app/utils/auth/"],
+      "relevant_files": ["本次强相关相对路径，如 app/utils/auth/jwt_validator.py"],
       "quality_score": 0.75
     }
   ]
@@ -136,6 +139,7 @@ class PatternSummarizer:
             data=data,
             commit_sha=commit_sha,
             commit_message=(commit_message or "").strip(),
+            files=files,
         )
         if not patterns:
             return ExperienceExtractionResult(extractable=False, skip_reason="LLM 未产出有效经验")
@@ -146,10 +150,12 @@ class PatternSummarizer:
         data: dict,
         commit_sha: str,
         commit_message: str,
+        files: Optional[List[FileChange]] = None,
     ) -> List[ExperiencePattern]:
         raw_items = data.get("experiences")
         if not isinstance(raw_items, list):
             raw_items = [data]
+        fallback_files = PatternSummarizer._fallback_relevant_files(files or [])
         out: List[ExperiencePattern] = []
         for item in raw_items:
             if not isinstance(item, dict):
@@ -167,6 +173,16 @@ class PatternSummarizer:
             )
             if quality_score < 0.55:
                 continue
+            plan = PatternSummarizer._str_list(item.get("plan"))
+            anchors = PatternSummarizer._str_list(item.get("anchors"))
+            relevant_files = [
+                p.replace("\\", "/")
+                for p in PatternSummarizer._str_list(item.get("relevant_files"))
+            ]
+            if not relevant_files:
+                relevant_files = list(fallback_files)
+            if not anchors and relevant_files:
+                anchors = PatternSummarizer._anchors_from_files(relevant_files)
             out.append(
                 ExperiencePattern(
                     title=title,
@@ -175,8 +191,39 @@ class PatternSummarizer:
                     source_commits=[commit_sha],
                     commit_message=commit_message,
                     quality_score=quality_score,
+                    plan=plan,
+                    anchors=anchors,
+                    relevant_files=relevant_files,
                 )
             )
+        return out
+
+    @staticmethod
+    def _fallback_relevant_files(files: List[FileChange], *, limit: int = 8) -> List[str]:
+        ranked = sorted(files or [], key=lambda f: int(f.churn), reverse=True)
+        out: List[str] = []
+        for f in ranked:
+            p = str(f.path or "").replace("\\", "/").strip()
+            if not p or p in out:
+                continue
+            out.append(p)
+            if len(out) >= limit:
+                break
+        return out
+
+    @staticmethod
+    def _anchors_from_files(files: List[str], *, limit: int = 4) -> List[str]:
+        out: List[str] = []
+        for fp in files:
+            parts = [x for x in fp.replace("\\", "/").split("/") if x]
+            if len(parts) >= 2:
+                anchor = "/".join(parts[:-1]) + "/"
+            else:
+                anchor = fp
+            if anchor and anchor not in out:
+                out.append(anchor)
+            if len(out) >= limit:
+                break
         return out
 
     @staticmethod

@@ -158,12 +158,22 @@ class CodeVectorService:
                 return await CodeSummary.llm_summarize(src, ct)
 
         summaries = await asyncio.gather(*[one_summary(src, ct) for _, _, _, _, src, ct in symbols])
+        raw_summaries: List[str] = []
         texts: List[str] = []
         for i, s in enumerate(summaries):
             t = (s or "").strip()
             if not t:
-                t = CodeVectorService._fallback_summary_from_source(symbols[i][4], symbols[i][5])  
-            texts.append(t)
+                t = CodeVectorService._fallback_summary_from_source(symbols[i][4], symbols[i][5])
+            raw_summaries.append(t)
+            kind, name, _, _, _, _ = symbols[i]
+            texts.append(
+                CodeVectorService.build_symbol_embed_text(
+                    file_path=rel_file_path,
+                    symbol_kind=kind,
+                    symbol_name=name,
+                    summary=t,
+                )
+            )
         
         # 向量化符号摘要
         vectors = await CodeVectorService._embed_texts(texts)
@@ -184,7 +194,7 @@ class CodeVectorService:
         records: List[Dict[str, object]] = []
         for idx, item in enumerate(symbols):
             symbol_kind, symbol_name, start_line, end_line, _, _ = item
-            summary = texts[idx]
+            summary = raw_summaries[idx]
             stable_id = CodeVectorService._build_stable_id(
                 repo_id=repo_id,
                 file_path=rel_file_path,
@@ -280,6 +290,28 @@ class CodeVectorService:
             return False
 
         return False
+
+    @staticmethod
+    def build_symbol_embed_text(
+        *,
+        file_path: str,
+        symbol_kind: str,
+        symbol_name: str,
+        summary: str,
+    ) -> str:
+        """符号向量入库文本：路径/符号名 + 摘要，提升自然语言检索命中。"""
+        fp = (file_path or "").replace("\\", "/").strip()
+        stem = fp.rsplit("/", 1)[-1].rsplit(".", 1)[0] if fp else ""
+        path_tokens = " ".join(
+            part for part in fp.replace(".", "/").split("/") if part and part not in {"app", "src"}
+        )
+        parts = [
+            f"文件: {fp}" if fp else "",
+            f"符号: {symbol_kind} {symbol_name}".strip(),
+            f"路径词: {path_tokens} {stem}".strip(),
+            (summary or "").strip(),
+        ]
+        return "\n".join(p for p in parts if p)
 
     @staticmethod
     def _fallback_summary_from_source(source_code: str, ct: ContentType) -> str:
