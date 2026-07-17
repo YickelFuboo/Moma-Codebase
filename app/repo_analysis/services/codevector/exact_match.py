@@ -58,16 +58,15 @@ class ExactMatchService:
         return out
 
     @classmethod
-    def score_symbol_keyword(cls, keyword: str, symbol_name: str, file_path: str) -> float:
-        """符号命中分层打分；弱路径命中分数明显更低。"""
+    def score_symbol_keyword(cls, keyword: str, symbol_name: str, file_path: str = "") -> float:
+        """仅按符号名分层打分；路径命中交给 match_chunk_paths，避免引用文件靠路径蹭 exact。"""
         kw = (keyword or "").strip()
         if not kw:
             return 0.0
         kw_l = kw.lower()
         name = symbol_name or ""
-        path = (file_path or "").replace("\\", "/")
         name_l = name.lower()
-        path_l = path.lower()
+        _ = file_path  # 保留参数兼容调用方；符号通道不再用路径加分
 
         # 1) 符号全名 / 后缀（Class.method）
         if name_l == kw_l:
@@ -85,19 +84,9 @@ class ExactMatchService:
         if kw_tokens and all(t in name_tokens for t in kw_tokens if len(t) >= 2):
             if len(kw_tokens) >= 2:
                 return 2.2
-        # 3) 符号名强子串（仅较长关键词，避免 agent 污染）
+        # 3) 符号名强子串（仅较长关键词）
         if len(kw_l) >= 6 and kw_l in name_l:
             return 1.8
-        # 4) 路径：禁止短词与弱词；要求边界或路径段命中
-        path_segs = re.split(r"[/_.-]+", path_l)
-        if kw_l in path_segs or any(seg == kw_l or seg.startswith(kw_l) for seg in path_segs if seg):
-            return 1.15
-        # 文件名 stem
-        stem = path_l.rsplit("/", 1)[-1]
-        if stem.endswith(".py"):
-            stem = stem[:-3]
-        if kw_l == stem or stem.startswith(kw_l) or kw_l.startswith(stem) and len(stem) >= cls.PATH_MIN_LEN:
-            return 1.25
         return 0.0
 
     @classmethod
@@ -167,6 +156,13 @@ class ExactMatchService:
                 hit = max(hit, cls.score_symbol_keyword(kw, name, path))
             if hit <= 0:
                 continue
+            # 仅名称通道：>=2.8 为强定义；1.8~2.8 为弱符号；不再产出 path tier
+            if hit >= 2.8:
+                tier = "symbol"
+            elif hit >= 1.8:
+                tier = "symbol_weak"
+            else:
+                continue
             scored.append(
                 (
                     hit,
@@ -179,7 +175,7 @@ class ExactMatchService:
                         "summary": row.get("summary"),
                         "_score": hit,
                         "match_source": "exact",
-                        "exact_tier": "symbol" if hit >= 1.8 else "path",
+                        "exact_tier": tier,
                     },
                 )
             )
@@ -187,39 +183,23 @@ class ExactMatchService:
         return [it for _, it in scored[: max(1, top_k)]]
 
     @classmethod
-    async def match_chunk_paths(
+    async def match_paths(
         cls,
         repo_id: str,
         keywords: List[str],
         *,
         top_k: int = 10,
     ) -> List[Dict[str, object]]:
-        """行块侧按路径段/文件名命中（弱于符号 exact）。"""
+        """按路径段/文件名命中（弱于符号 exact）；优先扫符号空间，回退行块空间。"""
         keys = [str(k).strip() for k in (keywords or []) if k and str(k).strip()]
         if not keys:
             return []
         dim = await cls._embedding_dim()
         if not dim:
             return []
-        space = line_chunk_space_name(repo_id, dim)
-        if not await VECTOR_STORE_CONN.space_exists(space):
+        rows = await cls._list_path_rows(repo_id, dim)
+        if not rows:
             return []
-        rows = await VECTOR_STORE_CONN.list_records(
-            space,
-            condition={
-                "repo_id": repo_id,
-                "analysis_type": AnalysisType.LINE_CHUNK_VECTOR.value,
-            },
-            select_fields=[
-                "repo_id",
-                "file_path",
-                "analysis_type",
-                "start_line",
-                "end_line",
-                "chunk_index",
-            ],
-            limit=cls.SCAN_CAP,
-        )
         best_by_file: Dict[str, Tuple[float, Dict[str, object]]] = {}
         for row in rows:
             path = str(row.get("file_path") or "")
@@ -243,3 +223,55 @@ class ExactMatchService:
                 best_by_file[path] = (hit, item)
         ranked = sorted(best_by_file.values(), key=lambda x: (-x[0], str(x[1].get("file_path") or "")))
         return [it for _, it in ranked[: max(1, top_k)]]
+
+    @classmethod
+    async def match_chunk_paths(
+        cls,
+        repo_id: str,
+        keywords: List[str],
+        *,
+        top_k: int = 10,
+    ) -> List[Dict[str, object]]:
+        """兼容旧名：等同 match_paths。"""
+        return await cls.match_paths(repo_id, keywords, top_k=top_k)
+
+    @classmethod
+    async def _list_path_rows(cls, repo_id: str, dim: int) -> List[Dict[str, object]]:
+        symbol_space = symbol_summary_space_name(repo_id, dim)
+        if await VECTOR_STORE_CONN.space_exists(symbol_space):
+            rows = await VECTOR_STORE_CONN.list_records(
+                symbol_space,
+                condition={
+                    "repo_id": repo_id,
+                    "analysis_type": AnalysisType.SYMBOL_SUMMARY_VECTOR.value,
+                },
+                select_fields=[
+                    "repo_id",
+                    "file_path",
+                    "analysis_type",
+                    "start_line",
+                    "end_line",
+                ],
+                limit=cls.SCAN_CAP,
+            )
+            if rows:
+                return rows
+        chunk_space = line_chunk_space_name(repo_id, dim)
+        if not await VECTOR_STORE_CONN.space_exists(chunk_space):
+            return []
+        return await VECTOR_STORE_CONN.list_records(
+            chunk_space,
+            condition={
+                "repo_id": repo_id,
+                "analysis_type": AnalysisType.LINE_CHUNK_VECTOR.value,
+            },
+            select_fields=[
+                "repo_id",
+                "file_path",
+                "analysis_type",
+                "start_line",
+                "end_line",
+                "chunk_index",
+            ],
+            limit=cls.SCAN_CAP,
+        )

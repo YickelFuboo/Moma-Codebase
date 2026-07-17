@@ -27,6 +27,41 @@ class GitHistorySource:
         return [GitHistorySource._enrich(repo_path, e) for e in normals]
 
     @staticmethod
+    def has_new_entries(repo_path: str, after_sha: Optional[str] = None) -> bool:
+        """相对 after_sha 检测是否还有未采集的 merge（无 merge 时看普通 commit）。"""
+        merges = GitHistorySource._list_commits(
+            repo_path, merges_only=True, since=None, limit=1
+        )
+        merges_only = bool(merges)
+        if after_sha is None:
+            entries = GitHistorySource._list_commits(
+                repo_path, merges_only=merges_only, since=None, limit=1
+            )
+            return bool(entries)
+        return (
+            GitHistorySource._count_commits_after(
+                repo_path, after_sha=after_sha, merges_only=merges_only
+            )
+            > 0
+        )
+
+    @staticmethod
+    def _count_commits_after(
+        repo_path: str, *, after_sha: str, merges_only: bool
+    ) -> int:
+        args = ["rev-list"]
+        if merges_only:
+            args.append("--merges")
+        else:
+            args.append("--no-merges")
+        args.extend([f"{after_sha}..HEAD", "--count"])
+        try:
+            out = GitHistorySource._run_git(repo_path, args).strip()
+            return int(out or 0)
+        except (RuntimeError, ValueError):
+            return 0
+
+    @staticmethod
     def _run_git(repo_path: str, args: List[str]) -> str:
         completed = subprocess.run(
             ["git", *args],

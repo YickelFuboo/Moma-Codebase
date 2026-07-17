@@ -55,9 +55,15 @@ config.toml
 .moma-repobase/
 .Agent/
 .agent/
+.codegraph/
+.claude
 
 # 参考信息
 参考项目/
+参考/
+
+# 测试中间产出
+.tmp_*.txt
 
 # 前台服务
 node_modules

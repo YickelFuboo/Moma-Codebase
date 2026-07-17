@@ -25,3 +25,26 @@ class TestChangeFilterExclude:
         assert ChangeFilter.status_action("A") == "新增"
         assert ChangeFilter.status_action("D") == "删除"
         assert ChangeFilter.status_action("M") == "修改"
+
+
+class TestChangeFilterPrefilter:
+    def test_skip_lock_only(self):
+        reason = ChangeFilter.prefilter_skip_reason(
+            "bump deps",
+            [FileChange(path="package-lock.json", status="M", additions=100, deletions=100)],
+        )
+        assert reason
+
+    def test_skip_empty_after_select(self):
+        reason = ChangeFilter.prefilter_skip_reason(
+            "only vendor",
+            [FileChange(path="node_modules/x.js", status="M", additions=1, deletions=0)],
+        )
+        assert reason == "无有效变更文件"
+
+    def test_keep_meaningful_change(self):
+        reason = ChangeFilter.prefilter_skip_reason(
+            "add skill module",
+            [FileChange(path="app/skill.py", status="A", additions=80, deletions=0)],
+        )
+        assert reason is None

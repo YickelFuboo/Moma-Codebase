@@ -37,9 +37,12 @@ async def init_runtime() -> None:
 
 
 async def ensure_scheduler() -> None:
-    """启动文件分析全局调度器（幂等，等同原 main 启动阶段）。"""
+    """启动文件分析调度器；可选启动已登记仓库的增量扫描。"""
     from app.repo_analysis.services.file_analysis_service import FileAnalysisService
+    from app.repo_analysis.services.incremental_scan_service import IncrementalScanService
+
     FileAnalysisService.start_global_scheduler()
+    IncrementalScanService.start()
 
 
 async def startup() -> None:
@@ -56,9 +59,11 @@ async def shutdown() -> None:
     global _runtime_inited
     end_long_session()
     from app.repo_analysis.services.file_analysis_service import FileAnalysisService
+    from app.repo_analysis.services.incremental_scan_service import IncrementalScanService
     from app.repo_analysis.services.lsp.lsp_service import CodeLSPService
     from app.infrastructure.vector_store import get_vector_store_conn
 
+    await IncrementalScanService.stop()
     await FileAnalysisService.stop_global_scheduler()
     await CodeLSPService.close_all()
     conn = get_vector_store_conn()

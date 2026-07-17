@@ -5,15 +5,58 @@ import re
 from typing import List
 from app.infrastructure.llms import llm_factory
 from app.repo_analysis.services.mr_experience.change_filter import ChangeFilter
-from app.repo_analysis.services.mr_experience.models import ExperiencePattern, ExperienceStep, FileChange
+from app.repo_analysis.services.mr_experience.models import (
+    ExperienceExtractionResult,
+    ExperiencePattern,
+    FileChange,
+)
 
 
-PATTERN_PROMPT = """你是资深研发，请根据一次合入的需求描述与变更文件，总结可复用的开发经验。
-要求：
-1. 只关注与需求强相关的文件改动
-2. 输出严格 JSON（不要 markdown 代码块），格式：
-{"title":"简短标题","steps":[{"file":"相对路径","action":"应如何修改的一句话"}]}
-3. steps 不超过 12 条；action 要具体可执行
+PATTERN_PROMPT = """你是资深架构师，从历史合入中提炼「对后续 Agent/研发有复用价值的经验」。
+
+核心标准（最重要）：
+- 经验必须能指导「未来新的、不同的需求」，不是复述「这次 MR 改了什么」
+- scenario：什么情况下会遇到同类问题（抽象场景，不要绑定本次具体文件名/commit）
+- patterns：跨项目可套用的约定/架构决策/迁移套路，不要写操作清单或 changelog
+
+quality_score 按「未来复用性」打分，不是按「本次改动大小」：
+- >=0.7：架构/分层/目录约定/协议桥接等，换需求仍适用（如 skill Hub、目录迁移范式）
+- 0.55~0.69：有一定泛化，但偏窄
+- <0.55：仅描述本次操作、一次性批量改动、单点文件/单 skill 特例 → 不要输出该条
+
+应丢弃的模式（不要输出，或 quality_score < 0.55）：
+- 「对全部 X 做批量删减/瘦身」「一次性处理 N 个文件」→ 这是本次运维操作，不是模式
+- 「在 xxx 目录下新增 run_stage.py」→ 绑定单个 skill 实现细节
+- 「新增 SkillsHubPanel.vue / 删减 88 行 manager」→ 复述 diff，未抽象成决策
+- patterns 里堆具体文件名、行数、PR 动作，而没有可迁移的「为什么/怎么选」
+
+好的 patterns 示例：
+- 「skill 按领域分类存 data/skills/{domain}/，而非按 agent 私有目录，便于跨 agent 复用」
+- 「外部协议接入用独立 Bridge 层，Agent 核心不感知协议细节」
+
+重要原则：
+1. 并非每次合入都有可提炼经验；无复用价值时 extractable=false
+2. 一个复杂 MR 可拆多条，但每条必须是不同「可复用场景」；不要为凑数拆 changelog
+3. 不要写成 changelog 或逐文件 diff
+
+输入 JSON 含 commit_message 与 files（path/status/churn/hint_action）。
+
+输出严格 JSON（不要 markdown 代码块），每条经验仅 4 个字段：
+{
+  "extractable": true,
+  "skip_reason": "",
+  "experiences": [
+    {
+      "title": "短标题（抽象场景，不要复述 commit message）",
+      "scenario": "什么情况下适用",
+      "patterns": ["可复用的架构/约定/决策"],
+      "quality_score": 0.75
+    }
+  ]
+}
+
+当 extractable=false 时：
+{"extractable":false,"skip_reason":"原因","experiences":[]}
 """
 
 
@@ -22,14 +65,33 @@ class PatternSummarizerError(RuntimeError):
 
 
 class PatternSummarizer:
-    """调用 LLM 生成经验标题与步骤；失败必须抛错供任务记 failed。"""
+    """调用 LLM 判断是否可提炼，并生成场景化经验；失败抛错供任务记 failed。"""
+
+    _CHANGELOG_HINTS = (
+        "一次性批量",
+        "纯删减",
+        "净删减",
+        "零新增",
+        "只删除",
+        "批量处理所有",
+        "新增 skillsHubPanel",
+        "新增 hub/service",
+        "run_stage.py",
+        "删减",
+        "行)",
+        "行，",
+    )
 
     @staticmethod
     async def summarize(
         commit_message: str,
         files: List[FileChange],
         commit_sha: str,
-    ) -> ExperiencePattern:
+    ) -> ExperienceExtractionResult:
+        skip = ChangeFilter.prefilter_skip_reason(commit_message, files)
+        if skip:
+            return ExperienceExtractionResult(extractable=False, skip_reason=skip)
+
         payload = {
             "commit_message": (commit_message or "").strip(),
             "files": [
@@ -38,6 +100,7 @@ class PatternSummarizer:
                     "status": f.status,
                     "additions": f.additions,
                     "deletions": f.deletions,
+                    "churn": f.churn,
                     "hint_action": ChangeFilter.status_action(f.status),
                 }
                 for f in files
@@ -47,7 +110,7 @@ class PatternSummarizer:
         try:
             llm = llm_factory.create_model()
             stream, _usage = await llm.chat_stream(
-                system_prompt="你擅长从历史合入沉淀开发模式，输出必须是合法 JSON。",
+                system_prompt="你擅长从历史合入沉淀可复用的开发模式，输出必须是合法 JSON。",
                 user_prompt=PATTERN_PROMPT,
                 user_question=user_question,
             )
@@ -62,28 +125,101 @@ class PatternSummarizer:
             raise PatternSummarizerError(f"LLM 返回无效: {raw[:200]}")
 
         data = PatternSummarizer._parse_json(raw)
-        title = str(data.get("title") or "").strip()
-        if not title:
-            raise PatternSummarizerError("LLM JSON 缺少 title")
-        steps_raw = data.get("steps") or []
-        if not isinstance(steps_raw, list) or not steps_raw:
-            raise PatternSummarizerError("LLM JSON 缺少 steps")
-        steps: List[ExperienceStep] = []
-        for item in steps_raw:
-            if not isinstance(item, dict):
-                continue
-            file_path = str(item.get("file") or "").strip()
-            action = str(item.get("action") or "").strip()
-            if file_path and action:
-                steps.append(ExperienceStep(file=file_path, action=action))
-        if not steps:
-            raise PatternSummarizerError("LLM steps 解析为空")
-        return ExperiencePattern(
-            title=title,
-            steps=steps,
-            source_commits=[commit_sha],
+        extractable = bool(data.get("extractable"))
+        skip_reason = str(data.get("skip_reason") or "").strip()
+        if not extractable:
+            if not skip_reason:
+                skip_reason = "LLM 判定无可复用经验"
+            return ExperienceExtractionResult(extractable=False, skip_reason=skip_reason)
+
+        patterns = PatternSummarizer._build_patterns(
+            data=data,
+            commit_sha=commit_sha,
             commit_message=(commit_message or "").strip(),
         )
+        if not patterns:
+            return ExperienceExtractionResult(extractable=False, skip_reason="LLM 未产出有效经验")
+        return ExperienceExtractionResult(extractable=True, patterns=patterns)
+
+    @staticmethod
+    def _build_patterns(
+        data: dict,
+        commit_sha: str,
+        commit_message: str,
+    ) -> List[ExperiencePattern]:
+        raw_items = data.get("experiences")
+        if not isinstance(raw_items, list):
+            raw_items = [data]
+        out: List[ExperiencePattern] = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            scenario = str(item.get("scenario") or "").strip()
+            patterns = PatternSummarizer._str_list(item.get("patterns"))
+            if not title or not scenario or not patterns:
+                continue
+            quality_score = PatternSummarizer._cap_score_if_mr_summary(
+                title=title,
+                scenario=scenario,
+                patterns=patterns,
+                score=PatternSummarizer._score(item.get("quality_score")),
+            )
+            if quality_score < 0.55:
+                continue
+            out.append(
+                ExperiencePattern(
+                    title=title,
+                    scenario=scenario,
+                    patterns=patterns,
+                    source_commits=[commit_sha],
+                    commit_message=commit_message,
+                    quality_score=quality_score,
+                )
+            )
+        return out
+
+    @staticmethod
+    def _cap_score_if_mr_summary(
+        title: str,
+        scenario: str,
+        patterns: List[str],
+        score: float,
+    ) -> float:
+        blob = f"{title} {scenario} {' '.join(patterns)}".lower()
+        hits = sum(1 for hint in PatternSummarizer._CHANGELOG_HINTS if hint.lower() in blob)
+        concrete_files = len(re.findall(r"[\w/\\-]+\.(py|vue|md|json|ts|tsx|go|java)", blob, flags=re.I))
+        capped = score
+        if hits >= 2:
+            capped = min(capped, 0.5)
+        elif hits >= 1:
+            capped = min(capped, 0.58)
+        if concrete_files >= 3:
+            capped = min(capped, 0.58)
+        return capped
+
+    @staticmethod
+    def _score(raw: object) -> float:
+        try:
+            score = float(raw)
+        except (TypeError, ValueError):
+            return 0.0
+        if score < 0:
+            return 0.0
+        if score > 1:
+            return 1.0
+        return score
+
+    @staticmethod
+    def _str_list(raw: object) -> List[str]:
+        if not isinstance(raw, list):
+            return []
+        out: List[str] = []
+        for item in raw:
+            text = str(item or "").strip()
+            if text:
+                out.append(text)
+        return out
 
     @staticmethod
     def _parse_json(raw: str) -> dict:

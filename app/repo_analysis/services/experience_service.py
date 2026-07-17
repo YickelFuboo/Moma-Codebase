@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from sqlalchemy import delete, func, select, update
+from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.models.experience_status import (
     ExperienceItemStatus,
@@ -14,7 +15,7 @@ from app.repo_analysis.models.experience_status import (
 )
 from app.repo_analysis.services.mr_experience.change_filter import ChangeFilter
 from app.repo_analysis.services.mr_experience.git_history_source import GitHistorySource
-from app.repo_analysis.services.mr_experience.models import FileChange
+from app.repo_analysis.services.mr_experience.models import ExperiencePattern, FileChange
 from app.repo_analysis.services.mr_experience.pattern_summarizer import (
     PatternSummarizer,
     PatternSummarizerError,
@@ -30,6 +31,41 @@ class ExperienceService:
     _retry_scheduler_task: Optional[asyncio.Task] = None
     _retry_stop_event: Optional[asyncio.Event] = None
     MAX_RETRY = 5
+    DEFAULT_ANALYZE_LIMIT = 50
+
+    @staticmethod
+    async def is_job_running(repo_id: str) -> bool:
+        running = ExperienceService._running_jobs.get(repo_id)
+        if running and not running.done():
+            return True
+        async with get_db_session() as db:
+            status = await db.scalar(
+                select(RepoExperienceTask.job_status).where(RepoExperienceTask.repo_id == repo_id)
+            )
+        return status == ExperienceJobStatus.RUNNING.value
+
+    @staticmethod
+    async def get_latest_analyzed_commit_sha(repo_id: str) -> Optional[str]:
+        async with get_db_session() as db:
+            return await db.scalar(
+                select(MrExperienceItem.commit_sha)
+                .where(MrExperienceItem.repo_id == repo_id)
+                .order_by(
+                    MrExperienceItem.committed_at.desc().nullslast(),
+                    MrExperienceItem.created_at.desc(),
+                )
+                .limit(1)
+            )
+
+    @staticmethod
+    def _keep_high_quality_patterns(patterns: List[ExperiencePattern]) -> List[ExperiencePattern]:
+        threshold = float(settings.mr_experience_min_quality_score or 0.0)
+        kept: List[ExperiencePattern] = []
+        for p in patterns:
+            score = float(p.quality_score or 0.0)
+            if score >= threshold:
+                kept.append(p)
+        return kept
 
     @staticmethod
     async def start_analyze(
@@ -38,6 +74,8 @@ class ExperienceService:
         since: Optional[str] = None,
         limit: int = 50,
     ) -> Dict[str, object]:
+        if not settings.mr_experience_enabled:
+            raise ValueError("MR 经验能力已关闭：请设置 MR_EXPERIENCE_ENABLED=true")
         async with get_db_session() as db:
             repo = await db.scalar(select(GitRepository).where(GitRepository.id == repo_id))
             if not repo:
@@ -217,15 +255,58 @@ class ExperienceService:
         try:
             if not files:
                 raise PatternSummarizerError("候选文件为空")
-            pattern = await PatternSummarizer.summarize(message, files, commit_sha)
-            await PatternVectorService.upsert_pattern(repo_id, pattern)
+            result = await PatternSummarizer.summarize(message, files, commit_sha)
+            if not result.extractable:
+                async with get_db_session() as db:
+                    item = await db.scalar(select(MrExperienceItem).where(MrExperienceItem.id == item_id))
+                    if not item:
+                        return
+                    item.title = None
+                    item.steps_json = json.dumps(
+                        {"skip_reason": result.skip_reason},
+                        ensure_ascii=False,
+                    )
+                    item.status = ExperienceItemStatus.SKIPPED.value
+                    item.last_error = None
+                    item.last_finished_at = datetime.now()
+                    await db.commit()
+                logging.info(
+                    "经验条目跳过 item_id=%s sha=%s reason=%s",
+                    item_id,
+                    commit_sha[:10],
+                    result.skip_reason,
+                )
+                return
+            kept_patterns = ExperienceService._keep_high_quality_patterns(result.patterns)
+            if not kept_patterns:
+                async with get_db_session() as db:
+                    item = await db.scalar(select(MrExperienceItem).where(MrExperienceItem.id == item_id))
+                    if not item:
+                        return
+                    item.title = None
+                    item.steps_json = json.dumps(
+                        {"skip_reason": "经验质量分过低，已丢弃"},
+                        ensure_ascii=False,
+                    )
+                    item.status = ExperienceItemStatus.SKIPPED.value
+                    item.last_error = None
+                    item.last_finished_at = datetime.now()
+                    await db.commit()
+                return
+            await PatternVectorService.upsert_patterns(repo_id, kept_patterns)
             async with get_db_session() as db:
                 item = await db.scalar(select(MrExperienceItem).where(MrExperienceItem.id == item_id))
                 if not item:
                     return
-                item.title = pattern.title
+                first_title = kept_patterns[0].title
+                item.title = first_title if len(kept_patterns) == 1 else f"{first_title} 等{len(kept_patterns)}条经验"
                 item.steps_json = json.dumps(
-                    [{"file": s.file, "action": s.action} for s in pattern.steps],
+                    {
+                        "patterns": [p.to_payload() for p in kept_patterns],
+                        "total_extracted": len(result.patterns),
+                        "kept_after_quality_filter": len(kept_patterns),
+                        "quality_threshold": float(settings.mr_experience_min_quality_score or 0.0),
+                    },
                     ensure_ascii=False,
                 )
                 item.status = ExperienceItemStatus.READY.value
@@ -266,6 +347,14 @@ class ExperienceService:
                     MrExperienceItem.status == ExperienceItemStatus.FAILED.value,
                 )
             )
+            skipped = await db.scalar(
+                select(func.count())
+                .select_from(MrExperienceItem)
+                .where(
+                    MrExperienceItem.repo_id == repo_id,
+                    MrExperienceItem.status == ExperienceItemStatus.SKIPPED.value,
+                )
+            )
             task = await db.scalar(select(RepoExperienceTask).where(RepoExperienceTask.repo_id == repo_id))
             if not task:
                 task = RepoExperienceTask(repo_id=repo_id)
@@ -289,8 +378,19 @@ class ExperienceService:
                     "total_items": 0,
                     "ready_items": 0,
                     "failed_items": 0,
+                    "skipped_items": 0,
                 }
-            return ExperienceService._job_to_dict(task)
+            data = ExperienceService._job_to_dict(task)
+            skipped = await db.scalar(
+                select(func.count())
+                .select_from(MrExperienceItem)
+                .where(
+                    MrExperienceItem.repo_id == repo_id,
+                    MrExperienceItem.status == ExperienceItemStatus.SKIPPED.value,
+                )
+            )
+            data["skipped_items"] = int(skipped or 0)
+            return data
 
     @staticmethod
     def _job_to_dict(task: RepoExperienceTask) -> Dict[str, object]:

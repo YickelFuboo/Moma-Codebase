@@ -15,6 +15,7 @@ class ExperienceItemStatus(str, enum.Enum):
     PENDING = "pending"
     RUNNING = "running"
     READY = "ready"
+    SKIPPED = "skipped"
     FAILED = "failed"
 
 
@@ -56,7 +57,7 @@ class MrExperienceItem(Base):
         String(32),
         nullable=False,
         default=ExperienceItemStatus.PENDING.value,
-        comment="pending|running|ready|failed",
+        comment="pending|running|ready|skipped|failed",
     )
     last_error = Column(Text, nullable=True, comment="最近错误")
     retry_count = Column(Integer, nullable=False, default=0, comment="重试次数")

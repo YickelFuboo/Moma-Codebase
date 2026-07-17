@@ -1,7 +1,8 @@
 import hashlib
 import json
 import logging
-from typing import Dict, List, Optional
+import re
+from typing import Dict, List
 from app.infrastructure.llms import embedding_factory
 from app.infrastructure.vector_store import MatchDenseExpr, SearchRequest, VECTOR_STORE_CONN
 from app.repo_analysis.constants.experience_space import ExperienceAnalysisType, mr_pattern_space_name
@@ -14,54 +15,60 @@ class PatternVectorService:
 
     @staticmethod
     def build_embed_text(pattern: ExperiencePattern) -> str:
-        steps = "；".join(f"{s.file}: {s.action}" for s in pattern.steps)
-        return f"{pattern.title}\n{pattern.commit_message}\n{steps}".strip()
+        parts = [
+            pattern.title,
+            pattern.scenario,
+            f"模式：{'；'.join(pattern.patterns)}",
+        ]
+        return "\n".join(p for p in parts if p).strip()
 
     @staticmethod
-    async def upsert_pattern(repo_id: str, pattern: ExperiencePattern) -> None:
-        text = PatternVectorService.build_embed_text(pattern)
-        vectors = await CodeVectorService._embed_texts([text])
+    def _pattern_key(pattern: ExperiencePattern) -> str:
+        scenario = re.sub(r"\s+", " ", (pattern.scenario or "").strip().lower())
+        modes = " | ".join(pattern.patterns)
+        return f"{scenario} || {modes}"
+
+    @staticmethod
+    async def upsert_patterns(repo_id: str, patterns: List[ExperiencePattern]) -> int:
+        valid = [p for p in patterns if p.title and p.scenario and p.patterns]
+        if not valid:
+            return 0
+        texts = [PatternVectorService.build_embed_text(p) for p in valid]
+        vectors = await CodeVectorService._embed_texts(texts)
         if not vectors:
             raise RuntimeError("经验向量化失败")
         dim = len(vectors[0])
         vector_field = f"q_{dim}_vec"
         space = mr_pattern_space_name(repo_id, dim)
         await VECTOR_STORE_CONN.create_space(space, dim)
-        sha = (pattern.source_commits or ["unknown"])[0]
-        await VECTOR_STORE_CONN.delete_records(
-            space,
-            {
-                "repo_id": repo_id,
-                "analysis_type": ExperienceAnalysisType.MR_PATTERN_VECTOR,
-                "symbol_name": sha,
-            },
-        )
-        stable_id = hashlib.sha1(f"{repo_id}|mr_pattern|{sha}".encode("utf-8")).hexdigest()
-        steps_payload = [{"file": s.file, "action": s.action} for s in pattern.steps]
-        record = {
-            "id": stable_id,
-            "repo_id": repo_id,
-            "file_path": "",
-            "analysis_type": ExperienceAnalysisType.MR_PATTERN_VECTOR,
-            "symbol_kind": "mr_pattern",
-            "symbol_name": sha,
-            "content": pattern.title,
-            "summary": json.dumps(
+        records: List[Dict[str, object]] = []
+        for idx, pattern in enumerate(valid):
+            sha = (pattern.source_commits or ["unknown"])[0]
+            pkey = PatternVectorService._pattern_key(pattern)
+            stable_id = hashlib.sha1(f"{repo_id}|mr_pattern|{sha}|{pkey}".encode("utf-8")).hexdigest()
+            records.append(
                 {
-                    "title": pattern.title,
-                    "steps": steps_payload,
-                    "source_commits": pattern.source_commits,
-                    "commit_message": pattern.commit_message,
-                },
-                ensure_ascii=False,
-            ),
-            "start_line": 0,
-            "end_line": 0,
-            vector_field: vectors[0],
-        }
-        failed = await VECTOR_STORE_CONN.insert_records(space, [record])
+                    "id": stable_id,
+                    "repo_id": repo_id,
+                    "file_path": "",
+                    "analysis_type": ExperienceAnalysisType.MR_PATTERN_VECTOR,
+                    "symbol_kind": "mr_pattern",
+                    "symbol_name": sha,
+                    "content": pattern.title,
+                    "summary": json.dumps(pattern.to_payload(), ensure_ascii=False),
+                    "start_line": 0,
+                    "end_line": 0,
+                    vector_field: vectors[idx],
+                }
+            )
+        failed = await VECTOR_STORE_CONN.insert_records(space, records)
         if failed:
             raise RuntimeError(f"经验向量写入失败: {failed}")
+        return len(records)
+
+    @staticmethod
+    async def upsert_pattern(repo_id: str, pattern: ExperiencePattern) -> None:
+        await PatternVectorService.upsert_patterns(repo_id, [pattern])
 
     @staticmethod
     async def search(repo_id: str, query: str, top_k: int = 10) -> List[Dict[str, object]]:
@@ -103,17 +110,49 @@ class PatternVectorService:
         items: List[Dict[str, object]] = []
         for doc in docs:
             payload = PatternVectorService._parse_summary(doc.get("summary"))
-            items.append(
-                {
-                    "title": payload.get("title") or doc.get("content"),
-                    "similarity": doc.get("_score"),
-                    "steps": payload.get("steps") or [],
-                    "source_commits": payload.get("source_commits")
-                    or ([doc.get("symbol_name")] if doc.get("symbol_name") else []),
-                    "commit_message": payload.get("commit_message") or "",
-                }
-            )
+            items.append(PatternVectorService._item_from_payload(payload, doc))
         return items
+
+    @staticmethod
+    def _item_from_payload(payload: dict, doc: dict) -> Dict[str, object]:
+        title = payload.get("title") or doc.get("content")
+        return {
+            "title": title,
+            "similarity": doc.get("_score"),
+            "scenario": payload.get("scenario") or "",
+            "patterns": payload.get("patterns") or [],
+            "quality_score": float(payload.get("quality_score") or 0.0),
+            "source_commits": payload.get("source_commits")
+            or ([doc.get("symbol_name")] if doc.get("symbol_name") else []),
+        }
+
+    @staticmethod
+    def merge_by_scenario(items: List[Dict[str, object]]) -> List[Dict[str, object]]:
+        grouped: Dict[str, Dict[str, object]] = {}
+        for item in items:
+            scenario = str(item.get("scenario") or "").strip()
+            key = re.sub(r"\s+", " ", scenario.lower()) if scenario else str(item.get("title") or "")
+            if not key:
+                continue
+            cur = grouped.get(key)
+            if cur is None:
+                grouped[key] = dict(item)
+                continue
+            if float(item.get("similarity") or 0.0) > float(cur.get("similarity") or 0.0):
+                keep = dict(item)
+            else:
+                keep = cur
+            merged_patterns = list(dict.fromkeys([*(cur.get("patterns") or []), *(item.get("patterns") or [])]))
+            merged_commits = list(
+                dict.fromkeys([*(cur.get("source_commits") or []), *(item.get("source_commits") or [])])
+            )
+            keep["patterns"] = merged_patterns
+            keep["source_commits"] = merged_commits
+            keep["merged_count"] = int(cur.get("merged_count") or 1) + 1
+            grouped[key] = keep
+        merged = list(grouped.values())
+        merged.sort(key=lambda x: float(x.get("similarity") or 0.0), reverse=True)
+        return merged
 
     @staticmethod
     def _parse_summary(raw: object) -> dict:

@@ -3,8 +3,14 @@ from __future__ import annotations
 import asyncio
 import subprocess
 from pathlib import Path
+from unittest.mock import AsyncMock
 import pytest
-from app.repo_analysis.services.mr_experience.models import ExperiencePattern, ExperienceStep, FileChange
+from app.repo_analysis.services.mr_experience.models import (
+    ExperienceExtractionResult,
+    ExperiencePattern,
+    ExperienceStep,
+    FileChange,
+)
 from app.repo_analysis.services.mr_experience.pattern_summarizer import PatternSummarizer
 from app.repo_analysis.services.mr_experience.pattern_vector import PatternVectorService
 from app.repo_analysis.services.mr_experience.change_filter import ChangeFilter
@@ -28,11 +34,22 @@ def _git(cwd: Path, *args: str) -> None:
 class TestExperiencePatternPipeline:
     def test_filter_and_mock_summarize_then_search(self, tmp_path: Path, monkeypatch):
         async def _fake_summarize(message, files, commit_sha):
-            return ExperiencePattern(
-                title="更新 hello 返回值",
-                steps=[ExperienceStep(file="hello.py", action="将返回值从 1 改为 2")],
-                source_commits=[commit_sha],
-                commit_message=message,
+            return ExperienceExtractionResult(
+                extractable=True,
+                patterns=[
+                    ExperiencePattern(
+                        title="更新 hello 返回值",
+                        scenario="修改简单函数返回值时",
+                        plan=["定位 hello.py 中的 hi 函数", "调整 return 并保持调用方兼容"],
+                        patterns=["单文件函数改动优先直接改定义处"],
+                        anchors=["hello.py"],
+                        source_commits=[commit_sha],
+                        commit_message=message,
+                        quality_score=0.88,
+                        relevant_files=["hello.py"],
+                        steps=[ExperienceStep(file="hello.py", action="将返回值从 1 改为 2")],
+                    )
+                ],
             )
 
         monkeypatch.setattr(PatternSummarizer, "summarize", staticmethod(_fake_summarize))
@@ -58,24 +75,36 @@ class TestExperiencePatternPipeline:
         assert [x.path for x in selected] == ["hello.py"]
 
         async def _run():
-            pattern = await PatternSummarizer.summarize(
+            result = await PatternSummarizer.summarize(
                 "update hello return value for callers",
                 selected,
                 "deadbeef",
             )
+            assert result.extractable and result.patterns
+            pattern = result.patterns[0]
             repo_id = "exp-scenario-demo"
-            await PatternVectorService.upsert_pattern(repo_id, pattern)
+            upsert = AsyncMock()
+            search = AsyncMock(
+                return_value=[
+                    {
+                        "title": pattern.title,
+                        "scenario": pattern.scenario,
+                        "plan": pattern.plan,
+                        "patterns": pattern.patterns,
+                        "anchors": pattern.anchors,
+                        "relevant_files": pattern.relevant_files,
+                        "source_commits": pattern.source_commits,
+                    }
+                ]
+            )
+            monkeypatch.setattr(PatternVectorService, "upsert_patterns", upsert)
+            monkeypatch.setattr(PatternVectorService, "search", search)
+            await PatternVectorService.upsert_patterns(repo_id, [pattern])
             items = await PatternVectorService.search(repo_id, "更新 hello 返回值", top_k=5)
-            await PatternVectorService.delete_repo_patterns(repo_id)
+            upsert.assert_awaited_once()
+            search.assert_awaited_once()
             return items
 
-        try:
-            items = asyncio.run(_run())
-        except Exception as exc:
-            msg = str(exc).lower()
-            if "embedding" in msg or "模型" in msg or "vector" in msg:
-                pytest.skip(f"环境缺少 embedding: {exc}")
-            raise
-
+        items = asyncio.run(_run())
         assert items
-        assert any("hello" in str(it.get("title") or "").lower() or "hello" in str(it.get("steps")) for it in items)
+        assert any("hello" in str(it.get("title") or "").lower() for it in items)

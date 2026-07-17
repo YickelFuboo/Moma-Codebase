@@ -3,10 +3,15 @@ from __future__ import annotations
 import asyncio
 import subprocess
 from pathlib import Path
+from unittest.mock import AsyncMock
 import pytest
 from app.repo_analysis.services.mr_experience.change_filter import ChangeFilter
 from app.repo_analysis.services.mr_experience.git_history_source import GitHistorySource
-from app.repo_analysis.services.mr_experience.models import ExperiencePattern, ExperienceStep
+from app.repo_analysis.services.mr_experience.models import (
+    ExperienceExtractionResult,
+    ExperiencePattern,
+    ExperienceStep,
+)
 from app.repo_analysis.services.mr_experience.pattern_summarizer import (
     PatternSummarizer,
     PatternSummarizerError,
@@ -61,11 +66,22 @@ class TestMrExperienceScenarios:
             calls["n"] += 1
             if calls["n"] == 1:
                 raise PatternSummarizerError("temporary llm fail")
-            return ExperiencePattern(
-                title="调整 svc 返回值",
-                steps=[ExperienceStep(file="svc.py", action="将返回值改为 2")],
-                source_commits=[commit_sha],
-                commit_message=message,
+            return ExperienceExtractionResult(
+                extractable=True,
+                patterns=[
+                    ExperiencePattern(
+                        title="调整 svc 返回值",
+                        scenario="修改服务返回值时",
+                        plan=["定位 svc.py 中 run 函数", "调整 return 值"],
+                        patterns=["单点返回值改动优先改定义处"],
+                        anchors=["svc.py"],
+                        source_commits=[commit_sha],
+                        commit_message=message,
+                        quality_score=0.9,
+                        relevant_files=["svc.py"],
+                        steps=[ExperienceStep(file="svc.py", action="将返回值改为 2")],
+                    )
+                ],
             )
 
         monkeypatch.setattr(PatternSummarizer, "summarize", staticmethod(_summarize))
@@ -81,21 +97,28 @@ class TestMrExperienceScenarios:
                 [],
                 "sha-ok",
             )
-            await PatternVectorService.upsert_pattern(repo_id, pattern)
+            assert pattern.extractable and pattern.patterns
+            upsert = AsyncMock()
+            search = AsyncMock(
+                return_value=[
+                    {
+                        "title": pattern.patterns[0].title,
+                        "patterns": pattern.patterns[0].patterns,
+                        "source_commits": pattern.patterns[0].source_commits,
+                    }
+                ]
+            )
+            monkeypatch.setattr(PatternVectorService, "upsert_patterns", upsert)
+            monkeypatch.setattr(PatternVectorService, "search", search)
+            await PatternVectorService.upsert_patterns(repo_id, pattern.patterns)
             items = await PatternVectorService.search(repo_id, "调整 svc 返回值", top_k=5)
-            await PatternVectorService.delete_repo_patterns(repo_id)
+            upsert.assert_awaited_once()
             return items
 
-        try:
-            items = asyncio.run(_run())
-        except Exception as exc:
-            msg = str(exc).lower()
-            if "embedding" in msg or "模型" in msg or "vector" in msg:
-                pytest.skip(f"环境缺少 embedding: {exc}")
-            raise
+        items = asyncio.run(_run())
 
         assert calls["n"] == 2
         assert items
         assert items[0].get("title")
-        assert items[0].get("steps")
+        assert items[0].get("patterns")
         assert items[0].get("source_commits")

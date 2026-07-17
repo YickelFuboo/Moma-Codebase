@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
-from typing import List, Set
+import re
+from typing import List, Optional, Set
 from app.repo_analysis.services.mr_experience.models import FileChange
 
 
@@ -35,6 +36,34 @@ class ChangeFilter:
         ".map",
         ".lock",
     )
+    _MERGE_MSG = re.compile(r"^merge\b", re.I)
+    _LOW_VALUE_NAMES = {
+        "start.sh",
+        "stop.sh",
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "poetry.lock",
+    }
+
+    @classmethod
+    def prefilter_skip_reason(cls, message: str, files: List[FileChange]) -> Optional[str]:
+        """规则预筛：明显无可提炼价值的 MR，跳过 LLM。"""
+        selected = cls.select(files)
+        if not selected:
+            return "无有效变更文件"
+        msg = (message or "").strip()
+        if not msg:
+            return "缺少合入说明"
+        paths = {f.path.replace("\\", "/").lower() for f in selected}
+        if len(paths) == 1:
+            base = os.path.basename(next(iter(paths))).lower()
+            if base in cls._LOW_VALUE_NAMES:
+                return "仅运维/依赖锁文件变更，无可复用开发经验"
+        if cls._MERGE_MSG.match(msg) and len(selected) <= 2:
+            if all(os.path.basename(p).lower() in cls._LOW_VALUE_NAMES for p in paths):
+                return "纯同步合并，无可复用开发经验"
+        return None
 
     @classmethod
     def select(cls, files: List[FileChange], top_k: int = DEFAULT_TOP_K) -> List[FileChange]:

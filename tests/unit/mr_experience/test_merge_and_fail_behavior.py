@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 import pytest
 from app.repo_analysis.services.mr_experience.git_history_source import GitHistorySource
-from app.repo_analysis.services.mr_experience.models import ExperiencePattern, ExperienceStep, FileChange
+from app.repo_analysis.services.mr_experience.models import ExperiencePattern, FileChange
 from app.repo_analysis.services.mr_experience.pattern_summarizer import (
     PatternSummarizer,
     PatternSummarizerError,
@@ -81,14 +81,17 @@ class TestPatternVectorEmbedText:
     def test_build_embed_text(self):
         pattern = ExperiencePattern(
             title="改告警",
-            steps=[ExperienceStep(file="a.go", action="改触发逻辑")],
+            scenario="调整监控告警命名时",
+            plan=["修改 a.go 中告警定义"],
+            patterns=["告警名与指标名保持一致"],
+            anchors=["a.go"],
             source_commits=["abc"],
             commit_message="fix alert",
         )
         text = PatternVectorService.build_embed_text(pattern)
         assert "改告警" in text
-        assert "a.go" in text
-        assert "fix alert" in text
+        assert "调整监控告警命名时" in text
+        assert "告警名与指标名保持一致" in text
 
 
 class TestFailedDoesNotUpsertVector:
@@ -118,3 +121,28 @@ class TestFailedDoesNotUpsertVector:
             upsert.assert_not_awaited()
 
         asyncio.run(_run())
+
+
+class TestMergeByScenario:
+    def test_merge_items_by_scenario(self):
+        items = [
+            {
+                "title": "A",
+                "scenario": "技能中心化迁移",
+                "patterns": ["p1"],
+                "source_commits": ["c1"],
+                "similarity": 0.6,
+            },
+            {
+                "title": "B",
+                "scenario": "技能中心化迁移",
+                "patterns": ["p2"],
+                "source_commits": ["c2"],
+                "similarity": 0.7,
+            },
+        ]
+        merged = PatternVectorService.merge_by_scenario(items)
+        assert len(merged) == 1
+        assert merged[0]["title"] == "B"
+        assert set(merged[0]["patterns"]) == {"p1", "p2"}
+        assert set(merged[0]["source_commits"]) == {"c1", "c2"}

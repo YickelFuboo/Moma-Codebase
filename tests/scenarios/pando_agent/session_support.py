@@ -14,7 +14,7 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
     """登记并分析外部 Pando-Agent 仓（与本仓 ScenarioSession 隔离）。"""
 
     ENABLE_SYMBOL_SUMMARY = True
-    ENABLE_CODE_GRAPH = False
+    ENABLE_CODE_GRAPH = True
     # 全仓产品代码（app/），不是某个业务子目录；排除前端/打包等噪音
     ANALYZE_TARGET = "app"
     CLEAR_BEFORE_ANALYZE = False
@@ -68,42 +68,42 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
 
     @classmethod
     def run_async(cls, coro):
-        if cls._loop is None or cls._loop.is_closed():
-            cls._loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(cls._loop)
-        return cls._loop.run_until_complete(coro)
+        if PandoAgentScenarioSession._loop is None or PandoAgentScenarioSession._loop.is_closed():
+            PandoAgentScenarioSession._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(PandoAgentScenarioSession._loop)
+        return PandoAgentScenarioSession._loop.run_until_complete(coro)
 
     @classmethod
     def _async_lock(cls) -> asyncio.Lock:
         loop = asyncio.get_running_loop()
-        lock = getattr(cls, "_lock", None)
-        if lock is None or getattr(cls, "_lock_loop_id", None) != id(loop):
-            cls._lock = asyncio.Lock()
-            cls._lock_loop_id = id(loop)
-        return cls._lock
+        lock = getattr(PandoAgentScenarioSession, "_lock", None)
+        if lock is None or getattr(PandoAgentScenarioSession, "_lock_loop_id", None) != id(loop):
+            PandoAgentScenarioSession._lock = asyncio.Lock()
+            PandoAgentScenarioSession._lock_loop_id = id(loop)
+        return PandoAgentScenarioSession._lock
 
     @classmethod
     async def ensure_repo(cls) -> str:
         cls.require_repo_or_skip()
-        if cls._session_repo_id and cls._session_repo_path:
+        if PandoAgentScenarioSession._session_repo_id and PandoAgentScenarioSession._session_repo_path:
             cls.apply_feature_flags()
             import app.runtime as runtime_mod
             if not getattr(runtime_mod, "_runtime_inited", False):
                 await cls._reset_runtime()
-            cls._repo_id = cls._session_repo_id
-            cls._repo_path = cls._session_repo_path
-            return cls._session_repo_id
+            cls._repo_id = PandoAgentScenarioSession._session_repo_id
+            cls._repo_path = PandoAgentScenarioSession._session_repo_path
+            return PandoAgentScenarioSession._session_repo_id
         repo_id = await super().ensure_repo()
-        cls._session_repo_id = repo_id
-        cls._session_repo_path = cls._repo_path
+        PandoAgentScenarioSession._session_repo_id = repo_id
+        PandoAgentScenarioSession._session_repo_path = cls._repo_path
         return repo_id
 
     @classmethod
     async def ensure_vector_ready(cls) -> str:
         async with cls._async_lock():
-            need_clear = bool(cls._should_clear() or cls.CLEAR_BEFORE_ANALYZE) and not cls._vector_ready
+            need_clear = bool(cls._should_clear() or cls.CLEAR_BEFORE_ANALYZE) and not PandoAgentScenarioSession._vector_ready
             repo_id = await cls.ensure_repo()
-            if not cls._vector_ready:
+            if not PandoAgentScenarioSession._vector_ready:
                 from app.repo_analysis.services.analysis_service import AnalysisService
                 from app.repo_analysis.services.file_analysis_service import FileAnalysisService
 
@@ -133,7 +133,6 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
                 a = summary.get("analysis_summary") or {}
                 completed = int(a.get("completed_files") or 0)
                 if completed <= 0:
-                    # 无缓存时再强制清空重跑一次
                     print("[pando-scenario] no completed files, force clear re-analyze", flush=True)
                     await FileAnalysisService.stop_global_scheduler()
                     await AnalysisService.delete_repo_analysis_data(repo_id)
@@ -148,17 +147,50 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
                     f"failed={a.get('failed_files')}",
                     flush=True,
                 )
-                cls._vector_ready = True
+                if cls.ENABLE_CODE_GRAPH:
+                    await cls._wait_code_graph(repo_id)
+                PandoAgentScenarioSession._vector_ready = True
             return repo_id
+
+    @classmethod
+    async def _wait_code_graph(cls, repo_id: str, *, timeout_sec: float = 1800) -> None:
+        """等待 analyze 触发的 CodeGraph 任务；若无任务则主动全量 init。"""
+        from app.config.settings import settings
+        from app.repo_analysis.services.analysis_service import AnalysisService
+        from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
+
+        settings.code_graph_enabled = True
+        task = AnalysisService._running_graph_tasks.get(repo_id)
+        if task and not task.done():
+            print("[pando-scenario] waiting CodeGraph task...", flush=True)
+            await asyncio.wait_for(task, timeout=timeout_sec)
+        repo_path = str(PandoAgentScenarioSession._session_repo_path or cls.codebase_path())
+        graph_dir = Path(repo_path) / ".codegraph"
+        if graph_dir.is_dir():
+            print(f"[pando-scenario] CodeGraph ready path={graph_dir}", flush=True)
+            return
+        print(f"[pando-scenario] CodeGraph missing, force init path={repo_path}", flush=True)
+        generator = CodeGraphGateway.create_generator(
+            repo_id=repo_id,
+            repo_name=str(repo_id),
+            repo_local_path=repo_path,
+        )
+        try:
+            await generator.generate_graph(clean_stale=True)
+        finally:
+            generator.close()
+        if not graph_dir.is_dir():
+            raise AssertionError(f"CodeGraph init 后仍无 .codegraph: {graph_dir}")
+        print(f"[pando-scenario] CodeGraph init done path={graph_dir}", flush=True)
 
     @classmethod
     async def shutdown_runtime(cls) -> None:
         await super().shutdown_runtime()
-        cls._vector_ready = False
-        cls._session_repo_id = None
-        cls._session_repo_path = None
-        if cls._loop is not None and not cls._loop.is_closed():
-            cls._loop.close()
-        cls._loop = None
-        cls._lock = None
-        cls._lock_loop_id = None
+        PandoAgentScenarioSession._vector_ready = False
+        PandoAgentScenarioSession._session_repo_id = None
+        PandoAgentScenarioSession._session_repo_path = None
+        if PandoAgentScenarioSession._loop is not None and not PandoAgentScenarioSession._loop.is_closed():
+            PandoAgentScenarioSession._loop.close()
+        PandoAgentScenarioSession._loop = None
+        PandoAgentScenarioSession._lock = None
+        PandoAgentScenarioSession._lock_loop_id = None

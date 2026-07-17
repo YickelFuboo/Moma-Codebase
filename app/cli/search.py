@@ -27,7 +27,7 @@ def search() -> None:
 @click.option("--code", required=True, help="待检索的代码片段")
 @click.option("--top-k", default=10, show_default=True, help="返回条数")
 def search_similar(path: str, code: str, top_k: int) -> None:
-    """相似代码检索（仅 kind=code）"""
+    """相似代码片段检索（行块向量；仅 kind=code）"""
 
     async def _similar() -> None:
         repo = await get_repo_by_path(path)
@@ -47,7 +47,7 @@ def search_similar(path: str, code: str, top_k: int) -> None:
 @click.option("--keywords", required=True, help="检索关键词，逗号分隔")
 @click.option("--top-k", default=10, show_default=True, help="返回条数")
 def search_related(path: str, keywords: str, top_k: int) -> None:
-    """相关位置检索：符号摘要/行块向量 + 名称精确匹配（仅 kind=code）"""
+    """相关代码检索：符号 exact/摘要 + CodeGraph（仅 kind=code）"""
 
     async def _related() -> None:
         repo = await get_repo_by_path(path)
@@ -69,7 +69,7 @@ def search_related(path: str, keywords: str, top_k: int) -> None:
 @click.option("--query", required=True, help="查询文本（语义检索行块）")
 @click.option("--top-k", default=10, show_default=True, help="返回条数")
 def search_chunks(path: str, query: str, top_k: int) -> None:
-    """仅查询行块向量（人工调试；Agent 优先用 related）"""
+    """仅查询行块向量（人工调试；Agent 优先用 similar）"""
 
     async def _chunks() -> None:
         repo = await get_repo_by_path(path)
@@ -126,7 +126,7 @@ def search_api(path: str, query: str, top_k: int) -> None:
 @click.option("--query", required=True, help="需求/问题描述")
 @click.option("--top-k", default=10, show_default=True, help="返回条数")
 def search_pattern(path: str, query: str, top_k: int) -> None:
-    """按需求检索历史开发经验模式（仅 kind=code）"""
+    """按需求检索历史开发经验模式（独立经验接口；仅 kind=code）"""
 
     async def _pattern() -> None:
         repo = await get_repo_by_path(path)

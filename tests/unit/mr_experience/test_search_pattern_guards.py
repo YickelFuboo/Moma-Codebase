@@ -12,14 +12,35 @@ class _Repo:
 
 
 class TestSearchPatternsGuards:
-    def test_empty_query(self):
+    def test_empty_query(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_service.settings.mr_experience_enabled",
+            True,
+        )
+
         async def _run():
             with pytest.raises(ValueError, match="query"):
                 await SearchService.search_patterns("r1", " ")
 
         asyncio.run(_run())
 
+    def test_rejects_when_disabled(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_service.settings.mr_experience_enabled",
+            False,
+        )
+
+        async def _run():
+            with pytest.raises(ValueError, match="MR_EXPERIENCE"):
+                await SearchService.search_patterns("r1", "改告警")
+
+        asyncio.run(_run())
+
     def test_rejects_lib_kind(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_service.settings.mr_experience_enabled",
+            True,
+        )
         class _CM:
             async def __aenter__(self):
                 db = MagicMock()
@@ -41,6 +62,10 @@ class TestSearchPatternsGuards:
         asyncio.run(_run())
 
     def test_rejects_when_no_index(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_service.settings.mr_experience_enabled",
+            True,
+        )
         class _CM:
             async def __aenter__(self):
                 db = MagicMock()

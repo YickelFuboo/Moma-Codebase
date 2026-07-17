@@ -50,6 +50,8 @@ class CodebaseScenarioBase(ABC):
         settings.code_graph_enabled = bool(cls.ENABLE_CODE_GRAPH)
         settings.code_graph_provider = cls.CODE_GRAPH_PROVIDER
         settings.code_analysis_symbol_summary_enabled = bool(cls.ENABLE_SYMBOL_SUMMARY)
+        settings.code_analysis_line_chunk_enabled = True
+        settings.mr_experience_enabled = True
         from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
         CodeGraphGateway.reset_provider()
 

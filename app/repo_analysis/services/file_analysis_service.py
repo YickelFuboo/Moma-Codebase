@@ -314,41 +314,49 @@ class FileAnalysisService:
         abs_file_path: str,
     ) -> tuple[bool, Optional[str]]:
         try:
-            source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
-            chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
-            if not settings.code_analysis_symbol_summary_enabled:
-                await CodeVectorService.vectorize_and_store_line_chunks(
+            chunk_on = bool(settings.code_analysis_line_chunk_enabled)
+            symbol_on = bool(settings.code_analysis_symbol_summary_enabled)
+            if not chunk_on and not symbol_on:
+                logging.info(
+                    "跳过向量化（chunk/symbol 均关闭）repo_id=%s file_path=%s",
                     repo_id,
                     rel_file_path,
-                    chunks,
                 )
                 return True, None
-            # 行块向量与 AST 互不依赖：并行以缩短墙钟时间；return_exceptions=True 避免一方失败时取消另一方（防止向量写入被中途取消）
+
+            source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
+
             async def _line_chunk_vectors() -> None:
+                chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
                 await CodeVectorService.vectorize_and_store_line_chunks(
                     repo_id,
                     rel_file_path,
                     chunks,
                 )
 
-            async def _ast_file() -> object:
-                return await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
+            async def _symbol_vectors() -> None:
+                file_info = await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
+                await CodeVectorService.vectorize_and_store_symbol_summaries(
+                    repo_id,
+                    rel_file_path,
+                    file_info,
+                )
 
-            r_line, r_ast = await asyncio.gather(
-                _line_chunk_vectors(),
-                _ast_file(),
-                return_exceptions=True,
-            )
-            if isinstance(r_line, Exception):
-                raise r_line
-            if isinstance(r_ast, Exception):
-                raise r_ast
-            file_info = r_ast
-            await CodeVectorService.vectorize_and_store_symbol_summaries(
-                repo_id,
-                rel_file_path,
-                file_info,
-            )
+            if chunk_on and symbol_on:
+                # 行块与符号互不依赖：并行；return_exceptions 避免一方失败取消另一方
+                r_line, r_sym = await asyncio.gather(
+                    _line_chunk_vectors(),
+                    _symbol_vectors(),
+                    return_exceptions=True,
+                )
+                if isinstance(r_line, Exception):
+                    raise r_line
+                if isinstance(r_sym, Exception):
+                    raise r_sym
+            elif chunk_on:
+                await _line_chunk_vectors()
+            else:
+                await _symbol_vectors()
             return True, None
         except Exception as e:
             logging.error("文件分析子步骤失败 repo_id=%s file_path=%s error=%s", repo_id, rel_file_path, e)

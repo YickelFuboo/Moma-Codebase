@@ -2,22 +2,10 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 import pytest
+from app.config.settings import settings
 from app.repo_analysis.services.codevector.exact_match import ExactMatchService
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
 from app.repo_analysis.services.search_service import SearchService
-
-
-class TestExactScoring:
-    def test_symbol_full_name_beats_weak_path(self):
-        assert ExactMatchService.score_symbol_keyword("ReActAgent", "ReActAgent", "app/agents/core/react.py") >= 2.5
-        assert ExactMatchService.score_symbol_keyword("agent", "BaseAgent", "app/agents/core/base.py") == 0.0
-        assert ExactMatchService.score_symbol_keyword("AgentState", "AgentState", "app/agents/core/base.py") >= 2.5
-
-    def test_path_rejects_short_and_weak_terms(self):
-        assert ExactMatchService.score_path_keyword("agent", "app/agents/core/base.py") == 0.0
-        assert ExactMatchService.score_path_keyword("core", "app/agents/core/base.py") == 0.0
-        assert ExactMatchService.score_path_keyword("jwt_validator", "app/utils/auth/jwt_validator.py") >= 1.2
-        assert ExactMatchService.score_path_keyword("agents/core/base", "app/agents/core/base.py") >= 1.3
 
 
 class TestFuseRelatedItems:
@@ -46,12 +34,12 @@ class TestFuseRelatedItems:
         items = SearchService.fuse_related_items(
             exact_items=exact,
             symbol_docs=symbol_docs,
-            chunk_docs=[],
             top_k=5,
         )
+        # 强符号命中：丢弃向量填充，只保留定义
+        assert len(items) == 1
         assert items[0]["match_source"] == "exact"
         assert items[0]["symbol_name"] == "TriggerAlarm"
-        assert items[1]["match_source"] == "symbol_summary"
 
     def test_dedupe_by_file_keeps_best(self):
         exact = [
@@ -86,11 +74,101 @@ class TestFuseRelatedItems:
         items = SearchService.fuse_related_items(
             exact_items=exact,
             symbol_docs=symbol_docs,
-            chunk_docs=[],
             top_k=5,
         )
         assert len(items) == 1
         assert items[0]["match_source"] == "exact"
+
+    def test_strong_symbol_drops_path_and_caps(self):
+        exact = [
+            {
+                "file_path": "app/agents/core/react.py",
+                "symbol_name": "ReActAgent",
+                "_score": 3.0,
+                "exact_tier": "symbol",
+            },
+            {
+                "file_path": "app/agents/plan/react_executor.py",
+                "symbol_name": None,
+                "_score": 1.25,
+                "exact_tier": "path",
+            },
+        ]
+        items = SearchService.fuse_related_items(
+            exact_items=exact,
+            symbol_docs=[{"file_path": "noise.py", "_score": 0.95}],
+            top_k=10,
+        )
+        assert len(items) == 1
+        assert items[0]["file_path"] == "app/agents/core/react.py"
+
+    def test_path_only_keeps_ratio_trim(self):
+        exact = [
+            {
+                "file_path": "app/utils/auth/jwt_validator.py",
+                "_score": 1.3,
+                "exact_tier": "path",
+            },
+            {
+                "file_path": "app/utils/auth/jwt_middleware.py",
+                "_score": 1.2,
+                "exact_tier": "path",
+            },
+            {
+                "file_path": "app/unrelated/foo.py",
+                "_score": 0.2,
+                "exact_tier": "path",
+            },
+        ]
+        items = SearchService.fuse_related_items(
+            exact_items=exact,
+            symbol_docs=[],
+            top_k=10,
+        )
+        paths = {it["file_path"] for it in items}
+        assert "app/utils/auth/jwt_validator.py" in paths
+        assert "app/unrelated/foo.py" not in paths
+
+
+class TestRelatedChannelFlags:
+    def test_channel_flags_reflect_capability_settings(self, monkeypatch):
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_graph_enabled", False)
+        flags = SearchService.related_channel_flags()
+        assert flags == {
+            "symbol": True,
+            "codegraph": False,
+        }
+
+    def test_capability_flags(self, monkeypatch):
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_graph_enabled", True)
+        monkeypatch.setattr(settings, "mr_experience_enabled", False)
+        assert SearchService.capability_flags() == {
+            "chunk": False,
+            "symbol": True,
+            "codegraph": True,
+            "mr_experience": False,
+        }
+
+
+class TestExactScoring:
+    def test_symbol_full_name_beats_weak_path(self):
+        assert ExactMatchService.score_symbol_keyword("ReActAgent", "ReActAgent", "app/agents/core/react.py") >= 2.5
+        assert ExactMatchService.score_symbol_keyword("agent", "BaseAgent", "app/agents/core/base.py") == 0.0
+        assert ExactMatchService.score_symbol_keyword("AgentState", "AgentState", "app/agents/core/base.py") >= 2.5
+
+    def test_symbol_ignores_path_only_rows(self):
+        # 引用文件：符号名不匹配时不应靠路径得分为 exact
+        assert ExactMatchService.score_symbol_keyword("ReActAgent", "run_react", "app/agents/plan/react_executor.py") == 0.0
+        assert ExactMatchService.score_symbol_keyword("ReActAgent", "helper", "app/agents/core/react.py") == 0.0
+
+    def test_path_rejects_short_and_weak_terms(self):
+        assert ExactMatchService.score_path_keyword("agent", "app/agents/core/base.py") == 0.0
+        assert ExactMatchService.score_path_keyword("core", "app/agents/core/base.py") == 0.0
+        assert ExactMatchService.score_path_keyword("jwt_validator", "app/utils/auth/jwt_validator.py") >= 1.2
+        assert ExactMatchService.score_path_keyword("agents/core/base", "app/agents/core/base.py") >= 1.3
 
 
 class TestExactMatchService:
@@ -173,6 +251,24 @@ class TestSearchChunksSymbolsGuards:
         async def _run():
             with pytest.raises(ValueError, match="query"):
                 await SearchService.search_chunks("r1", "  ")
+
+        asyncio.run(_run())
+
+    def test_similar_rejects_when_chunk_disabled(self, monkeypatch):
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)
+
+        async def _run():
+            with pytest.raises(ValueError, match="LINE_CHUNK"):
+                await SearchService.search_similar_code("r1", "def foo():\n  pass")
+
+        asyncio.run(_run())
+
+    def test_patterns_rejects_when_experience_disabled(self, monkeypatch):
+        monkeypatch.setattr(settings, "mr_experience_enabled", False)
+
+        async def _run():
+            with pytest.raises(ValueError, match="MR_EXPERIENCE"):
+                await SearchService.search_patterns("r1", "改告警")
 
         asyncio.run(_run())
 

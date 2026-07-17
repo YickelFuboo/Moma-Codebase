@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # =============================================================================
     # 图数据库 / CodeGraph
     # =============================================================================
-    code_graph_enabled: bool = Field(default=True, description="是否启用代码依赖图谱", env="CODE_GRAPH_ENABLED")
+    code_graph_enabled: bool = Field(default=True, description="是否启用代码依赖图谱（分析 + related/图谱检索）", env="CODE_GRAPH_ENABLED")
     code_graph_provider: str = Field(
         default="codegraph",
         description="CodeGraph 实现：codegraph（开源 CLI，默认）| builtin（自研 Neo4j）",
@@ -88,15 +88,48 @@ class Settings(BaseSettings):
     # 代码仓分析 - 行切片（codechunk/code_chunk）
     # =============================================================================
     lsp_enabled: bool = Field(default=True, description="是否启用内置 LSP 客户端", env="LSP_ENABLED")
+    # 四类能力开关：同时控制「分析入库」与对应「检索接口」（默认全开）
+    # - Symbol → analyze 符号摘要向量 + search related
+    # - Line chunk → analyze 行块向量 + search similar
+    # - CodeGraph → analyze 图谱 + search related / dependents 等
+    # - MR experience → experience analyze + search pattern
+    code_analysis_line_chunk_enabled: bool = Field(
+        default=True,
+        description="是否启用行切片向量（分析 + 相似片段检索）",
+        env="CODE_ANALYSIS_LINE_CHUNK_ENABLED",
+    )
     code_analysis_line_chunk_target_lines: int = Field(default=5, description="行切片目标窗口行数", env="CODE_ANALYSIS_LINE_CHUNK_TARGET_LINES")
     code_analysis_line_chunk_overlap_lines: int = Field(default=1, description="行切片滑动重叠行数", env="CODE_ANALYSIS_LINE_CHUNK_OVERLAP_LINES")
     code_analysis_line_chunk_max_lines: int = Field(default=200, description="单行切片经扩展后的最大行数上限", env="CODE_ANALYSIS_LINE_CHUNK_MAX_LINES")
     code_analysis_symbol_summary_llm_concurrency: int = Field(default=4, ge=1, le=32, description="符号摘要阶段 LLM 并发上限", env="CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY")
-    code_analysis_symbol_summary_enabled: bool = Field(default=True, description="是否启用符号 LLM 摘要与符号向量；关闭时仅行片段向量化", env="CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED")
+    code_analysis_symbol_summary_enabled: bool = Field(
+        default=True,
+        description="是否启用符号 LLM 摘要与符号向量（分析 + related 检索）",
+        env="CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED",
+    )
     code_analysis_file_worker_count: int = Field(default=10, ge=1, le=64, description="单仓库文件分析 worker 并发数", env="CODE_ANALYSIS_FILE_WORKER_COUNT")
+    mr_experience_enabled: bool = Field(
+        default=True,
+        description="是否启用 MR/合入经验沉淀与检索（experience analyze + search pattern）",
+        env="MR_EXPERIENCE_ENABLED",
+    )
+    mr_experience_min_quality_score: float = Field(
+        default=0.55,
+        description="MR经验最小质量分（低于该分值会被丢弃）",
+        env="MR_EXPERIENCE_MIN_QUALITY_SCORE",
+    )
+    mr_experience_merge_by_scenario: bool = Field(
+        default=True,
+        description="检索时是否按场景合并多条MR经验",
+        env="MR_EXPERIENCE_MERGE_BY_SCENARIO",
+    )
 
     repo_storage_path: str = Field(default="./data/repos", description="远程克隆/上传仓库的本地存储根目录", env="REPO_STORAGE_PATH")
-    enable_incremental_scan: bool = Field(default=True, description="是否启用定时增量扫描", env="ENABLE_INCREMENTAL_SCAN")
+    enable_incremental_scan: bool = Field(
+        default=True,
+        description="程序运行后是否定时扫描已登记仓库变更并自动更新 repo/lib analysis 与 MR 经验",
+        env="ENABLE_INCREMENTAL_SCAN",
+    )
     incremental_scan_interval_sec: int = Field(default=300, ge=30, description="增量扫描间隔（秒）", env="INCREMENTAL_SCAN_INTERVAL_SEC")
 
     class Config:
