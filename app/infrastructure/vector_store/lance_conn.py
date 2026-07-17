@@ -265,6 +265,67 @@ class LanceDBConnection(VectorStoreConnection):
             logging.error("LanceDB get_record failed: %s", e)
             return None
 
+    async def list_records(
+        self,
+        space_name: str,
+        *,
+        condition: Optional[dict[str, Any]] = None,
+        select_fields: Optional[list[str]] = None,
+        limit: int = 500,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        if space_name not in self._table_names():
+            return []
+
+        def _run() -> list[dict[str, Any]]:
+            table = self._open_table(space_name)
+            try:
+                frame = table.to_pandas()
+            except Exception:
+                # 兼容旧版：无向量条件扫表
+                where = _build_where(condition)
+                builder = table.search()
+                if where:
+                    builder = builder.where(where, prefilter=True)
+                fields = list(select_fields or [])
+                if "id" not in fields:
+                    fields = fields + ["id"] if fields else ["id"]
+                take = limit if limit and limit > 0 else max(int(table.count_rows()), 1)
+                rows = builder.select(fields).limit(take).to_list()
+                return [dict(r) for r in rows]
+
+            if condition:
+                for key, value in condition.items():
+                    if key not in frame.columns or value is None or value == "":
+                        continue
+                    frame = frame[frame[key] == value]
+            if select_fields:
+                cols = [c for c in select_fields if c in frame.columns]
+                if "id" in frame.columns and "id" not in cols:
+                    cols = ["id"] + cols
+                frame = frame[cols] if cols else frame
+            if limit and limit > 0:
+                frame = frame.head(limit)
+            records: list[dict[str, Any]] = []
+            for _, row in frame.iterrows():
+                item = row.to_dict()
+                for k, v in list(item.items()):
+                    if hasattr(v, "tolist"):
+                        item[k] = v.tolist()
+                    elif hasattr(v, "item") and not isinstance(v, (bytes, str)):
+                        try:
+                            item[k] = v.item()
+                        except Exception:
+                            item[k] = v
+                records.append(item)
+            return records
+
+        try:
+            return await asyncio.to_thread(_run)
+        except Exception as e:
+            logging.error("LanceDB list_records failed on %s: %s", space_name, e)
+            raise
+
     async def search(self, space_names: list[str], request: SearchRequest, **kwargs) -> dict[str, Any]:
         if not space_names:
             return {"hits": {"hits": [], "total": {"value": 0}}}

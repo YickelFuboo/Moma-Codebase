@@ -10,6 +10,7 @@ _LAZY_COMMANDS: dict[str, str] = {
     "analyze": "app.cli.analyze",
     "experience": "app.cli.experience",
     "search": "app.cli.search",
+    "inspect": "app.cli.inspect",
     "migrate": "app.cli.db",
 }
 

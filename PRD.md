@@ -40,6 +40,7 @@
 三类业务命令：
 1. **生成类**：指定 Repo/Lib 本地目录 → 解析分析 → 结果落库（含源码镜像分析、可选的历史 MR 经验分析）
 2. **查询类**：必须先指定要查询的 Repo/Lib 本地路径 → 按需检索（含开发模式/经验检索）
+3. **验收类**：`inspect` 只读导出已落库的切片 / Graph / Lib API，供人工或脚本核对分析质量
 
 ## 2. 启动依赖：CodeGraph
 
@@ -140,6 +141,11 @@
 | `search dependencies` | 查询指定文件依赖的其他文件（CodeGraph 文件级） | `--path` + `--file` |
 | `search callers` | 查询调用指定符号的函数/方法（CodeGraph 符号级） | `--path` + `--symbol` `[--limit]` |
 | `search callees` | 查询指定符号调用的函数/方法（CodeGraph 符号级） | `--path` + `--symbol` `[--limit]` |
+| `inspect chunks` | 只读验收切片（行块）数据（仅 kind=code） | `--path` `[--target]` `[--limit]` `[--full-content]` `[--export]` |
+| `inspect graph` | 只读验收文件级依赖（仅 kind=code） | `--path` `[--target]` `[--limit]` `[--export]` |
+| `inspect apis` | 只读验收 Lib 公开接口（仅 kind=lib） | `--path` `[--file]` `[--limit]` `[--export]` |
+
+`inspect` 约定：`--target` / `--file` 不填=全仓/全库；填了=相对子目录前缀或单文件；默认 `--limit 500`，`0`=不限制；输出 JSON，可选 `--export` 写文件；未分析时报明确错误。
 
 `search pattern` 返回示例形态（示意）：
 

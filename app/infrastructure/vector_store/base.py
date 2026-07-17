@@ -368,6 +368,18 @@ class VectorStoreConnection(ABC):
         """
         raise NotImplementedError("Not implemented")
 
+    async def list_records(
+        self,
+        space_name: str,
+        *,
+        condition: Optional[dict[str, Any]] = None,
+        select_fields: Optional[list[str]] = None,
+        limit: int = 500,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """按条件列出记录（非向量检索）。默认未实现，由具体后端覆盖。"""
+        raise NotImplementedError(f"{self.get_db_type()} 未实现 list_records")
+
     # 搜索接口
     @abstractmethod
     async def search(self, space_names: list[str], request: SearchRequest, **kwargs) -> dict[str, Any]:
