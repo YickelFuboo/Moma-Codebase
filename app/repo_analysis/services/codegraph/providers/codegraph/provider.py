@@ -58,9 +58,15 @@ class _CliGenerator(CodeGraphGeneratorBase):
     async def update_files(self, file_paths: List[str]):
         if not self.repo_local_path or not os.path.isdir(self.repo_local_path):
             raise CodeGraphCliError(f"仓库路径不可用: {self.repo_local_path}")
+        logging.info(
+            "执行开源 CodeGraph sync (cwd=%s, hint_files=%s)",
+            self.repo_local_path,
+            len(file_paths or []),
+        )
         try:
             CodeGraphCliRunner.run(["sync"], cwd=self.repo_local_path, check=True)
         except CodeGraphCliError:
+            logging.warning("CodeGraph sync 失败，回退 init cwd=%s", self.repo_local_path)
             await self.generate_graph(clean_stale=False)
 
 

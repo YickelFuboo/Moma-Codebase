@@ -66,8 +66,8 @@
 
 | 能力 | 说明 | 主要使用方 |
 |------|------|------------|
-| `generate_graph` | 对本仓构建/重建图谱索引 | `analyze` 管线 |
-| `update_files` | 按变更文件增量更新图谱 | 文件级重分析 |
+| `generate_graph` | 对本仓构建/重建图谱索引（首次 / 无索引） | `analyze` 管线 |
+| `update_files` | 按变更增量更新（开源 CLI=`sync`；已有索引时 `analyze` 自动选用） | 文件级重分析 / 再次 `analyze` |
 | `delete_file_graph` / `delete_repo_graph` | 删除文件或整仓图谱数据 | `analyze clear` / `repo delete` |
 
 `codegraph` 实现映射开源 CLI（如 `codegraph init` / 增量 sync）；`builtin` 写 Neo4j。

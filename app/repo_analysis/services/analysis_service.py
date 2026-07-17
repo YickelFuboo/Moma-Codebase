@@ -67,6 +67,9 @@ class AnalysisService:
                 await db.commit()
             if task and task.scan_status == RepoAnalysisStatus.RUNNING.value:
                 return AnalysisService._scan_task_to_dict(task, repo.local_path)
+
+            # 加锁前记录是否曾成功扫过（用于图谱增量判断；加锁会清空 last_scan_finished_at）
+            had_prior_scan = bool(task and task.last_scan_finished_at)
             
             # 解析目标路径类型
             if target_rel_path:
@@ -120,29 +123,14 @@ class AnalysisService:
         )
         AnalysisService._running_scan_tasks[repo_id] = scanning_task
 
-        # 同步启动代码图谱生成（仅 kind=code；lib 不做 CodeGraph）
+        # 图谱：首次全量 init；已有索引则增量 sync/update_files（仅 kind=code）
         if settings.code_graph_enabled and repo_kind == "code":
-            existing_graph_task = AnalysisService._running_graph_tasks.get(repo_id)
-            if not existing_graph_task or existing_graph_task.done():
-                async def _run_graph() -> None:
-                    generator = None
-                    try:
-                        generator = CodeGraphGateway.create_generator(
-                            repo_id=repo_id,
-                            repo_name=str(repo_id),
-                            repo_local_path=repo_path or "",
-                        )
-                        await generator.generate_graph(clean_stale=True)
-                    except Exception as e:
-                        logging.warning("代码图谱生成失败 repo_id=%s error=%s", repo_id, e)
-                    finally:
-                        if generator:
-                            try:
-                                generator.close()
-                            except Exception:
-                                pass
-
-                AnalysisService._running_graph_tasks[repo_id] = asyncio.create_task(_run_graph())
+            AnalysisService._schedule_code_graph(
+                repo_id=repo_id,
+                repo_path=repo_path or "",
+                scan_task=scanning_task,
+                had_prior_scan=had_prior_scan,
+            )
 
         return {
             "repo_id": repo_id,
@@ -152,6 +140,109 @@ class AnalysisService:
             "is_directory": is_directory,
             "info": "scan is running",
         }
+
+    @staticmethod
+    def has_existing_graph_index(repo_path: str, *, had_prior_scan: bool = False) -> bool:
+        """判断仓库是否已有可增量更新的图谱索引。"""
+        if repo_path and os.path.isdir(os.path.join(repo_path, ".codegraph")):
+            return True
+        return bool(had_prior_scan)
+
+    @staticmethod
+    def _schedule_code_graph(
+        *,
+        repo_id: str,
+        repo_path: str,
+        scan_task: asyncio.Task,
+        had_prior_scan: bool,
+    ) -> None:
+        existing_graph_task = AnalysisService._running_graph_tasks.get(repo_id)
+        if existing_graph_task and not existing_graph_task.done():
+            return
+
+        incremental = AnalysisService.has_existing_graph_index(
+            repo_path,
+            had_prior_scan=had_prior_scan,
+        )
+
+        async def _run_graph() -> None:
+            try:
+                await AnalysisService._run_code_graph(
+                    repo_id=repo_id,
+                    repo_path=repo_path,
+                    scan_task=scan_task,
+                    incremental=incremental,
+                )
+            except Exception as e:
+                logging.warning("代码图谱更新失败 repo_id=%s error=%s", repo_id, e)
+
+        AnalysisService._running_graph_tasks[repo_id] = asyncio.create_task(_run_graph())
+
+    @staticmethod
+    async def _run_code_graph(
+        *,
+        repo_id: str,
+        repo_path: str,
+        scan_task: Optional[asyncio.Task],
+        incremental: bool,
+    ) -> None:
+        """全量 generate_graph，或增量 update_files（开源 CLI 对应 sync）。"""
+        generator = None
+        try:
+            generator = CodeGraphGateway.create_generator(
+                repo_id=repo_id,
+                repo_name=str(repo_id),
+                repo_local_path=repo_path or "",
+            )
+            provider_name = CodeGraphGateway.get_provider().name
+            if not incremental:
+                logging.info("CodeGraph 全量生成 provider=%s repo_id=%s", provider_name, repo_id)
+                await generator.generate_graph(clean_stale=True)
+                return
+
+            # builtin 需要变更文件列表，等扫描标完 PENDING；codegraph sync 可自行发现变更
+            changed_abs: List[str] = []
+            if provider_name == "builtin" and scan_task is not None:
+                try:
+                    await scan_task
+                except Exception:
+                    pass
+                changed_abs = await AnalysisService._list_pending_abs_paths(repo_id, repo_path)
+
+            logging.info(
+                "CodeGraph 增量更新 provider=%s repo_id=%s changed_files=%s",
+                provider_name,
+                repo_id,
+                len(changed_abs),
+            )
+            await generator.update_files(changed_abs)
+        finally:
+            if generator:
+                try:
+                    generator.close()
+                except Exception:
+                    pass
+
+    @staticmethod
+    async def _list_pending_abs_paths(repo_id: str, repo_root: str) -> List[str]:
+        async with get_db_session() as db:
+            rel_paths = (
+                await db.scalars(
+                    select(RepoFileAnalysisState.file_path).where(
+                        RepoFileAnalysisState.repo_id == repo_id,
+                        RepoFileAnalysisState.status == FileAnalysisStatus.PENDING.value,
+                    )
+                )
+            ).all()
+        out: List[str] = []
+        for rel in rel_paths:
+            if not rel:
+                continue
+            norm = normalize_path(str(rel)).strip("/")
+            abs_path = os.path.normpath(os.path.join(repo_root, *norm.split("/")))
+            if os.path.isfile(abs_path):
+                out.append(abs_path)
+        return out
 
     @staticmethod
     async def _assert_scan_is_running(db, repo_id: str) -> None:
