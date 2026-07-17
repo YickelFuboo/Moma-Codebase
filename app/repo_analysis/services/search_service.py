@@ -5,6 +5,8 @@ from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.services.codevector.exact_match import ExactMatchService
+from app.repo_analysis.services.codevector.similar_query import SimilarQueryNormalizer
+from app.repo_analysis.services.codevector.similar_rerank import SimilarRerankService
 from app.repo_analysis.services.codevector.vector_search import CodeVectorSearchService
 from app.repo_analysis.services.mr_experience.pattern_vector import PatternVectorService
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
@@ -23,6 +25,68 @@ class SearchService:
     # 存在强符号定义命中时，不再硬凑满 top_k
     STRONG_SYMBOL_CAP = 5
     STRONG_SYMBOL_RAW = 2.8
+    SIMILAR_FETCH_MULTIPLIER = 4
+    SIMILAR_MIN_FETCH = 40
+
+    @classmethod
+    def _merge_similar_docs(
+        cls,
+        batches: List[List[Dict[str, object]]],
+    ) -> List[Dict[str, object]]:
+        best: Dict[Tuple[object, object, object], Dict[str, object]] = {}
+        for docs in batches:
+            for doc in docs:
+                key = (
+                    doc.get("file_path"),
+                    doc.get("start_line"),
+                    doc.get("end_line"),
+                )
+                score = float(doc.get("_score") or 0)
+                prev = best.get(key)
+                if prev is None or score > float(prev.get("_score") or 0):
+                    best[key] = doc
+        return list(best.values())
+
+    @classmethod
+    def _apply_similar_trim(
+        cls,
+        items: List[Dict[str, object]],
+        top_k: int,
+    ) -> List[Dict[str, object]]:
+        if not items:
+            return []
+        top_score = float(items[0].get("score") or 0)
+        floor = top_score * cls.SCORE_RATIO_FLOOR
+        trimmed = [it for it in items if float(it.get("score") or 0) >= floor]
+        if not trimmed:
+            trimmed = items[:1]
+        return trimmed[: max(1, top_k)]
+
+    @classmethod
+    def fuse_similar_items(
+        cls,
+        docs: List[Dict[str, object]],
+        *,
+        query_text: str,
+        top_k: int,
+    ) -> List[Dict[str, object]]:
+        symbol_names = SimilarQueryNormalizer.extract_symbol_names(query_text)
+        reranked = SimilarRerankService.rerank(docs, query_text, symbol_names)
+        items: List[Dict[str, object]] = []
+        for doc in reranked:
+            items.append(
+                {
+                    "file_path": doc.get("file_path"),
+                    "start_line": doc.get("start_line"),
+                    "end_line": doc.get("end_line"),
+                    "score": doc.get("_fused_score"),
+                    "vector_score": doc.get("_score"),
+                    "lexical_score": doc.get("_lexical_score"),
+                    "symbol_score": doc.get("_symbol_score"),
+                    "match_source": "line_chunk",
+                }
+            )
+        return cls._apply_similar_trim(items, top_k)
 
     @staticmethod
     def _item_key(it: Dict[str, object]) -> Tuple[object, object, object, object, object]:
@@ -248,22 +312,25 @@ class SearchService:
             if not repo:
                 raise ValueError("仓库不存在")
 
-        docs = await CodeVectorSearchService.search_code_chunk_vectors(repo_id, [query], top_k)
+        embed_queries = SimilarQueryNormalizer.build_embed_queries(query)
+        fetch_k = max(top_k * SearchService.SIMILAR_FETCH_MULTIPLIER, SearchService.SIMILAR_MIN_FETCH)
+        doc_batches: List[List[Dict[str, object]]] = []
+        for q in embed_queries:
+            docs = await CodeVectorSearchService.search_code_chunk_vectors(repo_id, [q], fetch_k)
+            if docs:
+                doc_batches.append(docs)
+        merged_docs = SearchService._merge_similar_docs(doc_batches)
+        unique = SearchService.fuse_similar_items(
+            merged_docs,
+            query_text=query,
+            top_k=top_k,
+        )
         index = await SearchIndexMeta.for_repo(repo_id)
         return {
             "repo_id": repo_id,
-            "total": len(docs),
+            "total": len(unique),
             "index": index,
-            "items": [
-                {
-                    "file_path": doc.get("file_path"),
-                    "start_line": doc.get("start_line"),
-                    "end_line": doc.get("end_line"),
-                    "score": doc.get("_score"),
-                    "match_source": "line_chunk",
-                }
-                for doc in docs
-            ],
+            "items": unique,
         }
 
     @classmethod

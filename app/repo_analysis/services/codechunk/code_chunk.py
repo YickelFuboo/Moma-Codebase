@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 from app.config.settings import settings
+from app.repo_analysis.services.codeast.model import FileInfo
 from app.utils.common import strip_utf8_bom
 
 
@@ -87,6 +88,57 @@ class CodeChunkService:
             step = end - overlap_lines if overlap_lines > 0 else end
             start = max(step, start + 1)
         return out
+
+    @staticmethod
+    def slice_symbol_bodies(file_info: FileInfo, *, file_ext: str = ".py") -> List[LineTextChunk]:
+        """从 AST 符号完整源码生成切片，便于 similar 命中整段函数/类。"""
+        if not file_info:
+            return []
+        out: List[LineTextChunk] = []
+        seen: set[tuple[int, int]] = set()
+
+        def _append(start_line: int, end_line: int, text: str) -> None:
+            if not text or not start_line or not end_line:
+                return
+            body = text.strip()
+            if len(body) < 24:
+                return
+            if CodeChunkService._should_drop_chunk(body, file_ext):
+                return
+            key = (int(start_line), int(end_line))
+            if key in seen:
+                return
+            seen.add(key)
+            out.append(LineTextChunk(int(start_line), int(end_line), body))
+
+        for fn in file_info.functions or []:
+            _append(fn.start_line or 0, fn.end_line or 0, fn.source_code or "")
+        for clz in file_info.classes or []:
+            _append(clz.start_line or 0, clz.end_line or 0, clz.source_code or "")
+            for method in clz.methods or []:
+                _append(method.start_line or 0, method.end_line or 0, method.source_code or "")
+        return out
+
+    @staticmethod
+    def merge_chunks(
+        line_chunks: List[LineTextChunk],
+        symbol_chunks: List[LineTextChunk],
+    ) -> List[LineTextChunk]:
+        """符号级切片优先；与符号重叠的行窗不再重复入库。"""
+        merged = list(symbol_chunks)
+
+        def _overlaps(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
+            return not (a_end < b_start or b_end < a_start)
+
+        for chunk in line_chunks:
+            if any(
+                _overlaps(chunk.start_line, chunk.end_line, sym.start_line, sym.end_line)
+                for sym in symbol_chunks
+            ):
+                continue
+            merged.append(chunk)
+        merged.sort(key=lambda c: (c.start_line, c.end_line))
+        return merged
 
     @staticmethod
     def _extend_chunk_end(

@@ -325,9 +325,18 @@ class FileAnalysisService:
                 return True, None
 
             source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
+            file_ext = os.path.splitext(abs_file_path)[1].lower()
+            file_info = None
+            if chunk_on or symbol_on:
+                file_info = await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
 
             async def _line_chunk_vectors() -> None:
-                chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
+                line_chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
+                if file_info:
+                    symbol_chunks = CodeChunkService.slice_symbol_bodies(file_info, file_ext=file_ext)
+                    chunks = CodeChunkService.merge_chunks(line_chunks, symbol_chunks)
+                else:
+                    chunks = line_chunks
                 await CodeVectorService.vectorize_and_store_line_chunks(
                     repo_id,
                     rel_file_path,
@@ -335,7 +344,8 @@ class FileAnalysisService:
                 )
 
             async def _symbol_vectors() -> None:
-                file_info = await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
+                if not file_info:
+                    return
                 await CodeVectorService.vectorize_and_store_symbol_summaries(
                     repo_id,
                     rel_file_path,
@@ -343,7 +353,6 @@ class FileAnalysisService:
                 )
 
             if chunk_on and symbol_on:
-                # 行块与符号互不依赖：并行；return_exceptions 避免一方失败取消另一方
                 r_line, r_sym = await asyncio.gather(
                     _line_chunk_vectors(),
                     _symbol_vectors(),
