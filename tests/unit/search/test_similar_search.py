@@ -95,6 +95,56 @@ class TestSearchServiceSimilarFusion:
         assert items[0]["match_source"] == "line_chunk"
         assert "vector_score" in items[0]
 
+    def test_similar_trim_raises_floor_and_caps_strong_signal(self):
+        items = [
+            {
+                "file_path": "app/agents/core/react.py",
+                "score": 1.0,
+                "symbol_score": 1.0,
+                "lexical_score": 0.8,
+            },
+            {
+                "file_path": "app/agents/core/base.py",
+                "score": 0.95,
+                "symbol_score": 0.0,
+                "lexical_score": 0.2,
+            },
+            {
+                "file_path": "app/agents/plan/planning.py",
+                "score": 0.92,
+                "symbol_score": 0.0,
+                "lexical_score": 0.1,
+            },
+            {
+                "file_path": "app/other/x.py",
+                "score": 0.70,
+                "symbol_score": 0.0,
+                "lexical_score": 0.0,
+            },
+        ]
+        trimmed = SearchService._apply_similar_trim(
+            items,
+            top_k=10,
+            symbol_names={"think_and_act", "ReActAgent"},
+        )
+        # 同目录配额 + 极强信号：只留 top1
+        assert [it["file_path"] for it in trimmed] == ["app/agents/core/react.py"]
+        assert len(trimmed) <= SearchService.SIMILAR_VERY_STRONG_CAP
+
+    def test_similar_trim_dir_quota_keeps_diverse_parents(self):
+        items = [
+            {"file_path": "app/a/one.py", "score": 1.0, "symbol_score": 0.0, "lexical_score": 0.1},
+            {"file_path": "app/a/two.py", "score": 0.99, "symbol_score": 0.0, "lexical_score": 0.1},
+            {"file_path": "app/b/three.py", "score": 0.98, "symbol_score": 0.0, "lexical_score": 0.1},
+            {"file_path": "app/c/four.py", "score": 0.97, "symbol_score": 0.0, "lexical_score": 0.1},
+        ]
+        trimmed = SearchService._apply_similar_trim(items, top_k=10, symbol_names=set())
+        paths = [it["file_path"] for it in trimmed]
+        assert "app/a/one.py" in paths
+        assert "app/a/two.py" not in paths
+        assert "app/b/three.py" in paths
+        assert len(trimmed) <= SearchService.SIMILAR_SOFT_CAP
+
 
 class TestCodeChunkSymbolBodies:
     def test_slice_symbol_bodies_from_ast(self):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
@@ -20,13 +20,22 @@ class SearchService:
     EXACT_SYMBOL_WEAK_BOOST = 0.6
     EXACT_PATH_BOOST = 0.3
     CODEGRAPH_SCORE = 1.0
-    # 相对 top1 的分数门槛：低于此比例的条目丢弃（对齐「短列表高精确」）
+    # related：相对 top1 的分数门槛
     SCORE_RATIO_FLOOR = 0.55
     # 存在强符号定义命中时，不再硬凑满 top_k
     STRONG_SYMBOL_CAP = 5
     STRONG_SYMBOL_RAW = 2.8
     SIMILAR_FETCH_MULTIPLIER = 4
     SIMILAR_MIN_FETCH = 40
+    # similar：短列表高精度（与 related 截断解耦）
+    SIMILAR_SCORE_RATIO_FLOOR = 0.82
+    SIMILAR_SOFT_CAP = 3
+    SIMILAR_STRONG_CAP = 2
+    SIMILAR_VERY_STRONG_CAP = 1
+    SIMILAR_DIR_QUOTA = 1
+    SIMILAR_STRONG_SYMBOL_SCORE = 0.5
+    SIMILAR_STRONG_LEXICAL_SCORE = 0.35
+    SIMILAR_VERY_STRONG_SYMBOL_SCORE = 0.8
 
     @classmethod
     def _merge_similar_docs(
@@ -48,19 +57,93 @@ class SearchService:
         return list(best.values())
 
     @classmethod
+    def _similar_parent_dir(cls, file_path: object) -> str:
+        fp = str(file_path or "").replace("\\", "/")
+        if "/" not in fp:
+            return ""
+        return fp.rsplit("/", 1)[0]
+
+    @classmethod
+    def _has_similar_strong_signal(
+        cls,
+        items: List[Dict[str, object]],
+        symbol_names: Set[str],
+    ) -> bool:
+        return cls._similar_signal_level(items, symbol_names) >= 1
+
+    @classmethod
+    def _similar_signal_level(
+        cls,
+        items: List[Dict[str, object]],
+        symbol_names: Set[str],
+    ) -> int:
+        """0=弱，1=强，2=极强（宜只返回 1 条）。"""
+        if not items:
+            return 0
+        top = items[0]
+        sym = float(top.get("symbol_score") or 0)
+        lex = float(top.get("lexical_score") or 0)
+        top_path = str(top.get("file_path") or "").replace("\\", "/")
+        stem = top_path.rsplit("/", 1)[-1].rsplit(".", 1)[0].lower()
+        path_hit = False
+        for name in symbol_names:
+            n = str(name or "").strip()
+            if not n:
+                continue
+            if n.lower() == stem or n.lower() in top_path.lower():
+                path_hit = True
+                break
+        if path_hit or sym >= cls.SIMILAR_VERY_STRONG_SYMBOL_SCORE:
+            return 2
+        if sym >= cls.SIMILAR_STRONG_SYMBOL_SCORE and lex >= cls.SIMILAR_STRONG_LEXICAL_SCORE:
+            return 1
+        return 0
+
+    @classmethod
+    def _apply_dir_quota(
+        cls,
+        items: List[Dict[str, object]],
+        quota: int,
+    ) -> List[Dict[str, object]]:
+        if quota <= 0:
+            return list(items)
+        kept: List[Dict[str, object]] = []
+        counts: Dict[str, int] = {}
+        for it in items:
+            parent = cls._similar_parent_dir(it.get("file_path"))
+            used = counts.get(parent, 0)
+            if used >= quota:
+                continue
+            counts[parent] = used + 1
+            kept.append(it)
+        return kept
+
+    @classmethod
     def _apply_similar_trim(
         cls,
         items: List[Dict[str, object]],
         top_k: int,
+        *,
+        symbol_names: Optional[Set[str]] = None,
     ) -> List[Dict[str, object]]:
         if not items:
             return []
+        names = symbol_names or set()
         top_score = float(items[0].get("score") or 0)
-        floor = top_score * cls.SCORE_RATIO_FLOOR
+        floor = top_score * cls.SIMILAR_SCORE_RATIO_FLOOR
         trimmed = [it for it in items if float(it.get("score") or 0) >= floor]
         if not trimmed:
             trimmed = items[:1]
-        return trimmed[: max(1, top_k)]
+        trimmed = cls._apply_dir_quota(trimmed, cls.SIMILAR_DIR_QUOTA)
+        level = cls._similar_signal_level(trimmed, names)
+        if level >= 2:
+            soft_cap = cls.SIMILAR_VERY_STRONG_CAP
+        elif level == 1:
+            soft_cap = cls.SIMILAR_STRONG_CAP
+        else:
+            soft_cap = cls.SIMILAR_SOFT_CAP
+        cap = min(max(1, top_k), soft_cap)
+        return trimmed[:cap]
 
     @classmethod
     def fuse_similar_items(
@@ -86,7 +169,7 @@ class SearchService:
                     "match_source": "line_chunk",
                 }
             )
-        return cls._apply_similar_trim(items, top_k)
+        return cls._apply_similar_trim(items, top_k, symbol_names=symbol_names)
 
     @staticmethod
     def _item_key(it: Dict[str, object]) -> Tuple[object, object, object, object, object]:
