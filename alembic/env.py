@@ -9,6 +9,7 @@ from app.infrastructure.database import Base
 import app.repo_mgmt.models.git_repo_mgmt
 import app.repo_mgmt.models.git_auth_mgmt
 import app.repo_analysis.models.analysis_status
+import app.repo_analysis.models.experience_status
 
 config = context.config
 if config.config_file_name is not None:

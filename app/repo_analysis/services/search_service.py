@@ -1,12 +1,13 @@
 from typing import Dict, List
 from sqlalchemy import select
-from app.repo_mgmt.models.git_repo_mgmt import GitRepository
+from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
 from app.repo_analysis.services.codevector.vector_search import CodeVectorSearchService
+from app.repo_analysis.services.mr_experience.pattern_vector import PatternVectorService
 from app.infrastructure.database import get_db_session
 
 
 class SearchService:
-    """仓库内代码相似检索、关键词关联位置检索（向量库：行块 / 符号摘要）。"""
+    """仓库内代码相似检索、关键词关联位置检索、历史经验模式检索。"""
 
     @staticmethod
     async def search_similar_code(
@@ -97,4 +98,33 @@ class SearchService:
             "keywords": keywords,
             "total": len(unique),
             "items": unique,
+        }
+
+    @staticmethod
+    async def search_patterns(
+        repo_id: str,
+        query: str,
+        top_k: int = 10,
+    ) -> Dict[str, object]:
+        q = (query or "").strip()
+        if not q:
+            raise ValueError("query 不能为空")
+
+        async with get_db_session() as db:
+            repo = await db.scalar(select(GitRepository).where(GitRepository.id == repo_id))
+            if not repo:
+                raise ValueError("仓库不存在")
+            kind = getattr(repo, "kind", None) or RepoKind.CODE
+            if kind != RepoKind.CODE:
+                raise ValueError(f"search pattern 仅支持 kind=code，当前 kind={kind}")
+
+        if not await PatternVectorService.space_exists(repo_id):
+            raise ValueError("该仓库尚无经验数据，请先执行 experience analyze")
+
+        items = await PatternVectorService.search(repo_id, q, top_k)
+        return {
+            "repo_id": repo_id,
+            "query": q,
+            "total": len(items),
+            "items": items,
         }

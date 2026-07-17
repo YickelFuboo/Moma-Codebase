@@ -447,6 +447,12 @@ class GitRepositoryService:
             except Exception as e:
                 logging.warning("删除仓库前清理分析数据失败 repo_id=%s error=%s", repository_id,e)
 
+            try:
+                from app.repo_analysis.services.experience_service import ExperienceService
+                await ExperienceService.clear(repository_id)
+            except Exception as e:
+                logging.warning("删除仓库前清理经验数据失败 repo_id=%s error=%s", repository_id, e)
+
             # 删除本地文件
             if delete_local and repository.local_path and os.path.exists(repository.local_path):
                 shutil.rmtree(repository.local_path)

@@ -8,6 +8,7 @@ from app.config.settings import APP_NAME, APP_VERSION
 _LAZY_COMMANDS: dict[str, str] = {
     "repo": "app.cli.repo",
     "analyze": "app.cli.analyze",
+    "experience": "app.cli.experience",
     "search": "app.cli.search",
     "migrate": "app.cli.db",
 }

@@ -86,6 +86,27 @@ def search_api(path: str, query: str, top_k: int) -> None:
     run_async(_api)
 
 
+@search.command("pattern")
+@click.option("--path", required=True, help="已登记的本地代码仓目录")
+@click.option("--query", required=True, help="需求/问题描述")
+@click.option("--top-k", default=10, show_default=True, help="返回条数")
+def search_pattern(path: str, query: str, top_k: int) -> None:
+    """按需求检索历史开发经验模式（仅 kind=code）"""
+
+    async def _pattern() -> None:
+        repo = await get_repo_by_path(path)
+        _assert_kind_code(repo)
+        result = await SearchService.search_patterns(
+            repo_id=repo.id,
+            query=query,
+            top_k=top_k,
+        )
+        result["path"] = path
+        echo_json(result)
+
+    run_async(_pattern)
+
+
 @search.command("dependents")
 @click.option("--path", required=True, help="已登记的本地代码仓目录")
 @click.option("--file", "file_path", required=True, help="仓库内相对文件路径")
