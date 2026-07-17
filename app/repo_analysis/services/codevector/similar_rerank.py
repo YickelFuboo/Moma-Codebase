@@ -8,11 +8,13 @@ _TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,}")
 
 
 class SimilarRerankService:
-    """similar 向量召回后的 lexical + 符号名加权 rerank。"""
+    """similar 向量召回后的 lexical + 符号 + 稀有特征 + 路径加权 rerank。"""
 
-    VECTOR_WEIGHT = 0.55
-    LEXICAL_WEIGHT = 0.35
+    VECTOR_WEIGHT = 0.45
+    LEXICAL_WEIGHT = 0.28
     SYMBOL_WEIGHT = 0.10
+    RARE_WEIGHT = 0.12
+    PATH_WEIGHT = 0.05
 
     @classmethod
     def rerank(
@@ -25,30 +27,92 @@ class SimilarRerankService:
             return []
         normalized_query = SimilarQueryNormalizer.normalize(query_text)
         query_tokens = cls._tokenize(normalized_query)
+        rare_tokens = cls._rare_tokens(query_tokens | {n for n in symbol_names if n})
         ranked: List[Dict[str, object]] = []
         for doc in docs:
             content = str(doc.get("content") or "")
+            file_path = str(doc.get("file_path") or "")
+            content_tokens = cls._tokenize(content)
             vec_score = cls._as_float(doc.get("_score"))
-            lex_score = cls._lexical_overlap(query_tokens, cls._tokenize(content))
+            lex_score = cls._lexical_overlap(query_tokens, content_tokens)
             sym_score = cls._symbol_overlap(symbol_names, content)
+            rare_score = cls._rare_overlap(rare_tokens, content_tokens)
+            path_score = cls._path_overlap(query_tokens | rare_tokens, file_path)
             fused = (
                 vec_score * cls.VECTOR_WEIGHT
                 + lex_score * cls.LEXICAL_WEIGHT
                 + sym_score * cls.SYMBOL_WEIGHT
+                + rare_score * cls.RARE_WEIGHT
+                + path_score * cls.PATH_WEIGHT
             )
             item = dict(doc)
             item["_fused_score"] = fused
             item["_lexical_score"] = lex_score
             item["_symbol_score"] = sym_score
+            item["_rare_score"] = rare_score
+            item["_path_score"] = path_score
             ranked.append(item)
         ranked.sort(
             key=lambda it: (
                 -float(it.get("_fused_score") or 0),
+                -float(it.get("_rare_score") or 0),
+                -float(it.get("_path_score") or 0),
                 -float(it.get("_score") or 0),
                 str(it.get("file_path") or ""),
             )
         )
         return cls._dedupe_by_file(ranked)
+
+    @classmethod
+    def _rare_tokens(cls, tokens: Set[str]) -> Set[str]:
+        rare: Set[str] = set()
+        for tok in tokens:
+            t = (tok or "").strip()
+            if len(t) < 4:
+                continue
+            if "_" in t or len(t) >= 6:
+                rare.add(t)
+        return rare
+
+    @classmethod
+    def _rare_overlap(cls, rare_tokens: Set[str], candidate_tokens: Set[str]) -> float:
+        if not rare_tokens:
+            return 0.0
+        if not candidate_tokens:
+            return 0.0
+        cand_lower = {c.lower() for c in candidate_tokens}
+        hits = 0
+        for tok in rare_tokens:
+            low = tok.lower()
+            if low in cand_lower:
+                hits += 1
+                continue
+            # 子串命中：改写后仍保留 jwks / SESSION_MANAGER 等片段
+            if any(low in c or c in low for c in cand_lower if len(c) >= 4):
+                hits += 1
+        return min(1.0, hits / max(len(rare_tokens), 1))
+
+    @classmethod
+    def _path_overlap(cls, tokens: Set[str], file_path: str) -> float:
+        if not tokens or not file_path:
+            return 0.0
+        path = file_path.replace("\\", "/").lower()
+        parts = [p for p in re.split(r"[/_.\-]+", path) if p]
+        if not parts:
+            return 0.0
+        part_set = set(parts)
+        hits = 0
+        weighed = 0.0
+        for tok in tokens:
+            low = tok.lower()
+            if len(low) < 4:
+                continue
+            weighed += 1.0
+            if low in part_set or any(low in p or p in low for p in parts if len(p) >= 3):
+                hits += 1
+        if weighed <= 0:
+            return 0.0
+        return min(1.0, hits / weighed)
 
     @staticmethod
     def _tokenize(text: str) -> Set[str]:
@@ -81,7 +145,12 @@ class SimilarRerankService:
                 best[fp] = it
         return sorted(
             best.values(),
-            key=lambda it: (-float(it.get("_fused_score") or 0), str(it.get("file_path") or "")),
+            key=lambda it: (
+                -float(it.get("_fused_score") or 0),
+                -float(it.get("_rare_score") or 0),
+                -float(it.get("_path_score") or 0),
+                str(it.get("file_path") or ""),
+            ),
         )
 
     @staticmethod

@@ -567,13 +567,13 @@ class AnalysisService:
         cur_dir: str,
         existing_files: Set[str],
     ) -> None:
-        """删除目录中缺失的文件级分析状态记录。
+        """删除目录中缺失文件的分析数据（状态 + 向量 + graph）。
         Args:
-            db: 数据库会话。
+            db: 数据库会话（仅用于查询缺失路径；清理走 delete_file_analysis_data）。
             repo_id: 代码仓ID。
             repo_root: 仓库根路径。
-            current_root: 当前根目录。
-            existing_files: 现有文件集合。
+            cur_dir: 当前目录绝对路径。
+            existing_files: 磁盘上仍存在的相对路径集合。
         """
         rel_dir = normalize_path(os.path.relpath(cur_dir, repo_root))
         if rel_dir == ".":
@@ -597,13 +597,24 @@ class AnalysisService:
             file_paths = [p for p in rows if "/" not in p]
         
         delete_paths = [p for p in file_paths if p not in existing_files]
-        if delete_paths:
-            await db.execute(
-                delete(RepoFileAnalysisState).where(
-                    RepoFileAnalysisState.repo_id == repo_id,
-                    RepoFileAnalysisState.file_path.in_(delete_paths),
+        if not delete_paths:
+            return
+        # 先提交当前会话，避免与 delete_file_analysis_data 的独立会话锁冲突
+        await db.commit()
+        for rel_file_path in delete_paths:
+            try:
+                await FileAnalysisService.delete_file_analysis_data(
+                    repo_id=repo_id,
+                    rel_file_path=rel_file_path,
+                    force=True,
                 )
-            )
+            except Exception as e:
+                logging.warning(
+                    "删除缺失文件分析数据失败 repo_id=%s file_path=%s error=%s",
+                    repo_id,
+                    rel_file_path,
+                    e,
+                )
 
     @staticmethod
     async def _delete_files_under_excluded_dirs(
@@ -657,6 +668,19 @@ class AnalysisService:
             task.last_scan_finished_at = datetime.now()
             task.scan_heartbeat_at = datetime.now()
             await db.commit()
+        if status == RepoAnalysisStatus.COMPLETED.value:
+            try:
+                from app.repo_analysis.services.scan_change_detector import ScanChangeDetector
+
+                async with get_db_session() as db:
+                    repo = await db.scalar(
+                        select(GitRepository).where(GitRepository.id == repo_id)
+                    )
+                if repo and repo.local_path and ScanChangeDetector.is_git_repo(repo.local_path):
+                    head = ScanChangeDetector.current_head(repo.local_path)
+                    ScanChangeDetector.save_git_head(repo_id, head)
+            except Exception as e:
+                logging.debug("保存扫描 git fingerprint 失败 repo_id=%s error=%s", repo_id, e)
 
     @staticmethod
     def _scan_task_to_dict(

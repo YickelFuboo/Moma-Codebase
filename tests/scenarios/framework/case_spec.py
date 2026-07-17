@@ -24,3 +24,16 @@ class SymbolRelationCase:
     min_precision: float = 0.5
     min_recall: float = 0.5
     limit: int = 30
+
+
+@dataclass(frozen=True)
+class TitleSetCase:
+    """标题集合用例：pattern 等返回 scenario/title 而非路径。"""
+
+    case_id: str
+    description: str
+    expected_titles: List[str]
+    min_precision: float = 0.5
+    min_recall: float = 1.0
+    top_k: int = 3
+    extra: dict = field(default_factory=dict)

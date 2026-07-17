@@ -118,6 +118,17 @@ class IncrementalScanService:
             )
         if not task or not task.last_scan_finished_at:
             return True
+
+        from app.repo_analysis.services.scan_change_detector import ScanChangeDetector
+
+        git_decision = ScanChangeDetector.needs_rescan_by_git(
+            repo.id,
+            repo.local_path,
+            extensions,
+        )
+        if git_decision is not None:
+            return git_decision
+
         disk_count = IncrementalScanService._count_source_files(repo.local_path, extensions)
         if int(db_file_count or 0) != disk_count:
             return True

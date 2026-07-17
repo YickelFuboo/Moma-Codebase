@@ -1,6 +1,6 @@
 """Pando-Agent 全仓 related/hybrid 与 similar 评测 ground truth。"""
 from __future__ import annotations
-from tests.scenarios.framework.case_spec import PathSetCase
+from tests.scenarios.framework.case_spec import PathSetCase, TitleSetCase
 
 
 PANDO_RELATED_CASES = [
@@ -229,7 +229,7 @@ PANDO_SIMILAR_WEAK_CASES = [
         case_id="pando.similar.weak.react_loop",
         description="改写 ReAct 循环逻辑（无 think_and_act 原名）",
         expected_paths=["app/agents/core/react.py"],
-        min_precision=0.33,
+        min_precision=0.5,
         min_recall=1.0,
         top_k=3,
         extra={
@@ -248,7 +248,7 @@ PANDO_SIMILAR_WEAK_CASES = [
         case_id="pando.similar.weak.jwt_auth",
         description="JWT 校验逻辑改写（无 JWTValidator 类名）",
         expected_paths=["app/utils/auth/jwt_validator.py"],
-        min_precision=0.33,
+        min_precision=0.5,
         min_recall=1.0,
         top_k=3,
         extra={
@@ -269,7 +269,7 @@ PANDO_SIMILAR_WEAK_CASES = [
         case_id="pando.similar.weak.ws_session",
         description="WebSocket 会话接入改写（无 websocket_endpoint）",
         expected_paths=["app/channel/websocket/websocket.py"],
-        min_precision=0.33,
+        min_precision=0.5,
         min_recall=1.0,
         top_k=3,
         extra={
@@ -288,7 +288,7 @@ PANDO_SIMILAR_WEAK_CASES = [
         case_id="pando.similar.weak.memory_prompt",
         description="工作区记忆整理 prompt 构造（无 MemoryExtractPrompt）",
         expected_paths=["app/agents/memorys/default/memory.py"],
-        min_precision=0.33,
+        min_precision=0.5,
         min_recall=1.0,
         top_k=3,
         extra={
@@ -299,6 +299,83 @@ PANDO_SIMILAR_WEAK_CASES = [
                 "    user = 'Extract durable facts from the conversation into memory.'\n"
                 "    return {'system_prompt': system, 'user_instruction': user}\n"
             ),
+        },
+    ),
+]
+
+# MR experience pattern：强特征 query → 期望标题子串；评测 Top1 + 标题集合 P/R
+# 弱短词（如 jwt/鉴权）当前召回不稳，不纳入本轮 GT
+PANDO_PATTERN_CASES = [
+    TitleSetCase(
+        case_id="pando.pattern.skill_hub",
+        description="Skill Hub 注册发现",
+        expected_titles=["Hub 模式统一管理 skill"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "Skill Hub 统一管理注册发现",
+            "require_top1": True,
+        },
+    ),
+    TitleSetCase(
+        case_id="pando.pattern.skill_migrate",
+        description="Skill 私有目录迁移到公共目录",
+        expected_titles=["Skill 从 Agent 私有目录迁移"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "Skill 从私有目录迁移到公共目录",
+            "require_top1": True,
+        },
+    ),
+    TitleSetCase(
+        case_id="pando.pattern.agent_bus",
+        description="Agent 核心与子 Agent 总线解耦",
+        expected_titles=["Agent 核心与子 Agent"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "Agent 核心与子 Agent 总线解耦",
+            "require_top1": True,
+        },
+    ),
+    TitleSetCase(
+        case_id="pando.pattern.streaming",
+        description="流式输出全链路",
+        expected_titles=["流式输出全链路贯通"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "流式输出全链路贯通前端渲染",
+            "require_top1": True,
+        },
+    ),
+    TitleSetCase(
+        case_id="pando.pattern.prompt_layers",
+        description="prompt 按职责分层",
+        expected_titles=["prompt 按职责分层"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "prompt 按职责分层 AGENT USER TOOLS",
+            "require_top1": True,
+        },
+    ),
+    TitleSetCase(
+        case_id="pando.pattern.web_providers",
+        description="多 Provider Web 抓取可插拔",
+        expected_titles=["多 Provider 可插拔"],
+        min_precision=0.33,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": "多 Provider 可插拔 Web 抓取",
+            "require_top1": True,
         },
     ),
 ]

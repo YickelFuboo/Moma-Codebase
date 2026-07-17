@@ -63,6 +63,17 @@ class TestSearchIntentRouter:
         assert plan.graph_file.endswith("search_service.py")
         assert plan.graph_mode == "dependents"
 
+    def test_chinese_keywords_extracted(self):
+        plan = SearchIntentRouter.plan(
+            "查找默认记忆提取提示词相关实现",
+            repo_kind="code",
+        )
+        assert plan.intent == SearchIntent.RELATED
+        joined = " ".join(plan.keywords)
+        assert "记忆" in joined or "提示词" in joined or "默认记忆" in joined or any(
+            "记忆" in k for k in plan.keywords
+        )
+
 
 class TestSearchResolveService:
     def test_resolve_related_channel(self, monkeypatch):
@@ -165,3 +176,97 @@ class TestSearchResolveService:
         assert "pattern" in (result.get("channel_errors") or {})
         assert result["channels_used"] == ["related"]
         assert result["items"][0]["file_path"] == "b.py"
+
+    def test_fuse_expands_pattern_relevant_files(self):
+        items = [
+            {
+                "title": "Skills Hub",
+                "match_source": "mr_experience",
+                "channel": "pattern",
+                "similarity": 0.9,
+                "relevant_files": ["app/skills/hub/service.py", "app/ui/SkillsHubPanel.vue"],
+            },
+            {
+                "file_path": "app/skills/hub/service.py",
+                "score": 1.5,
+                "match_source": "exact",
+                "channel": "related",
+            },
+        ]
+        expanded = []
+        for it in items:
+            expanded.append(it)
+            if it.get("channel") == "pattern":
+                expanded.extend(SearchResolveService._expand_pattern_file_hits(it))
+        fused = SearchResolveService._fuse_items(expanded, top_k=5)
+        paths = [str(it.get("file_path") or "") for it in fused]
+        assert "app/skills/hub/service.py" in paths
+        # exact 应优先于 pattern 展开
+        top_file = next(it for it in fused if it.get("file_path") == "app/skills/hub/service.py")
+        assert top_file.get("match_source") == "exact"
+        assert any(it.get("file_path") == "app/ui/SkillsHubPanel.vue" for it in fused)
+
+    def test_resolve_pattern_channel_expands_files(self, monkeypatch):
+        """端到端：pattern 通道可达，且 relevant_files 展开进融合结果。"""
+
+        class _Repo:
+            id = "r1"
+            kind = "code"
+
+        class _CM:
+            async def __aenter__(self):
+                db = AsyncMock()
+                db.scalar = AsyncMock(return_value=_Repo())
+                return db
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.get_db_session",
+            lambda: _CM(),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.SearchIndexMeta.for_repo",
+            AsyncMock(return_value={}),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.settings.mr_experience_enabled",
+            True,
+        )
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_patterns",
+                AsyncMock(
+                    return_value={
+                        "total": 1,
+                        "items": [
+                            {
+                                "title": "Skills Hub",
+                                "similarity": 0.91,
+                                "quality_score": 0.8,
+                                "relevant_files": ["app/skills/hub/service.py"],
+                            }
+                        ],
+                    }
+                ),
+            ):
+                with patch(
+                    "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_related_files",
+                    AsyncMock(return_value={"total": 0, "items": []}),
+                ):
+                    return await SearchResolveService.resolve(
+                        "r1",
+                        "Skill Hub 怎么改",
+                        intent="pattern",
+                        top_k=5,
+                    )
+
+        result = asyncio.run(_run())
+        assert "pattern" not in (result.get("channel_errors") or {})
+        assert "pattern" in (result.get("channels_used") or [])
+        paths = [str(it.get("file_path") or "") for it in (result.get("items") or [])]
+        titles = [str(it.get("title") or "") for it in (result.get("items") or [])]
+        assert "app/skills/hub/service.py" in paths
+        assert "Skills Hub" in titles

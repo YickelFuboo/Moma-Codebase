@@ -54,6 +54,9 @@ class ExperiencePattern:
             "patterns": list(self.patterns),
             "quality_score": float(self.quality_score or 0.0),
             "source_commits": list(self.source_commits),
+            "anchors": list(self.anchors),
+            "relevant_files": list(self.relevant_files),
+            "plan": list(self.plan),
         }
 
     @classmethod

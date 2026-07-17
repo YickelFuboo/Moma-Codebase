@@ -58,10 +58,47 @@ class SearchIntentRouter:
         re.IGNORECASE,
     )
     _FILE_PATH = re.compile(
-        r"(?P<path>(?:[A-Za-z0-9_\-./\\]+)\.(?:py|go|java|cpp|c|h|hpp|ts|tsx|js|jsx))",
+        r"(?P<path>(?:[A-Za-z0-9_\-./\\]+)\.(?:py|go|java|cpp|cc|cxx|c|h|hpp|hh|hxx|ts|tsx|js|jsx|mjs|cjs|rs))",
         re.IGNORECASE,
     )
     _SYMBOL = re.compile(r"\b([A-Z][A-Za-z0-9_]{2,}|[a-z_][a-z0-9_]{2,})\b")
+    _CN_PHRASE = re.compile(r"[\u4e00-\u9fff]{2,}")
+    _CN_STOP = {
+        "怎么改",
+        "如何改",
+        "历史",
+        "经验",
+        "合入",
+        "复盘",
+        "改法",
+        "踩坑",
+        "谁依赖",
+        "依赖谁",
+        "依赖关系",
+        "影响面",
+        "查找",
+        "找到",
+        "定位",
+        "实现",
+        "代码",
+        "文件",
+        "模块",
+        "功能",
+        "相关",
+        "什么",
+        "哪里",
+        "哪个",
+        "一个",
+        "一下",
+        "这个",
+        "那个",
+        "我们",
+        "可以",
+        "需要",
+        "进行",
+        "使用",
+        "通过",
+    }
 
     @classmethod
     def normalize_intent(cls, raw: Optional[str]) -> SearchIntent:
@@ -196,6 +233,7 @@ class SearchIntentRouter:
             parts = re.split(r"[,，]", query)
             return [p.strip() for p in parts if p.strip()]
         tokens = cls._SYMBOL.findall(query)
+        cn_phrases = cls._CN_PHRASE.findall(query)
         stop: Set[str] = {
             "the",
             "and",
@@ -215,13 +253,26 @@ class SearchIntentRouter:
         }
         out: List[str] = []
         seen: Set[str] = set()
-        for t in tokens:
-            if t.lower() in stop or t in seen:
-                continue
+
+        def _add(token: str) -> None:
+            t = (token or "").strip()
+            if not t or t.lower() in stop or t in cls._CN_STOP or t in seen:
+                return
+            if len(t) < 2:
+                return
             seen.add(t)
             out.append(t)
+
+        # 标识符优先（精确命中），再补中文短语
+        for t in tokens:
+            _add(t)
             if len(out) >= 8:
                 break
+        if len(out) < 8:
+            for phrase in cn_phrases:
+                _add(phrase)
+                if len(out) >= 8:
+                    break
         if out:
             compact = " ".join(query.split())
             if compact and compact not in out and compact not in seen:

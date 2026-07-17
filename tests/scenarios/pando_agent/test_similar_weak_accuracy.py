@@ -26,9 +26,13 @@ class TestPandoSimilarWeakAccuracy(PandoAgentScenarioSession):
                 min_recall=case.min_recall,
                 require_precision=True,
             )
+            assert items, f"{case.case_id} 无结果"
+            top = str(items[0].get("file_path") or "").replace("\\", "/")
+            expected = {p.replace("\\", "/") for p in case.expected_paths}
+            assert top in expected, f"{case.case_id} Top1={top} not in {expected}"
             print(
                 f"[pando-similar-weak] {case.case_id} P={score.precision:.2%} "
-                f"R={score.recall:.2%} n={len(items)} hits={score.hits} missing={score.missing}",
+                f"R={score.recall:.2%} n={len(items)} top={top} hits={score.hits}",
                 flush=True,
             )
 

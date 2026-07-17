@@ -57,6 +57,41 @@ class TestSimilarRerankService:
         )
         assert ranked[0]["file_path"] == "b.py"
 
+    def test_rerank_prefers_rare_token_and_path_for_weak_query(self):
+        docs = [
+            {
+                "file_path": "app/agents/sessions/api.py",
+                "start_line": 1,
+                "end_line": 20,
+                "content": "async def get_session(sid):\n    return SESSION_MANAGER.get(sid)\n",
+                "_score": 0.92,
+            },
+            {
+                "file_path": "app/channel/websocket/websocket.py",
+                "start_line": 10,
+                "end_line": 40,
+                "content": (
+                    "async def websocket_endpoint(websocket, session_id=None):\n"
+                    "    session = await SESSION_MANAGER.get_session(session_id)\n"
+                    "    await websocket.accept()\n"
+                ),
+                "_score": 0.80,
+            },
+        ]
+        query = (
+            "async def accept_realtime_channel(ws, sid=None):\n"
+            "    session = await SESSION_MANAGER.get_session(sid)\n"
+            "    await ws.accept()\n"
+            "    return session\n"
+        )
+        ranked = SimilarRerankService.rerank(
+            docs,
+            query,
+            SimilarQueryNormalizer.extract_symbol_names(query),
+        )
+        assert ranked[0]["file_path"] == "app/channel/websocket/websocket.py"
+        assert float(ranked[0].get("_path_score") or 0) > 0
+
     def test_dedupe_by_file_keeps_best_chunk(self):
         docs = [
             {"file_path": "svc.py", "start_line": 1, "end_line": 3, "content": "x", "_score": 0.5, "_fused_score": 0.5},

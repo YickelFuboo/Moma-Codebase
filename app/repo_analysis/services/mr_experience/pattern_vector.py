@@ -124,6 +124,13 @@ class PatternVectorService:
             "quality_score": float(payload.get("quality_score") or 0.0),
             "source_commits": payload.get("source_commits")
             or ([doc.get("symbol_name")] if doc.get("symbol_name") else []),
+            "anchors": [str(x).strip() for x in (payload.get("anchors") or []) if str(x).strip()],
+            "relevant_files": [
+                str(x).strip().replace("\\", "/")
+                for x in (payload.get("relevant_files") or [])
+                if str(x).strip()
+            ],
+            "plan": payload.get("plan") or [],
         }
 
     @staticmethod

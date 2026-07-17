@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
@@ -123,7 +123,9 @@ class SearchResolveService:
             for it in result.get("items") or []:
                 row = dict(it)
                 row.setdefault("match_source", "mr_experience")
+                row.setdefault("channel", "pattern")
                 items.append(row)
+                items.extend(cls._expand_pattern_file_hits(row))
             return {"total": len(items), "items": items}
 
         if channel == "api":
@@ -226,6 +228,46 @@ class SearchResolveService:
         return {"total": len(items), "items": items[: max(1, top_k)]}
 
     @classmethod
+    def _expand_pattern_file_hits(cls, pattern_item: Dict[str, object]) -> List[Dict[str, object]]:
+        """把经验条目里的 relevant_files/anchors 展开成可与 related 对齐的文件命中。"""
+        files: List[str] = []
+        for key in ("relevant_files", "anchors"):
+            for raw in pattern_item.get(key) or []:
+                fp = str(raw or "").strip().replace("\\", "/")
+                if not fp or fp.startswith("title:"):
+                    continue
+                # anchors 可能是符号名；仅展开像路径的项
+                if "/" not in fp and "." not in fp.rsplit("/", 1)[-1]:
+                    continue
+                files.append(fp)
+        if not files:
+            return []
+        base_score = float(
+            pattern_item.get("similarity")
+            or pattern_item.get("quality_score")
+            or pattern_item.get("score")
+            or 0.6
+        )
+        title = str(pattern_item.get("title") or "")
+        out: List[Dict[str, object]] = []
+        seen: Set[str] = set()
+        for fp in files:
+            if fp in seen:
+                continue
+            seen.add(fp)
+            out.append(
+                {
+                    "file_path": fp,
+                    "score": base_score,
+                    "match_source": "mr_experience",
+                    "channel": "pattern",
+                    "pattern_title": title,
+                    "from_pattern_files": True,
+                }
+            )
+        return out
+
+    @classmethod
     def _fuse_items(cls, items: List[Dict[str, object]], *, top_k: int) -> List[Dict[str, object]]:
         if not items:
             return []
@@ -235,15 +277,25 @@ class SearchResolveService:
             channel = str(it.get("channel") or "")
             priority = cls.CHANNEL_PRIORITY.get(source, 9)
             if channel == "pattern" and source == "mr_experience":
-                priority = 4
-            score = float(it.get("score") or it.get("quality_score") or 0)
+                # 经验展开的文件可与 related 对齐，略优于纯经验 title 条
+                if it.get("from_pattern_files") or it.get("file_path"):
+                    priority = 3
+                else:
+                    priority = 4
+            score = float(it.get("score") or it.get("quality_score") or it.get("similarity") or 0)
             return (priority, -score, str(it.get("file_path") or ""), str(it.get("title") or ""))
 
         best_by_key: Dict[str, Dict[str, object]] = {}
         for it in items:
             fp = str(it.get("file_path") or "")
             title = str(it.get("title") or "")
-            key = fp or f"title:{title}" or str(it.get("symbol_name") or "")
+            # 纯经验条目（无文件）与文件命中分键，避免互相覆盖
+            if fp:
+                key = f"file:{fp}"
+            elif title:
+                key = f"title:{title}"
+            else:
+                key = str(it.get("symbol_name") or "")
             if not key:
                 continue
             prev = best_by_key.get(key)

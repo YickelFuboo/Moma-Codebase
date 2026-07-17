@@ -1,5 +1,6 @@
 """集合准确率：Precision / Recall；向量检索可侧重 Recall@k。"""
 from __future__ import annotations
+import re
 from dataclasses import dataclass, field
 from typing import Iterable, List, Optional, Set
 
@@ -18,6 +19,20 @@ def to_path_set(paths: Iterable[str], *, prefix: Optional[str] = "app/") -> Set[
             continue
         result.add(p)
     return result
+
+
+def normalize_title(title: str) -> str:
+    text = str(title or "").strip().casefold()
+    return re.sub(r"\s+", " ", text)
+
+
+def title_matches(hit: str, expected: str) -> bool:
+    """期望为命中标题的子串，或命中为期望的子串（短标题）。"""
+    h = normalize_title(hit)
+    e = normalize_title(expected)
+    if not h or not e:
+        return False
+    return e in h or h in e
 
 
 @dataclass
@@ -74,6 +89,37 @@ class AccuracyMetrics:
             expected=sorted(e),
             missing=sorted(e - h),
             extra=sorted(h - e),
+        )
+        cls._scores.append(score)
+        return score
+
+    @classmethod
+    def evaluate_titles(
+        cls,
+        case_id: str,
+        hits: Iterable[str],
+        expected: Iterable[str],
+    ) -> AccuracyScore:
+        """标题集合准确率：子串匹配（pattern title / scenario）。"""
+        hit_list = [str(h).strip() for h in hits if str(h or "").strip()]
+        exp_list = [str(e).strip() for e in expected if str(e or "").strip()]
+        matched_hits = [h for h in hit_list if any(title_matches(h, e) for e in exp_list)]
+        matched_exp = [e for e in exp_list if any(title_matches(h, e) for h in hit_list)]
+        precision = (len(matched_hits) / len(hit_list)) if hit_list else 0.0
+        recall = (len(matched_exp) / len(exp_list)) if exp_list else 0.0
+        unmatched_hits = [h for h in hit_list if h not in matched_hits]
+        missing = [e for e in exp_list if e not in matched_exp]
+        score = AccuracyScore(
+            case_id=case_id,
+            precision=precision,
+            recall=recall,
+            hit_count=len(hit_list),
+            expected_count=len(exp_list),
+            matched_count=len(matched_exp),
+            hits=hit_list,
+            expected=exp_list,
+            missing=missing,
+            extra=unmatched_hits,
         )
         cls._scores.append(score)
         return score
