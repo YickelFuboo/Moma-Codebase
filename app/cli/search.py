@@ -47,7 +47,7 @@ def search_similar(path: str, code: str, top_k: int) -> None:
 @click.option("--keywords", required=True, help="检索关键词，逗号分隔")
 @click.option("--top-k", default=10, show_default=True, help="返回条数")
 def search_related(path: str, keywords: str, top_k: int) -> None:
-    """相关文件检索（仅 kind=code）"""
+    """相关位置检索：符号摘要/行块向量 + 名称精确匹配（仅 kind=code）"""
 
     async def _related() -> None:
         repo = await get_repo_by_path(path)
@@ -58,9 +58,44 @@ def search_related(path: str, keywords: str, top_k: int) -> None:
             keywords=keyword_list,
             top_k=top_k,
         )
+        result["path"] = path
         echo_json(result)
 
     run_async(_related)
+
+
+@search.command("chunks")
+@click.option("--path", required=True, help="已登记的本地代码仓目录")
+@click.option("--query", required=True, help="查询文本（语义检索行块）")
+@click.option("--top-k", default=10, show_default=True, help="返回条数")
+def search_chunks(path: str, query: str, top_k: int) -> None:
+    """仅查询行块向量（人工调试；Agent 优先用 related）"""
+
+    async def _chunks() -> None:
+        repo = await get_repo_by_path(path)
+        _assert_kind_code(repo)
+        result = await SearchService.search_chunks(repo_id=repo.id, query=query, top_k=top_k)
+        result["path"] = path
+        echo_json(result)
+
+    run_async(_chunks)
+
+
+@search.command("symbols")
+@click.option("--path", required=True, help="已登记的本地代码仓目录")
+@click.option("--query", required=True, help="查询文本（语义检索符号摘要）")
+@click.option("--top-k", default=10, show_default=True, help="返回条数")
+def search_symbols(path: str, query: str, top_k: int) -> None:
+    """仅查询符号摘要向量（人工调试；Agent 优先用 related）"""
+
+    async def _symbols() -> None:
+        repo = await get_repo_by_path(path)
+        _assert_kind_code(repo)
+        result = await SearchService.search_symbols(repo_id=repo.id, query=query, top_k=top_k)
+        result["path"] = path
+        echo_json(result)
+
+    run_async(_symbols)
 
 
 @search.command("api")

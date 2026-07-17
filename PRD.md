@@ -134,7 +134,9 @@
 | 命令 | 能力 | 主要参数 |
 |------|------|----------|
 | `search similar` | 相似代码片段检索（向量） | `--path` + `--code` `[--top-k]` |
-| `search related` | 按关键词/描述找相关类、函数、文件（向量） | `--path` + `--keywords` `[--top-k]` |
+| `search related` | 相关位置检索（符号摘要/行块向量 + 名称精确匹配融合） | `--path` + `--keywords` `[--top-k]` |
+| `search chunks` | 仅行块向量检索（人工调试；Agent 优先 related） | `--path` + `--query` `[--top-k]` |
+| `search symbols` | 仅符号摘要向量检索（人工调试；Agent 优先 related） | `--path` + `--query` `[--top-k]` |
 | `search api` | 按需求检索公开接口摘要（Lib 侧重，code 也可用） | `--path` + `--query` `[--top-k]` |
 | `search pattern` | 按需求/问题描述检索历史开发模式与经验 | `--path` + `--query` `[--top-k]` |
 | `search dependents` | 查询依赖指定文件的其他文件（CodeGraph 文件级） | `--path` + `--file` |

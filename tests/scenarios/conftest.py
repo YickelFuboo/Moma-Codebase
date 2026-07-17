@@ -18,3 +18,9 @@ def _shutdown_scenario_session():
         ScenarioSession().run_async(ScenarioSession.shutdown_runtime())
     except Exception:
         pass
+    try:
+        from tests.scenarios.pando_agent.session_support import PandoAgentScenarioSession
+
+        PandoAgentScenarioSession().run_async(PandoAgentScenarioSession.shutdown_runtime())
+    except Exception:
+        pass

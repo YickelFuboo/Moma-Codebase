@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+.arts
+
+# Logs
+logs/
+*.log
+
+# Environment files
+env
+env.dev
+!env.example
+
+# Database
+*.db
+*.sqlite3
+
+# AI api-key
+app/config/*.json*
+!app/config/*.json.example
+
+# Project specific
+assistant_snippet_*.txt
+
+# local data
+/data/**
+!/data/agents/
+!/data/agents/**
+!/data/models/
+!/data/models/**
+!/data/skills/
+!/data/skills/**
+
+# Other
+.DS_Store
+Thumbs.db
+
+# Project specific
+config.toml
+!config.template.toml
+
+# ai 信息
+.Pando/
+.pando/
+.Agent/
+.agent/
+
+# 参考信息
+参考项目/
+
+# 前台服务
+node_modules
+frontend/dist/
+dist/
+*.local
+.DS_Store
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Packaging artifacts
+release/
+backend/build/
+backend/dist/
+backend/frontend_dist/
+backend/*.spec
+
+# tests
+tests/**

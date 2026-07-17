@@ -2,7 +2,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, AsyncSession, async_sessionmaker
 import logging
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy import text
 from contextlib import asynccontextmanager
 from app.infrastructure.database.base import AsyncBaseConnection, DatabaseConfig
@@ -81,14 +81,15 @@ class SQLConnection(AsyncBaseConnection):
                 }
             })
         elif self.db_type == 'sqlite':
-            # SQLite 不需要连接池
-            engine_config.pop('poolclass', None)
+            # SQLite 文件库：用 NullPool，避免 QueuePool 在高并发分析下耗尽/锁死
             engine_config.pop('pool_size', None)
             engine_config.pop('max_overflow', None)
+            engine_config.pop('pool_recycle', None)
+            engine_config['poolclass'] = NullPool
             connect_args.update({
                 'check_same_thread': False,
                 # 让底层 sqlite3 在遇到锁时等待一段时间再报错
-                'timeout': 30
+                'timeout': 60
             })
         elif self.db_type in ['oracle']:
             connect_args.update({
