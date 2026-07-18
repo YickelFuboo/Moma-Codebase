@@ -43,6 +43,8 @@ repo add --kind code|lib
 | `CODE_GRAPH_ENABLED` / `CODE_GRAPH_PROVIDER` | 图谱；`codegraph`（默认）或 `builtin` |
 | `MR_EXPERIENCE_ENABLED` | 历史经验沉淀与 `search pattern` |
 | `ENABLE_INCREMENTAL_SCAN` | 文件变更重分析；新 MR 触发经验更新 |
+| 忽略规则 | 扫描遵循内置排除 + 仓根 `.gitignore` + 可选 `.momaignore` |
+| `analyze status` | 文件计数、`index_age_seconds` / `stale_hint`、增量开关、忽略来源、最近失败 |
 
 向量默认落 LanceDB（`RUNTIME_DATA_DIR` 下）；查询类统一 JSON，未分析时报明确错误，不返回空成功。
 
@@ -186,7 +188,7 @@ experience analyze
 
 - 向量侧：mtime / 指纹变化 → 文件标 PENDING → worker 重分析。
 - 图谱：见 §3.1.3 全量/增量选择。
-- `ENABLE_INCREMENTAL_SCAN`：调度器周期性扫已登记仓；新 MR 可触发 `experience analyze`。
+- `ENABLE_INCREMENTAL_SCAN`：启动交互 `mcb` 后后台 tick；对**已登记**仓做变更扫描、未完成补扫与失败/卡住重处理（人工负责 `repo add`，可选手动 `analyze` 加速首次）。
 - 查询结果附带只读 `index`：`last_scan_finished_at` / `index_age_seconds`，供 Agent 判断是否过期。
 
 ### 3.5 验收（inspect）
@@ -431,7 +433,7 @@ poetry run pytest tests/scenarios/pando_agent/test_related_hybrid_accuracy.py -q
 2. 贴代码 → similar；符号/中文定位 → related；「以前怎么改」→ pattern。  
 3. 改影响面 → dependents / callers，不要用 related 硬凑调用链。  
 4. 索引过期先 `analyze`；经验过期先 `experience analyze`。  
-5. 对接方式：把 CLI 命令注册给 Agent（见 README），无需额外服务进程。
+5. 对接方式：仅 CLI；注册 `search resolve`（见 README / `skills/mcb-resolve`），全部 `search *` 查询输出结构见 `app/cli/schemes.py` 与 `docs/cli-schemes.md`（`ok` 信封、退出码、`--timeout-ms`）。无需额外服务进程。
 
 ---
 

@@ -24,6 +24,7 @@ poetry install
 |--------|--------------------------|------------------------|
 | `repo` | 支持 | 支持 |
 | `search` | 支持 | 支持 |
+| `doctor` | 支持 | 支持 |
 | `migrate` | 支持 | 支持 |
 | `analyze` | 支持（进程退出后后台任务结束；长任务建议交互） | 支持 |
 
@@ -48,6 +49,8 @@ poetry run mcb
 
 编码 Agent **直接调用一次性 `mcb` 命令**即可，无需另起服务。查询类输出为 JSON（stdout），便于解析。
 
+主入口 `search resolve` 与其它 `search *` 查询均使用稳定信封：`ok: true/false`（见 [docs/cli-schemes.md](docs/cli-schemes.md) / `app/cli/schemes.py`）。
+
 ### 前置条件
 
 1. 已 `poetry install`，并配置好 `env`
@@ -58,6 +61,8 @@ poetry run mcb
 
 | 用途 | 命令 |
 |------|------|
+| 已登记仓 | `mcb repo list` |
+| 环境自检 | `mcb doctor` |
 | 主检索 | `mcb search resolve --path <仓或上级目录> [--path ...] --query "..."` |
 | 相似代码 | `mcb search similar --path <仓或上级目录> [--path ...] --code "..."` |
 | 相关定位 | `mcb search related --path <仓或上级目录> [--path ...] --keywords "a,b"` |
@@ -87,7 +92,12 @@ poetry run mcb search resolve --path F:\a\b --query "登录鉴权"     # → d +
 poetry run mcb search resolve --path F:\frontend --path F:\backend --query "登录鉴权"
 ```
 
-在 Cursor / 自研 Agent 里：把上述命令写成工具或 Skill（shell 执行），约定 `--path` 与登记目录一致；主路径优先 `search resolve`。
+在 Cursor / 自研 Agent 里：优先注册主工具 `search resolve`（可直接用仓内 Skill 模板 [skills/mcb-resolve/SKILL.md](skills/mcb-resolve/SKILL.md)）；约定 `--path` 与登记目录一致。JSON 信封见 [docs/cli-schemes.md](docs/cli-schemes.md)。
+
+```bash
+# Agent 推荐调用形态
+poetry run mcb search resolve --path F:\myproject --query "JWT 鉴权怎么做" --timeout-ms 60000
+```
 
 ## repo（仓库管理）
 
@@ -102,11 +112,13 @@ poetry run mcb repo delete --path F:\myproject
 
 ## analyze（代码仓分析）
 
-`analyze --path` 即启动扫描；文件分析由进程内调度器消费。
+`analyze --path` 即启动扫描；文件分析由进程内调度器消费。扫描忽略：内置目录 + 仓根 `.gitignore` + 可选 `.momaignore`。
+
+交互模式 `mcb` 启动后会拉起后台 tick（`ENABLE_INCREMENTAL_SCAN`）：对**已 `repo add` 登记**的仓做变更扫描、未完成补扫与失败重处理。也可主动 `analyze --path` 立刻开扫。
 
 ```text
 analyze --path F:\myproject
-analyze status --path F:\myproject
+analyze status --path F:\myproject   # 进度 / 新鲜度 / 忽略规则 / 最近失败
 analyze stop --path F:\myproject
 analyze clear --path F:\myproject
 ```

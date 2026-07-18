@@ -40,7 +40,7 @@ def analyze(ctx: click.Context, path: Optional[str]) -> None:
 @analyze.command("status")
 @click.option("--path", required=True, help="已登记的本地代码仓目录")
 def analyze_status(path: str) -> None:
-    """查看扫描与分析进度"""
+    """查看扫描/分析进度、索引新鲜度、忽略规则与最近失败文件。"""
 
     async def _status() -> None:
         repo = await get_repo_by_path(path)

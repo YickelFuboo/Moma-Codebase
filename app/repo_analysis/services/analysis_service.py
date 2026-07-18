@@ -10,6 +10,7 @@ from app.repo_mgmt.models.git_repo_mgmt import GitRepository
 from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
 from app.repo_analysis.services.file_analysis_service import FileAnalysisService
 from app.repo_analysis.services.codevector.code_vector import CodeVectorService
+from app.repo_analysis.services.repo_path_ignore import RepoPathIgnore
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.utils.common import normalize_path
@@ -65,7 +66,23 @@ class AnalysisService:
         ".tsx",
         ".rs",
     }
-    EXCLUDED_DIRS = {"__pycache__", ".git", ".idea", ".vscode", "venv", "node_modules", "dist", "build", "target", ".pytest_cache", ".mypy_cache", ".coverage", "__tests__", "tests"}
+    EXCLUDED_DIRS = {
+        "__pycache__",
+        ".git",
+        ".idea",
+        ".vscode",
+        "venv",
+        ".venv",
+        "node_modules",
+        "dist",
+        "build",
+        "target",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".coverage",
+        "__tests__",
+        "tests",
+    }
 
     @staticmethod
     async def start_scan(
@@ -420,29 +437,25 @@ class AnalysisService:
         extensions = allowed_extensions or AnalysisService.CODE_EXTENSIONS
         scanned_code_files = 0
         excluded_dirs: Set[str] = set()
+        ignorer = RepoPathIgnore.load(
+            repo_root,
+            builtin_dir_names=AnalysisService.EXCLUDED_DIRS,
+        )
         async with get_db_session() as db:
             batch = 0
             
             # 迭代扫描目录
             for parent_root, dirs, files in AnalysisService._iter_scan_directories(repo_root=repo_root, target_rel_path=target_rel_path):
                 await AnalysisService._assert_scan_is_running(db, repo_id)
-                pruned: List[str] = []
-                for d in dirs:
-                    # 过滤排除目录
-                    if d in AnalysisService.EXCLUDED_DIRS or d.startswith("."):
-                        sub_abs = os.path.join(parent_root, d)
-                        rel_sub = normalize_path(os.path.relpath(sub_abs, repo_root))
-                        if rel_sub != ".":
-                            excluded_dirs.add(rel_sub)
-                    else:
-                        pruned.append(d)
-                dirs[:] = pruned
+                excluded_dirs.update(ignorer.filter_walk_dirs(parent_root, dirs))
                 
                 # 处理文件
                 direct_file_paths: Set[str] = set()
                 for filename in files:
                     abs_path = os.path.join(parent_root, filename)
                     rel_path = normalize_path(os.path.relpath(abs_path, repo_root))
+                    if ignorer.should_ignore_file(rel_path):
+                        continue
                     ok = await AnalysisService.update_file_state(
                         db, repo_id, abs_path, rel_path, allowed_extensions=extensions
                     )
@@ -732,6 +745,7 @@ class AnalysisService:
         repo_id: str,
     ) -> Dict[str, object]:
         async with get_db_session() as db:
+            repo = await db.scalar(select(GitRepository).where(GitRepository.id == repo_id))
             rows = (await db.execute(
                 select(
                     RepoFileAnalysisState.status,
@@ -753,20 +767,89 @@ class AnalysisService:
                 repo_id in AnalysisService._running_scan_tasks
                 and not AnalysisService._running_scan_tasks[repo_id].done()
             )
-            analysis_summary = {
-                "total_files": total,
-                "pending_files": by_status.get(FileAnalysisStatus.PENDING.value, 0),
-                "running_files": by_status.get(FileAnalysisStatus.RUNNING.value, 0),
-                "completed_files": by_status.get(FileAnalysisStatus.COMPLETED.value, 0),
-                "failed_files": by_status.get(FileAnalysisStatus.FAILED.value, 0),
-                "skipped_files": by_status.get(FileAnalysisStatus.SKIPPED.value, 0),
-                "scan_active_in_process": in_memory_scan,
-            }
-            return {
-                "repo_id": repo_id,
-                "scan": scan,
-                "analysis_summary": analysis_summary,
-            }
+            fail_rows = (
+                await db.scalars(
+                    select(RepoFileAnalysisState)
+                    .where(
+                        RepoFileAnalysisState.repo_id == repo_id,
+                        RepoFileAnalysisState.status == FileAnalysisStatus.FAILED.value,
+                    )
+                    .order_by(RepoFileAnalysisState.updated_at.desc())
+                    .limit(10)
+                )
+            ).all()
+
+        pending = by_status.get(FileAnalysisStatus.PENDING.value, 0)
+        running = by_status.get(FileAnalysisStatus.RUNNING.value, 0)
+        completed = by_status.get(FileAnalysisStatus.COMPLETED.value, 0)
+        failed = by_status.get(FileAnalysisStatus.FAILED.value, 0)
+        skipped = by_status.get(FileAnalysisStatus.SKIPPED.value, 0)
+
+        finished_raw = scan.get("last_scan_finished_at")
+        index_age_seconds: Optional[int] = None
+        if finished_raw:
+            try:
+                finished_at = datetime.fromisoformat(str(finished_raw))
+                index_age_seconds = max(
+                    0, int((datetime.now() - finished_at).total_seconds())
+                )
+            except ValueError:
+                index_age_seconds = None
+
+        stale_reasons: List[str] = []
+        if not finished_raw:
+            stale_reasons.append("never_scanned")
+        if pending > 0:
+            stale_reasons.append("pending_files")
+        if running > 0 or in_memory_scan or scan.get("scan_status") == RepoAnalysisStatus.RUNNING.value:
+            stale_reasons.append("scan_or_analysis_running")
+        if index_age_seconds is not None and index_age_seconds >= 86400:
+            stale_reasons.append("index_age_high")
+
+        ignore_info: Dict[str, object] = {
+            "sources": ["builtin", ".gitignore", ".momaignore"],
+            "gitignore_loaded": False,
+            "momaignore_loaded": False,
+        }
+        repo_path = repo.local_path if repo else None
+        if repo_path and os.path.isdir(repo_path):
+            ignore_info = RepoPathIgnore.load(
+                repo_path,
+                builtin_dir_names=AnalysisService.EXCLUDED_DIRS,
+            ).describe()
+
+        analysis_summary = {
+            "total_files": total,
+            "pending_files": pending,
+            "running_files": running,
+            "completed_files": completed,
+            "failed_files": failed,
+            "skipped_files": skipped,
+            "scan_active_in_process": in_memory_scan,
+        }
+        return {
+            "repo_id": repo_id,
+            "scan": scan,
+            "analysis_summary": analysis_summary,
+            "index_age_seconds": index_age_seconds,
+            "stale": bool(stale_reasons),
+            "stale_hint": "; ".join(stale_reasons) if stale_reasons else None,
+            "incremental_scan": {
+                "enabled": bool(settings.enable_incremental_scan),
+                "interval_sec": int(settings.incremental_scan_interval_sec),
+                "mode": "registered_repos",
+                "note": "对已 repo add 的仓做变更扫描、未完成补扫与失败重处理；启动交互 mcb 后生效",
+            },
+            "ignore": ignore_info,
+            "recent_failures": [
+                {
+                    "file_path": row.file_path,
+                    "last_error": row.last_error,
+                    "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                }
+                for row in fail_rows
+            ],
+        }
 
     @staticmethod
     async def get_scan_status(

@@ -10,6 +10,7 @@ from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
 
 class TestIncrementalScanDetection:
     def test_needs_rescan_when_never_scanned(self, tmp_path: Path):
+        """已登记但从未扫完：后台 tick 应拉起分析。"""
         repo = GitRepository(
             id="r1",
             local_path=str(tmp_path),
@@ -115,13 +116,23 @@ class TestIncrementalScanScheduler:
                         "_needs_rescan",
                         AsyncMock(return_value=True),
                     ):
-                        start_scan = AsyncMock()
-                        with patch(
-                            "app.repo_analysis.services.incremental_scan_service.AnalysisService.start_scan",
-                            start_scan,
+                        with patch.object(
+                            IncrementalScanService,
+                            "_recover_stale_running",
+                            AsyncMock(return_value=0),
                         ):
-                            await IncrementalScanService.run_once()
-                            start_scan.assert_awaited_once_with(repo_id="r4")
+                            with patch.object(
+                                IncrementalScanService,
+                                "_nudge_file_workers",
+                                AsyncMock(),
+                            ):
+                                start_scan = AsyncMock()
+                                with patch(
+                                    "app.repo_analysis.services.incremental_scan_service.AnalysisService.start_scan",
+                                    start_scan,
+                                ):
+                                    await IncrementalScanService.run_once()
+                                    start_scan.assert_awaited_once_with(repo_id="r4")
 
         asyncio.run(_run())
 
@@ -156,24 +167,34 @@ class TestIncrementalScanScheduler:
                             "_needs_experience_rescan",
                             AsyncMock(return_value=True),
                         ):
-                            with patch(
-                                "app.repo_analysis.services.incremental_scan_service.ExperienceService.is_job_running",
-                                AsyncMock(return_value=False),
+                            with patch.object(
+                                IncrementalScanService,
+                                "_recover_stale_running",
+                                AsyncMock(return_value=0),
                             ):
-                                start_analyze = AsyncMock()
-                                with patch(
-                                    "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
-                                    start_analyze,
+                                with patch.object(
+                                    IncrementalScanService,
+                                    "_nudge_file_workers",
+                                    AsyncMock(),
                                 ):
                                     with patch(
-                                        "app.repo_analysis.services.incremental_scan_service.AnalysisService.start_scan",
-                                        AsyncMock(),
+                                        "app.repo_analysis.services.incremental_scan_service.ExperienceService.is_job_running",
+                                        AsyncMock(return_value=False),
                                     ):
-                                        await IncrementalScanService.run_once()
-                                        start_analyze.assert_awaited_once_with(
-                                            "r5",
-                                            limit=50,
-                                        )
+                                        start_analyze = AsyncMock()
+                                        with patch(
+                                            "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
+                                            start_analyze,
+                                        ):
+                                            with patch(
+                                                "app.repo_analysis.services.incremental_scan_service.AnalysisService.start_scan",
+                                                AsyncMock(),
+                                            ):
+                                                await IncrementalScanService.run_once()
+                                                start_analyze.assert_awaited_once_with(
+                                                    "r5",
+                                                    limit=50,
+                                                )
 
         asyncio.run(_run())
 
@@ -231,13 +252,23 @@ class TestIncrementalScanScheduler:
                         "_needs_rescan",
                         AsyncMock(return_value=False),
                     ):
-                        start_analyze = AsyncMock()
-                        with patch(
-                            "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
-                            start_analyze,
+                        with patch.object(
+                            IncrementalScanService,
+                            "_recover_stale_running",
+                            AsyncMock(return_value=0),
                         ):
-                            await IncrementalScanService.run_once()
-                            start_analyze.assert_not_awaited()
+                            with patch.object(
+                                IncrementalScanService,
+                                "_nudge_file_workers",
+                                AsyncMock(),
+                            ):
+                                start_analyze = AsyncMock()
+                                with patch(
+                                    "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
+                                    start_analyze,
+                                ):
+                                    await IncrementalScanService.run_once()
+                                    start_analyze.assert_not_awaited()
 
         asyncio.run(_run())
 
@@ -275,16 +306,42 @@ class TestIncrementalScanScheduler:
                             "_needs_experience_rescan",
                             AsyncMock(return_value=True),
                         ):
-                            start_analyze = AsyncMock()
-                            with patch(
-                                "app.repo_analysis.services.incremental_scan_service.ExperienceService.is_job_running",
-                                AsyncMock(return_value=True),
+                            with patch.object(
+                                IncrementalScanService,
+                                "_recover_stale_running",
+                                AsyncMock(return_value=0),
                             ):
-                                with patch(
-                                    "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
-                                    start_analyze,
+                                with patch.object(
+                                    IncrementalScanService,
+                                    "_nudge_file_workers",
+                                    AsyncMock(),
                                 ):
-                                    await IncrementalScanService.run_once()
-                                    start_analyze.assert_not_awaited()
+                                    start_analyze = AsyncMock()
+                                    with patch(
+                                        "app.repo_analysis.services.incremental_scan_service.ExperienceService.is_job_running",
+                                        AsyncMock(return_value=True),
+                                    ):
+                                        with patch(
+                                            "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
+                                            start_analyze,
+                                        ):
+                                            await IncrementalScanService.run_once()
+                                            start_analyze.assert_not_awaited()
 
         asyncio.run(_run())
+
+    def test_needs_experience_skips_when_never_analyzed(self, tmp_path: Path):
+        repo = GitRepository(
+            id="r9",
+            local_path=str(tmp_path),
+            kind=RepoKind.CODE,
+        )
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.incremental_scan_service.ExperienceService.get_latest_analyzed_commit_sha",
+                AsyncMock(return_value=None),
+            ):
+                return await IncrementalScanService._needs_experience_rescan(repo)
+
+        assert asyncio.run(_run()) is False

@@ -2,23 +2,35 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Set
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
-from app.repo_analysis.models.analysis_status import RepoAnalysisStatus, RepoAnalysisTask, RepoFileAnalysisState
+from app.repo_analysis.models.analysis_status import (
+    FileAnalysisStatus,
+    RepoAnalysisStatus,
+    RepoAnalysisTask,
+    RepoFileAnalysisState,
+)
 from app.repo_analysis.services.analysis_service import AnalysisService
 from app.repo_analysis.services.experience_service import ExperienceService
+from app.repo_analysis.services.file_analysis_service import FileAnalysisService
 from app.repo_analysis.services.mr_experience.git_history_source import GitHistorySource
+from app.repo_analysis.services.repo_path_ignore import RepoPathIgnore
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
 
 
 class IncrementalScanService:
-    """定时检测已登记仓库变更：code/lib 文件分析、code 仓 MR 经验增量分析。"""
+    """
+    后台 tick：对已登记（repo add）的 code/lib 仓做
+    变更扫描、首次未完成扫描补跑、失败/卡住文件重处理。
+    人工负责登记仓；启动交互 mcb 后由本服务周期处理。
+    """
 
     _task: Optional[asyncio.Task] = None
     _stop_event: Optional[asyncio.Event] = None
+    STALE_RUNNING_SEC = 1800
 
     @staticmethod
     def start() -> bool:
@@ -33,7 +45,10 @@ class IncrementalScanService:
         IncrementalScanService._task = asyncio.create_task(
             IncrementalScanService._loop(interval_seconds=interval)
         )
-        logging.info("增量扫描调度器已启动 interval=%ss", interval)
+        logging.info(
+            "后台 tick 已启动：已登记仓的变更/补扫 + 失败重处理 interval=%ss",
+            interval,
+        )
         return True
 
     @staticmethod
@@ -77,11 +92,13 @@ class IncrementalScanService:
             if not repo.local_path or not os.path.isdir(repo.local_path):
                 continue
             try:
+                await IncrementalScanService._recover_stale_running(repo.id)
+                await IncrementalScanService._nudge_file_workers(repo.id)
                 if not await IncrementalScanService._is_scan_active(repo.id):
                     if await IncrementalScanService._needs_rescan(repo):
                         await AnalysisService.start_scan(repo_id=repo.id)
                         logging.info(
-                            "增量扫描触发分析 repo_id=%s path=%s kind=%s",
+                            "增量扫描触发变更分析 repo_id=%s path=%s kind=%s",
                             repo.id,
                             repo.local_path,
                             kind,
@@ -89,6 +106,48 @@ class IncrementalScanService:
             except Exception as e:
                 logging.warning("增量扫描触发失败 repo_id=%s error=%s", repo.id, e)
             await IncrementalScanService._maybe_trigger_experience_analyze(repo)
+
+    @staticmethod
+    async def _recover_stale_running(repo_id: str) -> int:
+        """把长时间卡在 RUNNING 的文件重置为 PENDING，便于失败重处理。"""
+        cutoff_dt = datetime.now() - timedelta(seconds=IncrementalScanService.STALE_RUNNING_SEC)
+        async with get_db_session() as db:
+            result = await db.execute(
+                update(RepoFileAnalysisState)
+                .where(
+                    RepoFileAnalysisState.repo_id == repo_id,
+                    RepoFileAnalysisState.status == FileAnalysisStatus.RUNNING.value,
+                    RepoFileAnalysisState.last_started_at.is_not(None),
+                    RepoFileAnalysisState.last_started_at < cutoff_dt,
+                )
+                .values(
+                    status=FileAnalysisStatus.PENDING.value,
+                    last_error="stale running recovered by background tick",
+                )
+            )
+            await db.commit()
+            return int(result.rowcount or 0)
+
+    @staticmethod
+    async def _nudge_file_workers(repo_id: str) -> None:
+        """有 PENDING/FAILED 时拉起文件分析 worker（与全局调度互补）。"""
+        async with get_db_session() as db:
+            cnt = await db.scalar(
+                select(func.count())
+                .select_from(RepoFileAnalysisState)
+                .where(
+                    RepoFileAnalysisState.repo_id == repo_id,
+                    RepoFileAnalysisState.status.in_(
+                        [
+                            FileAnalysisStatus.PENDING.value,
+                            FileAnalysisStatus.FAILED.value,
+                        ]
+                    ),
+                )
+            )
+        if int(cnt or 0) <= 0:
+            return
+        await FileAnalysisService.start_analysis(repo_id)
 
     @staticmethod
     async def _is_scan_active(repo_id: str) -> bool:
@@ -117,6 +176,7 @@ class IncrementalScanService:
                 .where(RepoFileAnalysisState.repo_id == repo.id)
             )
         if not task or not task.last_scan_finished_at:
+            # 已登记但尚未成功扫完：由后台 tick 拉起（含首次）；人工只需 repo add
             return True
 
         from app.repo_analysis.services.scan_change_detector import ScanChangeDetector
@@ -166,37 +226,48 @@ class IncrementalScanService:
     @staticmethod
     async def _needs_experience_rescan(repo: GitRepository) -> bool:
         last_sha = await ExperienceService.get_latest_analyzed_commit_sha(repo.id)
+        if not last_sha:
+            # 从未跑过 experience analyze：首次留给人工
+            return False
         return GitHistorySource.has_new_entries(repo.local_path, after_sha=last_sha)
 
     @staticmethod
     def _count_source_files(repo_root: str, extensions: Set[str]) -> int:
+        ignorer = RepoPathIgnore.load(
+            repo_root,
+            builtin_dir_names=AnalysisService.EXCLUDED_DIRS,
+        )
         count = 0
         for parent_root, dirs, files in AnalysisService._iter_scan_directories(repo_root, None):
-            dirs[:] = [
-                d
-                for d in dirs
-                if d not in AnalysisService.EXCLUDED_DIRS and not d.startswith(".")
-            ]
-            for name in files:
-                ext = os.path.splitext(name)[1].lower()
-                if ext in extensions:
-                    count += 1
-        return count
-
-    @staticmethod
-    def _max_source_mtime(repo_root: str, extensions: Set[str]) -> Optional[datetime]:
-        latest: Optional[datetime] = None
-        for parent_root, dirs, files in AnalysisService._iter_scan_directories(repo_root, None):
-            dirs[:] = [
-                d
-                for d in dirs
-                if d not in AnalysisService.EXCLUDED_DIRS and not d.startswith(".")
-            ]
+            ignorer.filter_walk_dirs(parent_root, dirs)
             for name in files:
                 ext = os.path.splitext(name)[1].lower()
                 if ext not in extensions:
                     continue
                 abs_path = os.path.join(parent_root, name)
+                rel = os.path.relpath(abs_path, repo_root)
+                if ignorer.should_ignore_file(rel):
+                    continue
+                count += 1
+        return count
+
+    @staticmethod
+    def _max_source_mtime(repo_root: str, extensions: Set[str]) -> Optional[datetime]:
+        ignorer = RepoPathIgnore.load(
+            repo_root,
+            builtin_dir_names=AnalysisService.EXCLUDED_DIRS,
+        )
+        latest: Optional[datetime] = None
+        for parent_root, dirs, files in AnalysisService._iter_scan_directories(repo_root, None):
+            ignorer.filter_walk_dirs(parent_root, dirs)
+            for name in files:
+                ext = os.path.splitext(name)[1].lower()
+                if ext not in extensions:
+                    continue
+                abs_path = os.path.join(parent_root, name)
+                rel = os.path.relpath(abs_path, repo_root)
+                if ignorer.should_ignore_file(rel):
+                    continue
                 try:
                     mtime = datetime.fromtimestamp(os.path.getmtime(abs_path))
                 except OSError:
