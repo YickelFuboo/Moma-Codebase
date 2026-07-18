@@ -58,18 +58,33 @@ poetry run mcb
 
 | 用途 | 命令 |
 |------|------|
-| 主检索 | `mcb search resolve --path <仓> --query "..."` |
-| 相似代码 | `mcb search similar --path <仓> --code "..."` |
-| 相关定位 | `mcb search related --path <仓> --keywords "a,b"` |
-| 历史经验 | `mcb search pattern --path <仓> --query "..."` |
-| Lib API | `mcb search api --path <库> --query "..."` |
+| 主检索 | `mcb search resolve --path <仓或上级目录> [--path ...] --query "..."` |
+| 相似代码 | `mcb search similar --path <仓或上级目录> [--path ...] --code "..."` |
+| 相关定位 | `mcb search related --path <仓或上级目录> [--path ...] --keywords "a,b"` |
+| 历史经验 | `mcb search pattern --path <仓或上级目录> [--path ...] --query "..."` |
+| Lib API | `mcb search api --path <库或上级目录> [--path ...] --query "..."` |
 | 依赖 / 调用链 | `mcb search dependents\|dependencies\|callers\|callees ...` |
 | 已登记仓 | `mcb repo list` |
+
+`--path` 支持两种用法（可组合，结果并集后融合）：
+
+1. **精确仓**：`--path F:\frontend`（须已 `repo add`）
+2. **上级目录前缀**：`--path F:\workspace\services`，自动展开其下所有已登记子仓  
+3. **多 path**：`--path A --path B` 并集
+
+展开时会按命令过滤 `kind`：`similar` / `related` / `pattern` 等只展开 **code**；`search api` 只展开 **lib**；`resolve` 同时覆盖二者。
 
 示例：
 
 ```bash
 poetry run mcb search resolve --path F:\myproject --query "JWT 鉴权怎么做"
+
+# 上级目录：已登记 a/b/c/d、a/b/c/e、a/b/f 时
+poetry run mcb search resolve --path F:\a\b\c --query "登录鉴权"   # → d + e
+poetry run mcb search resolve --path F:\a\b --query "登录鉴权"     # → d + e + f
+
+# 多 path 并集
+poetry run mcb search resolve --path F:\frontend --path F:\backend --query "登录鉴权"
 ```
 
 在 Cursor / 自研 Agent 里：把上述命令写成工具或 Skill（shell 执行），约定 `--path` 与登记目录一致；主路径优先 `search resolve`。

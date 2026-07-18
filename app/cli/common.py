@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from typing import Any, Callable, Coroutine, List, Optional, Sequence, TypeVar
 import click
 from app.infrastructure.database import get_db_session
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository
@@ -66,6 +66,40 @@ async def get_repo_by_path(path: str, user_id: str = DEFAULT_USER_ID) -> GitRepo
         await db.refresh(repo)
         db.expunge(repo)
         return repo
+
+
+async def resolve_search_repos(
+    paths: Sequence[str],
+    user_id: str = DEFAULT_USER_ID,
+    *,
+    kind: Optional[str] = None,
+) -> List[GitRepository]:
+    """
+    解析检索目标仓：支持
+    1) 多个 --path 精确仓；
+    2) 上级目录前缀，展开其下所有已登记仓；
+    3) 二者组合（并集）；
+    4) kind=code|lib 时只保留对应类型（resolve 可不传以同时覆盖）。
+    """
+    raw = [str(p).strip() for p in (paths or []) if str(p).strip()]
+    if not raw:
+        raise click.ClickException("至少指定一个 --path")
+    async with get_db_session() as db:
+        repos = await RepoResolver.expand_search_paths(
+            db, raw, user_id=user_id, kind=kind
+        )
+        if not repos:
+            shown = ", ".join(RepoResolver.normalize_repo_path(p) for p in raw)
+            kind_hint = f"，kind={kind}" if kind else ""
+            raise click.ClickException(
+                f"未找到匹配的已登记仓库（支持精确 path 或上级目录前缀{kind_hint}）: {shown}"
+            )
+        out: List[GitRepository] = []
+        for repo in repos:
+            await db.refresh(repo)
+            db.expunge(repo)
+            out.append(repo)
+        return out
 
 
 def repo_public_view(repo: GitRepository) -> dict[str, Any]:

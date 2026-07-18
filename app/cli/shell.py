@@ -47,6 +47,8 @@ async def _async_main() -> None:
     print("  analyze --path F:/myproject")
     print("  experience analyze --path F:/myproject --limit 20")
     print("  search resolve --path F:/myproject --query \"JWT 鉴权怎么做\"")
+    print("  search resolve --path F:/workspace/services --query \"登录鉴权\"")
+    print("  search resolve --path F:/frontend --path F:/backend --query \"登录鉴权\"")
     print("  search similar --path F:/myproject --code \"def foo\"")
     print("  search related --path F:/myproject --keywords \"告警,触发\"")
     print("  search chunks --path F:/myproject --query \"告警触发\"")
