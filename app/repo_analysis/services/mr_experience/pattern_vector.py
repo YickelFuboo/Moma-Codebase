@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from app.infrastructure.llms import embedding_factory
 from app.infrastructure.vector_store import MatchDenseExpr, SearchRequest, VECTOR_STORE_CONN
 from app.repo_analysis.constants.experience_space import ExperienceAnalysisType, mr_pattern_space_name
@@ -93,7 +93,17 @@ class PatternVectorService:
         valid = [p for p in patterns if p.title and p.scenario and p.patterns]
         if not valid:
             return 0
-        texts = [PatternVectorService.build_embed_text(p) for p in valid]
+        pairs: List[Tuple[ExperiencePattern, str]] = []
+        for p in valid:
+            text = (PatternVectorService.build_embed_text(p) or "").strip()
+            if not text:
+                logging.warning("跳过空经验 embedding 文本 title=%s", p.title)
+                continue
+            pairs.append((p, text))
+        if not pairs:
+            return 0
+        valid = [p for p, _ in pairs]
+        texts = [t for _, t in pairs]
         vectors = await CodeVectorService._embed_texts(texts)
         if not vectors:
             raise RuntimeError("经验向量化失败")

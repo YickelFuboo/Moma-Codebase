@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import shutil
 from typing import Any, Optional
 import lancedb
 import pyarrow as pa
@@ -93,6 +94,9 @@ def _table_schema_compatible(table_schema: pa.Schema, vector_size: int) -> bool:
 class LanceDBConnection(VectorStoreConnection):
     """LanceDB 本地嵌入式向量存储。"""
 
+    # LanceDB table_names 默认 limit=10；此处翻页拉取，避免漏表。
+    TABLE_NAMES_PAGE_SIZE = 1000
+
     def __init__(self, uri: str):
         self.uri = os.path.abspath(uri)
         os.makedirs(self.uri, exist_ok=True)
@@ -110,14 +114,52 @@ class LanceDBConnection(VectorStoreConnection):
                 self._space_locks[space_name] = lock
             return lock
 
+    def _space_dir(self, space_name: str) -> str:
+        return os.path.join(self.uri, f"{space_name}.lance")
+
+    def _space_dir_exists(self, space_name: str) -> bool:
+        return os.path.isdir(self._space_dir(space_name))
+
+    def _remove_space_dir(self, space_name: str) -> None:
+        path = self._space_dir(space_name)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+
+    def _space_reachable(self, space_name: str) -> bool:
+        """table_names 可能漏登记磁盘上仍可打开的表（幽灵表），需目录/open 兜底。"""
+        if space_name in self._table_names():
+            return True
+        if not self._space_dir_exists(space_name):
+            return False
+        try:
+            self._open_table(space_name)
+            return True
+        except Exception as e:
+            logging.warning(
+                "LanceDB space %s 目录存在但无法打开，视为不存在: %s",
+                space_name,
+                e,
+            )
+            return False
+
+    def _drop_space_sync(self, space_name: str) -> None:
+        """从目录摘除表：优先 drop_table，并清理残留 .lance 目录。"""
+        try:
+            if space_name in self._table_names():
+                self.db.drop_table(space_name)
+        except Exception as e:
+            logging.warning("LanceDB drop_table %s failed: %s", space_name, e)
+        self._remove_space_dir(space_name)
+        self._space_dims.pop(space_name, None)
+
     def _ensure_space_table(self, space_name: str, vector_size: int) -> bool:
         schema = _build_table_schema(vector_size)
-        if space_name in self._table_names():
+        if self._space_reachable(space_name):
             table = self._open_table(space_name)
             if _table_schema_compatible(table.schema, vector_size):
                 return True
             logging.warning("LanceDB table %s schema 过时，将重建", space_name)
-            self.db.drop_table(space_name)
+            self._drop_space_sync(space_name)
         self.db.create_table(
             space_name,
             schema=schema,
@@ -134,11 +176,24 @@ class LanceDBConnection(VectorStoreConnection):
         return None
 
     async def health_check(self) -> dict[str, Any]:
-        tables = await asyncio.to_thread(lambda: self.db.table_names())
+        tables = await asyncio.to_thread(self._table_names)
         return {"status": "ok", "uri": self.uri, "tables": len(tables)}
 
     def _table_names(self) -> list[str]:
-        return self.db.table_names()
+        # LanceDB 0.21 table_names 默认 limit=10，超出部分会被截断，导致
+        # `name in table_names()` 假阴性（见 lancedb#2727）。必须翻页取全量。
+        names: list[str] = []
+        page_token: Optional[str] = None
+        page_size = int(self.TABLE_NAMES_PAGE_SIZE)
+        while True:
+            batch = list(self.db.table_names(page_token=page_token, limit=page_size))
+            if not batch:
+                break
+            names.extend(batch)
+            if len(batch) < page_size:
+                break
+            page_token = batch[-1]
+        return names
 
     def _open_table(self, space_name: str):
         return self.db.open_table(space_name)
@@ -157,17 +212,14 @@ class LanceDBConnection(VectorStoreConnection):
 
     async def delete_space(self, space_name: str, **kwargs) -> bool:
         try:
-            if space_name not in self._table_names():
-                return True
-            await asyncio.to_thread(self.db.drop_table, space_name)
-            self._space_dims.pop(space_name, None)
+            await asyncio.to_thread(self._drop_space_sync, space_name)
             return True
         except Exception as e:
             logging.error("Failed to delete LanceDB table %s: %s", space_name, e)
             return False
 
     async def space_exists(self, space_name: str, **kwargs) -> bool:
-        return space_name in self._table_names()
+        return await asyncio.to_thread(self._space_reachable, space_name)
 
     def _prepare_record(self, record: dict[str, Any], vector_size: int) -> dict[str, Any]:
         row = dict(record)
@@ -224,7 +276,7 @@ class LanceDBConnection(VectorStoreConnection):
         return False
 
     async def delete_records(self, space_name: str, condition: dict[str, Any], **kwargs) -> int:
-        if space_name not in self._table_names():
+        if not self._space_reachable(space_name):
             return 0
         where = _build_where(condition)
         if not where:
@@ -232,7 +284,7 @@ class LanceDBConnection(VectorStoreConnection):
         lock = await self._get_space_lock(space_name)
         async with lock:
             try:
-                if space_name not in self._table_names():
+                if not self._space_reachable(space_name):
                     return 0
                 table = self._open_table(space_name)
                 before = await asyncio.to_thread(table.count_rows)
@@ -247,7 +299,7 @@ class LanceDBConnection(VectorStoreConnection):
         if not space_names or len(space_names) != 1:
             return None
         space_name = space_names[0]
-        if space_name not in self._table_names():
+        if not self._space_reachable(space_name):
             return None
         try:
             table = self._open_table(space_name)
@@ -274,7 +326,7 @@ class LanceDBConnection(VectorStoreConnection):
         limit: int = 500,
         **kwargs,
     ) -> list[dict[str, Any]]:
-        if space_name not in self._table_names():
+        if not self._space_reachable(space_name):
             return []
 
         def _run() -> list[dict[str, Any]]:
@@ -330,7 +382,7 @@ class LanceDBConnection(VectorStoreConnection):
         if not space_names:
             return {"hits": {"hits": [], "total": {"value": 0}}}
         space_name = space_names[0]
-        if space_name not in self._table_names():
+        if not self._space_reachable(space_name):
             return {"hits": {"hits": [], "total": {"value": 0}}}
 
         dense_expr: Optional[MatchDenseExpr] = None

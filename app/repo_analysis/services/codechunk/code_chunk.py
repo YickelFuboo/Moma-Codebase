@@ -91,14 +91,30 @@ class CodeChunkService:
 
     @staticmethod
     def slice_symbol_bodies(file_info: FileInfo, *, file_ext: str = ".py") -> List[LineTextChunk]:
-        """从 AST 符号完整源码生成切片，便于 similar 命中整段函数/类。"""
+        """从 AST 符号完整源码生成切片，便于 similar 命中整段函数/类。
+
+        策略：只保留「装得下」的整段符号；超限跳过（交给行窗，避免重复切分）。
+        - 函数/方法：行数 ≤ CODE_ANALYSIS_SYMBOL_BODY_MAX_LINES_FUNCTION
+        - 类：仅当行数 ≤ CODE_ANALYSIS_SYMBOL_BODY_MAX_LINES_CLASS 才整类入库；
+          大类不切整类，但仍尝试其方法。
+        """
         if not file_info:
             return []
         out: List[LineTextChunk] = []
         seen: set[tuple[int, int]] = set()
+        max_fn_lines = max(1, int(settings.code_analysis_symbol_body_max_lines_function or 500))
+        max_class_lines = max(1, int(settings.code_analysis_symbol_body_max_lines_class or 120))
 
-        def _append(start_line: int, end_line: int, text: str) -> None:
+        def _line_span(start_line: int, end_line: int) -> int:
+            if not start_line or not end_line:
+                return 0
+            return max(0, int(end_line) - int(start_line) + 1)
+
+        def _append(start_line: int, end_line: int, text: str, *, max_lines: int) -> None:
             if not text or not start_line or not end_line:
+                return
+            span = _line_span(start_line, end_line)
+            if span <= 0 or span > max_lines:
                 return
             body = text.strip()
             if len(body) < 24:
@@ -112,11 +128,26 @@ class CodeChunkService:
             out.append(LineTextChunk(int(start_line), int(end_line), body))
 
         for fn in file_info.functions or []:
-            _append(fn.start_line or 0, fn.end_line or 0, fn.source_code or "")
+            _append(
+                fn.start_line or 0,
+                fn.end_line or 0,
+                fn.source_code or "",
+                max_lines=max_fn_lines,
+            )
         for clz in file_info.classes or []:
-            _append(clz.start_line or 0, clz.end_line or 0, clz.source_code or "")
+            _append(
+                clz.start_line or 0,
+                clz.end_line or 0,
+                clz.source_code or "",
+                max_lines=max_class_lines,
+            )
             for method in clz.methods or []:
-                _append(method.start_line or 0, method.end_line or 0, method.source_code or "")
+                _append(
+                    method.start_line or 0,
+                    method.end_line or 0,
+                    method.source_code or "",
+                    max_lines=max_fn_lines,
+                )
         return out
 
     @staticmethod

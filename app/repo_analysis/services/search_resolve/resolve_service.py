@@ -8,6 +8,8 @@ from app.infrastructure.database import get_db_session
 from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
 from app.repo_analysis.services.search_resolve.intent import ResolvePlan, SearchIntentRouter
+from app.repo_analysis.services.search_resolve.result_presenter import ResolveResultPresenter
+from app.repo_analysis.services.search_resolve.weak_fallback import ResolveWeakFallback
 from app.repo_analysis.services.search_service import SearchService
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
 
@@ -44,6 +46,7 @@ class SearchResolveService:
         sections: Dict[str, object] = {}
         channel_errors: Dict[str, str] = {}
         fused_items: List[Dict[str, object]] = []
+        channels_used: List[str] = []
 
         tasks = []
         for channel in plan.channels:
@@ -61,6 +64,7 @@ class SearchResolveService:
                 sections[channel] = {"total": 0, "items": [], "error": str(result)}
                 continue
             sections[channel] = result
+            channels_used.append(channel)
             for item in result.get("items") or []:
                 fused = dict(item)
                 fused.setdefault("channel", channel)
@@ -73,6 +77,27 @@ class SearchResolveService:
                 fused_items.append(fused)
 
         fused_items = cls._fuse_items(fused_items, top_k=top_k)
+        fallback_used: Optional[str] = None
+        if ResolveWeakFallback.is_weak(plan.intent, fused_items):
+            fb_item, fb_channel, fb_section, fb_err = await ResolveWeakFallback.try_one(
+                repo_id,
+                plan,
+                fused_items,
+                run_channel=cls._run_channel,
+            )
+            if fb_channel and fb_section is not None and fb_channel not in sections:
+                sections[fb_channel] = fb_section
+            if fb_err and fb_channel:
+                channel_errors[fb_channel] = fb_err
+            if fb_item is not None and fb_channel:
+                fused_items = cls._fuse_items(fused_items + [fb_item], top_k=top_k)
+                fused_items = cls._ensure_fallback_marked(fused_items, fb_item)
+                fallback_used = fb_channel
+                if fb_channel not in channels_used:
+                    channels_used.append(fb_channel)
+
+        annotated = ResolveResultPresenter.annotate(fused_items)
+        agent_items = ResolveResultPresenter.agent_items(annotated)
         index = await SearchIndexMeta.for_repo(repo_id)
         return {
             "repo_id": repo_id,
@@ -80,7 +105,8 @@ class SearchResolveService:
             "intent": plan.intent.value,
             "intent_reason": plan.reason,
             "fallback_from": plan.fallback_from,
-            "channels_used": [c for c in plan.channels if c not in channel_errors],
+            "fallback_used": fallback_used,
+            "channels_used": channels_used,
             "channel_errors": channel_errors or None,
             "plan": {
                 "channels": plan.channels,
@@ -89,11 +115,49 @@ class SearchResolveService:
                 "graph_symbol": plan.graph_symbol,
                 "graph_mode": plan.graph_mode,
             },
-            "total": len(fused_items),
+            "summary": ResolveResultPresenter.summary(
+                intent=plan.intent.value,
+                items=agent_items,
+                fused_total=len(annotated),
+                fallback_used=fallback_used,
+            ),
+            "total": len(agent_items),
+            "fused_total": len(annotated),
             "index": index,
-            "items": fused_items,
+            "items": agent_items,
             "sections": sections,
         }
+
+    @classmethod
+    def _item_dedupe_key(cls, it: Dict[str, object]) -> str:
+        fp = str(it.get("file_path") or "")
+        if fp:
+            return f"file:{fp}"
+        title = str(it.get("title") or "")
+        if title:
+            return f"title:{title}"
+        return str(it.get("symbol_name") or "")
+
+    @classmethod
+    def _ensure_fallback_marked(
+        cls,
+        items: List[Dict[str, object]],
+        fallback_item: Dict[str, object],
+    ) -> List[Dict[str, object]]:
+        """融合后可能丢掉 fallback 标记；强制保留一条可展示的兜底命中。"""
+        key = cls._item_dedupe_key(fallback_item)
+        out = [dict(it) for it in items]
+        if key:
+            for it in out:
+                if cls._item_dedupe_key(it) == key:
+                    it["fallback"] = True
+                    it.setdefault("channel", fallback_item.get("channel"))
+                    it.setdefault("match_source", fallback_item.get("match_source"))
+                    return out
+        row = dict(fallback_item)
+        row["fallback"] = True
+        out.append(row)
+        return out
 
     @classmethod
     async def _run_channel(
@@ -236,7 +300,6 @@ class SearchResolveService:
                 fp = str(raw or "").strip().replace("\\", "/")
                 if not fp or fp.startswith("title:"):
                     continue
-                # anchors 可能是符号名；仅展开像路径的项
                 if "/" not in fp and "." not in fp.rsplit("/", 1)[-1]:
                     continue
                 files.append(fp)
@@ -277,7 +340,6 @@ class SearchResolveService:
             channel = str(it.get("channel") or "")
             priority = cls.CHANNEL_PRIORITY.get(source, 9)
             if channel == "pattern" and source == "mr_experience":
-                # 经验展开的文件可与 related 对齐，略优于纯经验 title 条
                 if it.get("from_pattern_files") or it.get("file_path"):
                     priority = 3
                 else:
@@ -289,7 +351,6 @@ class SearchResolveService:
         for it in items:
             fp = str(it.get("file_path") or "")
             title = str(it.get("title") or "")
-            # 纯经验条目（无文件）与文件命中分键，避免互相覆盖
             if fp:
                 key = f"file:{fp}"
             elif title:

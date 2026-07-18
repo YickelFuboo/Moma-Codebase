@@ -36,7 +36,23 @@ class ApiVectorService:
                 return await ApiSummaryService.summarize(api)
 
         summaries = await asyncio.gather(*[one(api) for api in apis])
-        texts = [(s or "").strip() or ApiSummaryService.fallback_summary(apis[i]) for i, s in enumerate(summaries)]
+        kept_apis = []
+        texts: List[str] = []
+        for i, s in enumerate(summaries):
+            t = (s or "").strip() or ApiSummaryService.fallback_summary(apis[i])
+            t = (t or "").strip()
+            if not t:
+                logging.warning(
+                    "跳过空 API 摘要 embedding file=%s api=%s",
+                    rel_file_path,
+                    apis[i].display_name(),
+                )
+                continue
+            kept_apis.append(apis[i])
+            texts.append(t)
+        if not texts:
+            return
+        apis = kept_apis
         vectors = await CodeVectorService._embed_texts(texts)
         if not vectors:
             raise RuntimeError("api summary 向量化失败")

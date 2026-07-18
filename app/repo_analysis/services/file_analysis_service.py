@@ -68,7 +68,8 @@ class FileAnalysisService:
             scheduler_task.cancel()
             try:
                 await scheduler_task # 等待调度任务完成
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, RuntimeError):
+                # RuntimeError: Future attached to a different loop（跨场景 session 切换）
                 pass
         # 清理停止事件和调度任务
         FileAnalysisService._scheduler_stop_event = None
@@ -158,7 +159,7 @@ class FileAnalysisService:
         running_task.cancel()
         try:
             await asyncio.wait_for(running_task, timeout=timeout_seconds)
-        except Exception:
+        except (asyncio.CancelledError, Exception):
             pass
 
         FileAnalysisService._running_tasks.pop(repo_id, None)

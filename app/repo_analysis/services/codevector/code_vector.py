@@ -37,12 +37,64 @@ class CodeVectorService:
         rel_file_path = normalize_path(rel_file_path)
         if not chunks:
             return
-        texts = [c.text for c in chunks]
-        vectors = await CodeVectorService._embed_texts(texts)
-        if not vectors:
-            raise RuntimeError("line chunk向量化失败")
-            
-        dim = len(vectors[0])
+        max_chars = max(1, int(settings.code_analysis_embed_max_chars or 12000))
+        kept: List[LineTextChunk] = []
+        skipped_empty = 0
+        skipped_oversize = 0
+        for c in chunks:
+            body = str(c.text or "").strip()
+            if not body:
+                skipped_empty += 1
+                continue
+            if len(body) > max_chars:
+                skipped_oversize += 1
+                logging.warning(
+                    "跳过超长行块 embedding repo_id=%s file=%s lines=%s-%s chars=%s max=%s",
+                    repo_id,
+                    rel_file_path,
+                    c.start_line,
+                    c.end_line,
+                    len(body),
+                    max_chars,
+                )
+                continue
+            kept.append(LineTextChunk(c.start_line, c.end_line, body))
+        if skipped_empty:
+            logging.warning(
+                "跳过空行块 embedding repo_id=%s file=%s skipped=%s/%s",
+                repo_id,
+                rel_file_path,
+                skipped_empty,
+                len(chunks),
+            )
+        if not kept:
+            return
+        texts = [c.text for c in kept]
+        vectors = await CodeVectorService._embed_texts_best_effort(texts)
+        paired: List[Tuple[LineTextChunk, List[float]]] = []
+        for c, vec in zip(kept, vectors):
+            if vec is None:
+                logging.warning(
+                    "跳过 embedding 失败行块 repo_id=%s file=%s lines=%s-%s chars=%s",
+                    repo_id,
+                    rel_file_path,
+                    c.start_line,
+                    c.end_line,
+                    len(c.text),
+                )
+                continue
+            paired.append((c, vec))
+        if not paired:
+            logging.warning(
+                "文件全部行块 embedding 被跳过 repo_id=%s file=%s total=%s oversize=%s",
+                repo_id,
+                rel_file_path,
+                len(chunks),
+                skipped_oversize,
+            )
+            return
+
+        dim = len(paired[0][1])
         vector_field = f"q_{dim}_vec"
         space_name = line_chunk_space_name(repo_id, dim)
         await VECTOR_STORE_CONN.create_space(space_name, dim)
@@ -55,7 +107,7 @@ class CodeVectorService:
             },
         )
         records: List[Dict[str, object]] = []
-        for idx, c in enumerate(chunks):
+        for idx, (c, vec) in enumerate(paired):
             stable_id = CodeVectorService._build_stable_id(
                 repo_id=repo_id,
                 file_path=rel_file_path,
@@ -74,7 +126,7 @@ class CodeVectorService:
                     "end_line": c.end_line,
                     "chunk_index": idx,
                     "content": c.text,
-                    vector_field: vectors[idx],
+                    vector_field: vec,
                 }
             )
         failed_ids = await VECTOR_STORE_CONN.insert_records(space_name, records)
@@ -158,28 +210,76 @@ class CodeVectorService:
                 return await CodeSummary.llm_summarize(src, ct)
 
         summaries = await asyncio.gather(*[one_summary(src, ct) for _, _, _, _, src, ct in symbols])
+        kept_symbols: List[Tuple[str, str, int, int, str, ContentType]] = []
         raw_summaries: List[str] = []
         texts: List[str] = []
         for i, s in enumerate(summaries):
             t = (s or "").strip()
             if not t:
                 t = CodeVectorService._fallback_summary_from_source(symbols[i][4], symbols[i][5])
-            raw_summaries.append(t)
-            kind, name, _, _, _, _ = symbols[i]
-            texts.append(
-                CodeVectorService.build_symbol_embed_text(
-                    file_path=rel_file_path,
-                    symbol_kind=kind,
-                    symbol_name=name,
-                    summary=t,
+            t = (t or "").strip()
+            if not t:
+                logging.warning(
+                    "跳过空摘要符号 embedding repo_id=%s file=%s symbol=%s",
+                    repo_id,
+                    rel_file_path,
+                    symbols[i][1],
                 )
+                continue
+            kind, name, _, _, _, _ = symbols[i]
+            embed_text = CodeVectorService.build_symbol_embed_text(
+                file_path=rel_file_path,
+                symbol_kind=kind,
+                symbol_name=name,
+                summary=t,
+            ).strip()
+            if not embed_text:
+                logging.warning(
+                    "跳过空 embedding 文本 repo_id=%s file=%s symbol=%s",
+                    repo_id,
+                    rel_file_path,
+                    name,
+                )
+                continue
+            max_chars = max(1, int(settings.code_analysis_embed_max_chars or 12000))
+            if len(embed_text) > max_chars:
+                logging.warning(
+                    "跳过超长符号摘要 embedding repo_id=%s file=%s symbol=%s chars=%s max=%s",
+                    repo_id,
+                    rel_file_path,
+                    name,
+                    len(embed_text),
+                    max_chars,
+                )
+                continue
+            kept_symbols.append(symbols[i])
+            raw_summaries.append(t)
+            texts.append(embed_text)
+        if not texts:
+            return
+        symbols = kept_symbols
+
+        # 向量化符号摘要（失败逐条跳过，不拖垮整文件）
+        vectors = await CodeVectorService._embed_texts_best_effort(texts)
+        paired_sym: List[Tuple[Tuple[str, str, int, int, str, ContentType], str, List[float]]] = []
+        for item, summary, vec in zip(symbols, raw_summaries, vectors):
+            if vec is None:
+                logging.warning(
+                    "跳过 embedding 失败符号 repo_id=%s file=%s symbol=%s",
+                    repo_id,
+                    rel_file_path,
+                    item[1],
+                )
+                continue
+            paired_sym.append((item, summary, vec))
+        if not paired_sym:
+            logging.warning(
+                "文件全部符号摘要 embedding 被跳过 repo_id=%s file=%s",
+                repo_id,
+                rel_file_path,
             )
-        
-        # 向量化符号摘要
-        vectors = await CodeVectorService._embed_texts(texts)
-        if not vectors:
-            raise RuntimeError("symbol summary向量化失败")
-        dim = len(vectors[0])
+            return
+        dim = len(paired_sym[0][2])
         vector_field = f"q_{dim}_vec"
         space_name = symbol_summary_space_name(repo_id, dim)
         await VECTOR_STORE_CONN.create_space(space_name, dim)
@@ -192,9 +292,8 @@ class CodeVectorService:
             },
         )
         records: List[Dict[str, object]] = []
-        for idx, item in enumerate(symbols):
+        for idx, (item, summary, vec) in enumerate(paired_sym):
             symbol_kind, symbol_name, start_line, end_line, _, _ = item
-            summary = raw_summaries[idx]
             stable_id = CodeVectorService._build_stable_id(
                 repo_id=repo_id,
                 file_path=rel_file_path,
@@ -214,7 +313,7 @@ class CodeVectorService:
                     "start_line": start_line,
                     "end_line": end_line,
                     "summary": summary,
-                    vector_field: vectors[idx],
+                    vector_field: vec,
                 }
             )
         failed_ids = await VECTOR_STORE_CONN.insert_records(space_name, records)
@@ -405,6 +504,32 @@ class CodeVectorService:
         if not raw:
             return []
         return [raw[index] for index in index_map]
+
+    @staticmethod
+    async def _embed_texts_best_effort(texts: List[str]) -> List[Optional[List[float]]]:
+        """入库用 embedding：批量失败时逐条重试，失败项返回 None（跳过，不抛）。"""
+        if not texts:
+            return []
+        try:
+            vectors = await CodeVectorService._embed_texts(texts)
+            if len(vectors) != len(texts):
+                raise RuntimeError("embedding 返回数量与输入不一致")
+            return vectors
+        except Exception as e:
+            logging.warning("批量 embedding 失败，改为逐条跳过失败项: %s", e)
+        out: List[Optional[List[float]]] = []
+        for text in texts:
+            try:
+                part = await CodeVectorService._embed_texts([text])
+                out.append(part[0] if part else None)
+            except Exception as e2:
+                logging.warning(
+                    "跳过单条 embedding 失败 chars=%s error=%s",
+                    len(text or ""),
+                    e2,
+                )
+                out.append(None)
+        return out
 
     @staticmethod
     def _build_stable_id(

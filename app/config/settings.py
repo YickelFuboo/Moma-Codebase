@@ -101,6 +101,24 @@ class Settings(BaseSettings):
     code_analysis_line_chunk_target_lines: int = Field(default=5, description="行切片目标窗口行数", env="CODE_ANALYSIS_LINE_CHUNK_TARGET_LINES")
     code_analysis_line_chunk_overlap_lines: int = Field(default=1, description="行切片滑动重叠行数", env="CODE_ANALYSIS_LINE_CHUNK_OVERLAP_LINES")
     code_analysis_line_chunk_max_lines: int = Field(default=200, description="单行切片经扩展后的最大行数上限", env="CODE_ANALYSIS_LINE_CHUNK_MAX_LINES")
+    code_analysis_symbol_body_max_lines_function: int = Field(
+        default=500,
+        ge=1,
+        description="符号体整段入库：函数/方法最大行数（超限跳过，交给行窗）",
+        env="CODE_ANALYSIS_SYMBOL_BODY_MAX_LINES_FUNCTION",
+    )
+    code_analysis_symbol_body_max_lines_class: int = Field(
+        default=120,
+        ge=1,
+        description="符号体整段入库：类最大行数（超限不切整类，仅尝试方法）",
+        env="CODE_ANALYSIS_SYMBOL_BODY_MAX_LINES_CLASS",
+    )
+    code_analysis_embed_max_chars: int = Field(
+        default=12000,
+        ge=1,
+        description="单条 embedding 文本最大字符数（超限跳过不截断；防超长行打爆 API）",
+        env="CODE_ANALYSIS_EMBED_MAX_CHARS",
+    )
     code_analysis_symbol_summary_llm_concurrency: int = Field(default=4, ge=1, le=32, description="符号摘要阶段 LLM 并发上限", env="CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY")
     code_analysis_symbol_summary_enabled: bool = Field(
         default=True,

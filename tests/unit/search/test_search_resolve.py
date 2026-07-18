@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from app.repo_analysis.services.search_resolve.intent import SearchIntent, SearchIntentRouter
 from app.repo_analysis.services.search_resolve.resolve_service import SearchResolveService
+from app.repo_analysis.services.search_resolve.result_presenter import ResolveResultPresenter
 
 
 class TestSearchIntentRouter:
@@ -126,6 +127,10 @@ class TestSearchResolveService:
         assert result["intent"] == "related"
         assert result["channels_used"] == ["related"]
         assert result["items"][0]["file_path"] == "a.py"
+        assert result["items"][0].get("why")
+        assert "a.py" in str(result.get("summary") or "")
+        assert result.get("fallback_used") is None
+        assert len(result["items"]) <= 3
         assert "related" in result["sections"]
 
     def test_resolve_channel_failure_degrades(self, monkeypatch):
@@ -270,3 +275,164 @@ class TestSearchResolveService:
         titles = [str(it.get("title") or "") for it in (result.get("items") or [])]
         assert "app/skills/hub/service.py" in paths
         assert "Skills Hub" in titles
+        assert all(it.get("why") for it in result["items"])
+
+    def test_agent_items_capped_at_three(self, monkeypatch):
+        class _Repo:
+            id = "r1"
+            kind = "code"
+
+        class _CM:
+            async def __aenter__(self):
+                db = AsyncMock()
+                db.scalar = AsyncMock(return_value=_Repo())
+                return db
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.get_db_session",
+            lambda: _CM(),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.SearchIndexMeta.for_repo",
+            AsyncMock(return_value={}),
+        )
+        many = [
+            {"file_path": f"f{i}.py", "score": 3.0 - i * 0.01, "match_source": "exact"}
+            for i in range(8)
+        ]
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_related_files",
+                AsyncMock(return_value={"total": 8, "items": many}),
+            ):
+                return await SearchResolveService.resolve(
+                    "r1",
+                    "Foo",
+                    intent="related",
+                    top_k=10,
+                )
+
+        result = asyncio.run(_run())
+        assert result["fused_total"] == 8
+        assert result["total"] == 3
+        assert len(result["items"]) == 3
+        assert "推荐 3 条" in str(result.get("summary") or "")
+
+    def test_weak_related_attaches_pattern_fallback(self, monkeypatch):
+        class _Repo:
+            id = "r1"
+            kind = "code"
+
+        class _CM:
+            async def __aenter__(self):
+                db = AsyncMock()
+                db.scalar = AsyncMock(return_value=_Repo())
+                return db
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.get_db_session",
+            lambda: _CM(),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.SearchIndexMeta.for_repo",
+            AsyncMock(return_value={}),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.weak_fallback.settings.mr_experience_enabled",
+            True,
+        )
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_related_files",
+                AsyncMock(
+                    return_value={
+                        "total": 1,
+                        "items": [
+                            {
+                                "file_path": "weak.py",
+                                "score": 0.4,
+                                "match_source": "symbol_summary",
+                            }
+                        ],
+                    }
+                ),
+            ):
+                with patch(
+                    "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_patterns",
+                    AsyncMock(
+                        return_value={
+                            "total": 1,
+                            "items": [
+                                {
+                                    "title": "弱相关经验",
+                                    "similarity": 0.88,
+                                    "relevant_files": ["app/fallback/hit.py"],
+                                }
+                            ],
+                        }
+                    ),
+                ):
+                    return await SearchResolveService.resolve(
+                        "r1",
+                        "某个模糊能力",
+                        intent="related",
+                        top_k=5,
+                    )
+
+        result = asyncio.run(_run())
+        assert result.get("fallback_used") == "pattern"
+        assert "pattern" in (result.get("channels_used") or [])
+        assert any(it.get("fallback") for it in result["items"])
+        assert result["items"][-1].get("fallback") is True
+        assert "app/fallback/hit.py" in str(result["items"][-1].get("file_path") or "")
+        assert "兜底" in str(result.get("summary") or "")
+
+    def test_agent_items_keeps_fallback_slot(self):
+        items = [
+            {"file_path": f"w{i}.py", "score": 0.5, "match_source": "symbol_summary"}
+            for i in range(5)
+        ]
+        items.append(
+            {
+                "file_path": "fb.py",
+                "score": 0.3,
+                "match_source": "mr_experience",
+                "fallback": True,
+                "channel": "pattern",
+            }
+        )
+        out = ResolveResultPresenter.agent_items(items)
+        assert len(out) == 3
+        assert out[-1]["file_path"] == "fb.py"
+        assert out[-1].get("fallback") is True
+
+    def test_presenter_why_and_summary(self):
+        why = ResolveResultPresenter.why_for(
+            {
+                "channel": "related",
+                "match_source": "exact",
+                "file_path": "a/b.py",
+                "symbol_name": "Foo",
+            }
+        )
+        assert "a/b.py#Foo" in why
+        assert "精确命中" in why
+        items = ResolveResultPresenter.annotate(
+            [{"channel": "related", "match_source": "exact", "file_path": "a.py"}]
+        )
+        assert items[0]["why"]
+        summary = ResolveResultPresenter.summary(
+            intent="related",
+            items=items,
+            fused_total=5,
+            fallback_used=None,
+        )
+        assert "融合池 5" in summary

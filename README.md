@@ -1,6 +1,8 @@
 # MomaCodeBase
 
-本地代码仓分析 CLI 工具（命令名：`mcb`）。
+本地代码仓分析 CLI 工具（命令名：`mcb`）。把存量代码仓逆向成「数字镜像」，供编码 Agent 检索相似代码、相关文件、调用关系与历史改法。
+
+详细能力、准确率优化与评测对比见 [Design.md](Design.md)。
 
 ## 安装
 
@@ -42,6 +44,36 @@ poetry run mcb repo add --path F:\myproject --kind code
 poetry run mcb
 ```
 
+## Agent 通过 CLI 对接
+
+编码 Agent **直接调用一次性 `mcb` 命令**即可，无需另起服务。查询类输出为 JSON（stdout），便于解析。
+
+### 前置条件
+
+1. 已 `poetry install`，并配置好 `env`
+2. 目标仓已 `repo add` + `analyze`（需要历史经验时再 `experience analyze`）
+3. Agent 侧把本仓加入 PATH / 工作目录，或写全路径调用 `poetry run mcb ...`
+
+### 推荐注册给 Agent 的命令
+
+| 用途 | 命令 |
+|------|------|
+| 主检索 | `mcb search resolve --path <仓> --query "..."` |
+| 相似代码 | `mcb search similar --path <仓> --code "..."` |
+| 相关定位 | `mcb search related --path <仓> --keywords "a,b"` |
+| 历史经验 | `mcb search pattern --path <仓> --query "..."` |
+| Lib API | `mcb search api --path <库> --query "..."` |
+| 依赖 / 调用链 | `mcb search dependents\|dependencies\|callers\|callees ...` |
+| 已登记仓 | `mcb repo list` |
+
+示例：
+
+```bash
+poetry run mcb search resolve --path F:\myproject --query "JWT 鉴权怎么做"
+```
+
+在 Cursor / 自研 Agent 里：把上述命令写成工具或 Skill（shell 执行），约定 `--path` 与登记目录一致；主路径优先 `search resolve`。
+
 ## repo（仓库管理）
 
 ```bash
@@ -67,6 +99,7 @@ analyze clear --path F:\myproject
 ## search（检索与图谱）
 
 ```bash
+poetry run mcb search resolve --path F:\myproject --query "JWT 鉴权" [--intent auto] [--top-k 10]
 poetry run mcb search similar --path F:\myproject --code "def foo()" [--top-k 10]
 poetry run mcb search related --path F:\myproject --keywords "auth,login" [--top-k 10]
 poetry run mcb search dependents --path F:\myproject --file src/main.py
@@ -95,5 +128,5 @@ mcb> exit
 ```
 
 ```bash
-poetry run mcb search similar --path F:\myproject --code "class User"
+poetry run mcb search resolve --path F:\myproject --query "class User"
 ```

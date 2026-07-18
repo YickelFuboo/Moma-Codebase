@@ -33,6 +33,13 @@ class SILICONFLOWEmbed(BaseEmbedding):
             "authorization": f"Bearer {api_key}",
         }
 
+    @staticmethod
+    def _batch_len_info(texts: List[str]) -> str:
+        lengths = [len(str(t or "")) for t in texts]
+        empty_idxs = [i for i, t in enumerate(texts) if not str(t or "").strip()]
+        max_chars = max(lengths) if lengths else 0
+        return f"count={len(texts)} char_lens={lengths} empty_idxs={empty_idxs} max_chars={max_chars}"
+
     async def encode(self, texts: List[str]) -> Tuple[np.ndarray, int]:
         """
         将文本列表编码为嵌入向量
@@ -70,12 +77,24 @@ class SILICONFLOWEmbed(BaseEmbedding):
                     except Exception as e:
                         if attempt < MAX_RETRY_ATTEMPTS - 1 and self._is_retryable_error(e):
                             delay = self._get_delay(attempt)
-                            logging.warning(f"SiliconFlow嵌入编码失败，重试 (尝试 {attempt + 1}/{MAX_RETRY_ATTEMPTS}): {e}. 等待 {delay:.2f}s...")
+                            logging.warning(
+                                "SiliconFlow嵌入编码失败，重试 (尝试 %s/%s): %s. 等待 %.2fs... | model=%s | %s",
+                                attempt + 1,
+                                MAX_RETRY_ATTEMPTS,
+                                e,
+                                delay,
+                                self.model_name,
+                                self._batch_len_info(texts_batch),
+                            )
                             await asyncio.sleep(delay)
                             continue
-                        else:
-                            logging.error(f"SiliconFlow嵌入编码最终失败: {e}")
-                            raise
+                        logging.error(
+                            "SiliconFlow嵌入编码最终失败: %s | model=%s | %s",
+                            e,
+                            self.model_name,
+                            self._batch_len_info(texts_batch),
+                        )
+                        raise
 
         return np.array(ress), token_count
 
@@ -104,13 +123,25 @@ class SILICONFLOWEmbed(BaseEmbedding):
                         if not res or not res.get("data") or not res["data"]:
                             raise ValueError(f"Invalid API response: {res}")
                         return np.array(res["data"][0]["embedding"]), self._total_token_count(res)
-                        
+
             except Exception as e:
                 if attempt < MAX_RETRY_ATTEMPTS - 1 and self._is_retryable_error(e):
                     delay = self._get_delay(attempt)
-                    logging.warning(f"SiliconFlow查询编码失败，重试 (尝试 {attempt + 1}/{MAX_RETRY_ATTEMPTS}): {e}. 等待 {delay:.2f}s...")
+                    logging.warning(
+                        "SiliconFlow查询编码失败，重试 (尝试 %s/%s): %s. 等待 %.2fs... | model=%s | %s",
+                        attempt + 1,
+                        MAX_RETRY_ATTEMPTS,
+                        e,
+                        delay,
+                        self.model_name,
+                        self._batch_len_info([text]),
+                    )
                     await asyncio.sleep(delay)
                     continue
-                else:
-                    logging.error(f"SiliconFlow查询编码最终失败: {e}")
-                    raise
+                logging.error(
+                    "SiliconFlow查询编码最终失败: %s | model=%s | %s",
+                    e,
+                    self.model_name,
+                    self._batch_len_info([text]),
+                )
+                raise
