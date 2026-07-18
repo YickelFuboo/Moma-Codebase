@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.services.codevector.exact_match import ExactMatchService
+from app.repo_analysis.services.codevector.related_keyword_expander import RelatedKeywordExpander
 from app.repo_analysis.services.codevector.similar_query import SimilarQueryNormalizer
 from app.repo_analysis.services.codevector.similar_rerank import SimilarRerankService
 from app.repo_analysis.services.codevector.vector_search import CodeVectorSearchService
@@ -275,13 +276,22 @@ class SearchService:
         symbol_docs: List[Dict[str, object]],
         top_k: int,
         extra_items: Optional[List[Dict[str, object]]] = None,
+        keywords: Optional[List[str]] = None,
     ) -> List[Dict[str, object]]:
         """精确强符号 > 弱符号 > 路径 > 图谱/向量；按文件去重后做分数门槛与强符号截断。"""
+        path_keywords = [
+            str(k).strip().lower().replace("\\", "/")
+            for k in (keywords or [])
+            if k and len(str(k).strip()) >= 4
+        ]
         ranked: List[Dict[str, object]] = []
         for it in exact_items:
             raw = float(it.get("_score") or 0)
             tier = str(it.get("exact_tier") or ("symbol" if raw >= 2.8 else "path"))
             boost = cls._exact_boost(tier)
+            fp = str(it.get("file_path") or "").replace("\\", "/")
+            score = raw + boost
+            score += cls._keyword_path_bonus(fp, path_keywords)
             ranked.append(
                 {
                     "file_path": it.get("file_path"),
@@ -289,28 +299,51 @@ class SearchService:
                     "symbol_name": it.get("symbol_name"),
                     "start_line": it.get("start_line"),
                     "end_line": it.get("end_line"),
-                    "score": raw + boost,
+                    "score": score,
                     "_raw_score": raw,
                     "match_source": "exact",
                     "exact_tier": tier,
                 }
             )
         for doc in symbol_docs:
-            ranked.append(cls._normalize_vector_item(doc, "symbol_summary"))
+            item = cls._normalize_vector_item(doc, "symbol_summary")
+            fp = str(item.get("file_path") or "").replace("\\", "/")
+            item["score"] = float(item.get("score") or 0) + cls._keyword_path_bonus(fp, path_keywords)
+            ranked.append(item)
         for it in extra_items or []:
-            ranked.append(it)
+            row = dict(it)
+            fp = str(row.get("file_path") or "").replace("\\", "/")
+            row["score"] = float(row.get("score") or 0) + cls._keyword_path_bonus(fp, path_keywords)
+            ranked.append(row)
 
         ranked.sort(key=cls._rank_key)
         best_by_file: Dict[str, Dict[str, object]] = {}
         for it in ranked:
             fp = str(it.get("file_path") or "")
-            if not fp:
+            if not fp or RelatedKeywordExpander.is_noise_path(fp):
                 continue
             prev = best_by_file.get(fp)
             if prev is None or cls._rank_key(it) < cls._rank_key(prev):
                 best_by_file[fp] = it
         unique = sorted(best_by_file.values(), key=cls._rank_key)
         return cls._apply_precision_trim(unique, top_k)
+
+    @staticmethod
+    def _keyword_path_bonus(file_path: str, path_keywords: List[str]) -> float:
+        """路径命中关键词加分：文件名整段匹配优先于路径子串。"""
+        if not path_keywords or not file_path:
+            return 0.0
+        fp = file_path.replace("\\", "/").lower()
+        stem = fp.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+        best = 0.0
+        for k in path_keywords:
+            if not k:
+                continue
+            if stem == k or stem.endswith(f"_{k}") or stem.startswith(f"{k}_"):
+                best = max(best, 1.25)
+            elif k in fp:
+                best = max(best, 0.85)
+        return best
 
     @classmethod
     async def _search_codegraph_files(
@@ -423,9 +456,10 @@ class SearchService:
         keywords: List[str],
         top_k: int = 10,
     ) -> Dict[str, object]:
-        keywords = [str(k).strip() for k in (keywords or []) if k and str(k).strip()]
-        if not keywords:
+        raw_keywords = [str(k).strip() for k in (keywords or []) if k and str(k).strip()]
+        if not raw_keywords:
             raise ValueError("keywords 不能为空")
+        keywords = RelatedKeywordExpander.expand(raw_keywords)
 
         channels = cls.related_channel_flags()
         if not any(channels.values()):
@@ -460,6 +494,7 @@ class SearchService:
             symbol_docs=symbol_docs,
             top_k=top_k,
             extra_items=extra_items,
+            keywords=keywords,
         )
         for it in unique:
             it.pop("_raw_score", None)
@@ -467,6 +502,7 @@ class SearchService:
         return {
             "repo_id": repo_id,
             "keywords": keywords,
+            "keywords_raw": raw_keywords,
             "channels": channels,
             "total": len(unique),
             "index": index,

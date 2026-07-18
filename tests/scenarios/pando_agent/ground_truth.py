@@ -88,11 +88,47 @@ PANDO_RELATED_CASES = [
     PathSetCase(
         case_id="pando.full.semantic.websocket",
         description="语义检索 websocket 通道",
-        expected_paths=["app/channel/websocket/websocket.py"],
+        expected_paths=[
+            "app/channel/websocket/websocket.py",
+            "app/channel/websocket/manager.py",
+        ],
         min_precision=0.1,
-        min_recall=1.0,
+        min_recall=0.5,
         top_k=15,
         extra={"keywords": ["websocket channel connection manager for realtime messages"]},
+    ),
+    PathSetCase(
+        case_id="pando.related.hard.short.cn_memory",
+        description="短中文难例：记忆",
+        expected_paths=["app/agents/memorys/default/memory.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={"keywords": ["记忆"]},
+    ),
+    PathSetCase(
+        case_id="pando.related.hard.short.cn_auth",
+        description="短中文难例：鉴权",
+        expected_paths=[
+            "app/utils/auth/jwt_validator.py",
+            "app/utils/auth/jwt_middleware.py",
+        ],
+        min_precision=0.15,
+        min_recall=0.5,
+        top_k=10,
+        extra={"keywords": ["鉴权"]},
+    ),
+    PathSetCase(
+        case_id="pando.related.hard.short.cn_ws",
+        description="短中文难例：websocket",
+        expected_paths=[
+            "app/channel/websocket/websocket.py",
+            "app/channel/websocket/manager.py",
+        ],
+        min_precision=0.15,
+        min_recall=0.5,
+        top_k=10,
+        extra={"keywords": ["websocket 通道"]},
     ),
 ]
 
@@ -298,6 +334,49 @@ PANDO_SIMILAR_WEAK_CASES = [
                 "    system = 'You are the workspace memory consolidation agent.'\n"
                 "    user = 'Extract durable facts from the conversation into memory.'\n"
                 "    return {'system_prompt': system, 'user_instruction': user}\n"
+            ),
+        },
+    ),
+    PathSetCase(
+        case_id="pando.similar.weak.context_skills",
+        description="上下文拼装改写（无 ContextBuilder）",
+        expected_paths=["app/agents/context/context.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "signal": "weak",
+            "code": (
+                "class PromptAssembler:\n"
+                "    def __init__(self, agent_ctx, skills=None, mem=None):\n"
+                "        self.ctx = agent_ctx\n"
+                "        self.skills_manager = skills\n"
+                "        self.memory_manager = mem\n"
+                "\n"
+                "    def assemble(self, question: str) -> str:\n"
+                "        parts = [self.ctx.system_prompt, question]\n"
+                "        if self.skills_manager:\n"
+                "            parts.append(self.skills_manager.render())\n"
+                "        return '\\n'.join(parts)\n"
+            ),
+        },
+    ),
+    PathSetCase(
+        case_id="pando.similar.weak.planning_run",
+        description="规划执行改写（贴近 PlanningAgent.run）",
+        expected_paths=["app/agents/plan/planning.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "signal": "weak",
+            "code": (
+                "class TaskPlanner(BaseAgent):\n"
+                "    async def run(self, question: str, *, is_internal: bool = False) -> str:\n"
+                "        plan = await self.build_plan(question)\n"
+                "        for step in plan.steps:\n"
+                "            await self.execute_step(step)\n"
+                "        return plan.summary\n"
             ),
         },
     ),

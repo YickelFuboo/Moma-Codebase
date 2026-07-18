@@ -10,11 +10,11 @@ _TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,}")
 class SimilarRerankService:
     """similar 向量召回后的 lexical + 符号 + 稀有特征 + 路径加权 rerank。"""
 
-    VECTOR_WEIGHT = 0.45
-    LEXICAL_WEIGHT = 0.28
+    VECTOR_WEIGHT = 0.42
+    LEXICAL_WEIGHT = 0.26
     SYMBOL_WEIGHT = 0.10
     RARE_WEIGHT = 0.12
-    PATH_WEIGHT = 0.05
+    PATH_WEIGHT = 0.10
 
     @classmethod
     def rerank(
@@ -37,7 +37,11 @@ class SimilarRerankService:
             lex_score = cls._lexical_overlap(query_tokens, content_tokens)
             sym_score = cls._symbol_overlap(symbol_names, content)
             rare_score = cls._rare_overlap(rare_tokens, content_tokens)
-            path_score = cls._path_overlap(query_tokens | rare_tokens, file_path)
+            # 路径分：查询稀有词 + 候选内容稀有词（避免 session↔sessions 等泛匹配反客为主）
+            path_score = max(
+                cls._path_overlap(rare_tokens, file_path),
+                cls._path_overlap(cls._rare_tokens(content_tokens), file_path),
+            )
             fused = (
                 vec_score * cls.VECTOR_WEIGHT
                 + lex_score * cls.LEXICAL_WEIGHT
@@ -108,11 +112,23 @@ class SimilarRerankService:
             if len(low) < 4:
                 continue
             weighed += 1.0
-            if low in part_set or any(low in p or p in low for p in parts if len(p) >= 3):
+            if cls._token_hits_path(low, part_set, parts):
                 hits += 1
         if weighed <= 0:
             return 0.0
         return min(1.0, hits / weighed)
+
+    @staticmethod
+    def _token_hits_path(low: str, part_set: Set[str], parts: List[str]) -> bool:
+        """路径命中：优先整段相等；复合词按 _ 拆段精确对齐，避免 session↔sessions 误伤。"""
+        if low in part_set:
+            return True
+        if len(low) >= 8 and any(low in p for p in parts):
+            return True
+        for seg in low.split("_"):
+            if len(seg) >= 4 and seg in part_set:
+                return True
+        return False
 
     @staticmethod
     def _tokenize(text: str) -> Set[str]:
