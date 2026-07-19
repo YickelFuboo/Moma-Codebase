@@ -683,6 +683,12 @@ class AnalysisService:
             await db.commit()
         if status == RepoAnalysisStatus.COMPLETED.value:
             try:
+                from app.repo_analysis.services.nl2code_enhance.lexicon import RepoIdentifierLexicon
+
+                RepoIdentifierLexicon.invalidate_repo(repo_id)
+            except Exception as e:
+                logging.debug("失效 NL lexicon 缓存失败 repo_id=%s error=%s", repo_id, e)
+            try:
                 from app.repo_analysis.services.scan_change_detector import ScanChangeDetector
 
                 async with get_db_session() as db:

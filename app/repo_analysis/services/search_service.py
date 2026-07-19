@@ -5,7 +5,11 @@ from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.services.codevector.exact_match import ExactMatchService
-from app.repo_analysis.services.codevector.related_keyword_expander import RelatedKeywordExpander
+from app.repo_analysis.services.nl2code_enhance import (
+    NlQueryPrep,
+    NlQueryPrepResult,
+    RelatedKeywordExpander,
+)
 from app.repo_analysis.services.codevector.similar_query import SimilarQueryNormalizer
 from app.repo_analysis.services.codevector.similar_rerank import SimilarRerankService
 from app.repo_analysis.services.codevector.vector_search import CodeVectorSearchService
@@ -513,6 +517,8 @@ class SearchService:
         repo_id: str,
         code_text: str,
         top_k: int = 10,
+        *,
+        nl_prep: Optional[NlQueryPrepResult] = None,
     ) -> Dict[str, object]:
         if not settings.code_analysis_line_chunk_enabled:
             raise ValueError(
@@ -527,7 +533,9 @@ class SearchService:
             if not repo:
                 raise ValueError("仓库不存在")
 
-        embed_queries = SimilarQueryNormalizer.build_embed_queries(query)
+        prep = nl_prep or await NlQueryPrep.prepare(repo_id, query, rewrite="auto")
+        query = prep.original_query or query
+        embed_queries = prep.embed_queries
         fetch_k = max(top_k * SearchService.SIMILAR_FETCH_MULTIPLIER, SearchService.SIMILAR_MIN_FETCH)
         doc_batches: List[List[Dict[str, object]]] = []
         for q in embed_queries:
@@ -541,12 +549,19 @@ class SearchService:
             top_k=top_k,
         )
         index = await SearchIndexMeta.for_repo(repo_id)
-        return {
+        out: Dict[str, object] = {
             "repo_id": repo_id,
             "total": len(unique),
             "index": index,
             "items": unique,
         }
+        meta = prep.meta()
+        if meta is not None:
+            out["nl_rewrite"] = {
+                "english": meta.get("english"),
+                "identifiers": meta.get("identifiers"),
+            }
+        return out
 
     @classmethod
     async def search_related_files(
@@ -554,11 +569,12 @@ class SearchService:
         repo_id: str,
         keywords: List[str],
         top_k: int = 10,
+        *,
+        nl_prep: Optional[NlQueryPrepResult] = None,
     ) -> Dict[str, object]:
         raw_keywords = [str(k).strip() for k in (keywords or []) if k and str(k).strip()]
         if not raw_keywords:
             raise ValueError("keywords 不能为空")
-        keywords = RelatedKeywordExpander.expand(raw_keywords)
 
         channels = cls.related_channel_flags()
         if not any(channels.values()):
@@ -572,6 +588,15 @@ class SearchService:
             repo = await db.scalar(select(GitRepository).where(GitRepository.id == repo_id))
             if not repo:
                 raise ValueError("仓库不存在")
+
+        joined_kw = " ".join(raw_keywords)
+        prep = nl_prep or await NlQueryPrep.prepare(
+            repo_id,
+            joined_kw,
+            keywords=raw_keywords,
+            rewrite="auto",
+        )
+        keywords = list(prep.keywords)
 
         fetch_k = max(top_k * 2, top_k)
         exact_items: List[Dict[str, object]] = []
@@ -609,7 +634,7 @@ class SearchService:
         for it in also_consider:
             it.pop("_raw_score", None)
         index = await SearchIndexMeta.for_repo(repo_id)
-        return {
+        out: Dict[str, object] = {
             "repo_id": repo_id,
             "keywords": keywords,
             "keywords_raw": raw_keywords,
@@ -621,6 +646,13 @@ class SearchService:
             "items": primary,
             "also_consider": also_consider,
         }
+        meta = prep.meta()
+        if meta is not None:
+            out["nl_rewrite"] = {
+                "english": meta.get("english"),
+                "identifiers": meta.get("identifiers"),
+            }
+        return out
 
     @staticmethod
     async def search_chunks(

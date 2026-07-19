@@ -200,6 +200,37 @@ class ExactMatchService:
         return out
 
     @classmethod
+    async def list_indexed_symbol_names(cls, repo_id: str) -> List[str]:
+        """已索引符号名列表（供仓内 identifier lexicon），去重保序。"""
+        dim = await cls._embedding_dim()
+        if not dim:
+            return []
+        space = symbol_summary_space_name(repo_id, dim)
+        if not await VECTOR_STORE_CONN.space_exists(space):
+            return []
+        rows = await VECTOR_STORE_CONN.list_records(
+            space,
+            condition={
+                "repo_id": repo_id,
+                "analysis_type": AnalysisType.SYMBOL_SUMMARY_VECTOR.value,
+            },
+            select_fields=["symbol_name"],
+            limit=cls.SCAN_CAP,
+        )
+        out: List[str] = []
+        seen: set[str] = set()
+        for row in rows:
+            name = str(row.get("symbol_name") or "").strip()
+            if not name:
+                continue
+            key = name.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(name)
+        return out
+
+    @classmethod
     async def match_paths(
         cls,
         repo_id: str,

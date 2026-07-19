@@ -76,6 +76,8 @@ class ResolveResultPresenter:
             band = 0
         elif source == "exact":
             band = 1
+        elif it.get("nl_token_hit") or it.get("nl_alias_hit"):
+            band = 1
         elif source == "grep" and score >= 2.5:
             band = 2
         elif source == "symbol_summary":

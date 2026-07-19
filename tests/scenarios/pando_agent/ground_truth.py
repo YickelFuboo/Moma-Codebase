@@ -132,6 +132,277 @@ PANDO_RELATED_CASES = [
     ),
 ]
 
+# Agent 主路径 search resolve：覆盖符号 exact / 中文 NL / 代码 similar
+# 消融对比以本列表为准（比旧 6 案更能拉开「有无符号摘要」差距）
+PANDO_RESOLVE_CASES = [
+    PathSetCase(
+        case_id="pando.resolve.related.ReActAgent",
+        description="中文+符号：resolve 应走 related 并命中 react.py",
+        expected_paths=["app/agents/core/react.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "查找 ReActAgent 实现位置",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.BaseAgent",
+        description="纯符号：BaseAgent 定义",
+        expected_paths=["app/agents/core/base.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "BaseAgent",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.ContextBuilder",
+        description="纯符号：ContextBuilder",
+        expected_paths=["app/agents/context/context.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "ContextBuilder",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.PlanningAgent",
+        description="中文+符号：PlanningAgent 在哪",
+        expected_paths=["app/agents/plan/planning.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "PlanningAgent 实现在哪",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.LangGraphExecutor",
+        description="纯符号：LangGraphExecutor",
+        expected_paths=["app/agents/plan/langraph_excutor.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "LangGraphExecutor",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.EmbeddingModelFactory",
+        description="纯符号：EmbeddingModelFactory",
+        expected_paths=["app/infrastructure/llms/embedding_models/factory.py"],
+        min_precision=0.3,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "EmbeddingModelFactory",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.OpenAIModels",
+        description="纯符号：OpenAIModels",
+        expected_paths=["app/infrastructure/llms/chat_models/openai_llm.py"],
+        min_precision=0.3,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "OpenAIModels",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.related.jwt_validator",
+        description="路径/标识：jwt_validator",
+        expected_paths=["app/utils/auth/jwt_validator.py"],
+        min_precision=0.25,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "jwt_validator",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.semantic.memory",
+        description="弱语义 NL：记忆相关应命中 memory.py",
+        expected_paths=["app/agents/memorys/default/memory.py"],
+        min_precision=0.15,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "default memory extract prompt for agent long-term memory",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.semantic.websocket",
+        description="弱语义 NL：websocket channel manager",
+        expected_paths=[
+            "app/channel/websocket/websocket.py",
+            "app/channel/websocket/manager.py",
+        ],
+        min_precision=0.1,
+        min_recall=0.5,
+        top_k=10,
+        extra={
+            "query": "websocket channel connection manager for realtime messages",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.cn_auth",
+        description="中文 NL：鉴权在哪",
+        expected_paths=[
+            "app/utils/auth/jwt_validator.py",
+            "app/utils/auth/jwt_middleware.py",
+        ],
+        min_precision=0.15,
+        min_recall=0.5,
+        top_k=10,
+        extra={
+            "query": "鉴权在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.cn_memory",
+        description="短中文 NL：记忆在哪",
+        expected_paths=["app/agents/memorys/default/memory.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "记忆在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.cn_ws",
+        description="中文 NL：websocket 通道在哪",
+        expected_paths=[
+            "app/channel/websocket/websocket.py",
+            "app/channel/websocket/manager.py",
+        ],
+        min_precision=0.15,
+        min_recall=0.5,
+        top_k=10,
+        extra={
+            "query": "websocket 通道在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.similar.think_and_act",
+        description="代码片段：think_and_act → react.py",
+        expected_paths=["app/agents/core/react.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "async def think_and_act(self, question, run_ctx):\n"
+                "    if self.tool_choices == ToolChoice.NONE:\n"
+                "        content, usage = await self.think_only(question)\n"
+                "        return content, [], usage, None\n"
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.similar.agent_state",
+        description="代码片段：AgentState → base.py",
+        expected_paths=["app/agents/core/base.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "class AgentState(str, Enum):\n"
+                '    IDLE = "IDLE"\n'
+                '    RUNNING = "RUNNING"\n'
+                '    WAITING = "WAITING"\n'
+                '    ERROR = "ERROR"\n'
+                '    FINISHED = "FINISHED"\n'
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.similar.jwt_validator",
+        description="代码片段：JWTValidator → jwt_validator.py",
+        expected_paths=["app/utils/auth/jwt_validator.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "class JWTValidator:\n"
+                "    def __init__(\n"
+                "        self,\n"
+                "        cache_ttl: int = 3600,\n"
+                "        blacklist_cache_ttl: int = 300,\n"
+                "    ):\n"
+                "        self._user_service_url = (settings.auth_user_service_url or \"\").rstrip(\"/\")\n"
+                "        self._jwks_endpoint = settings.auth_jwks_endpoint or \"/.well-known/jwks.json\"\n"
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.similar.websocket_endpoint",
+        description="代码片段：websocket_endpoint → websocket.py",
+        expected_paths=["app/channel/websocket/websocket.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                '@router.websocket("/{session_id}")\n'
+                "async def websocket_endpoint(websocket: WebSocket, session_id: str = None):\n"
+                "    session = await SESSION_MANAGER.get_session(session_id)\n"
+                "    if not session:\n"
+                '        raise HTTPException(status_code=400, detail="Session not found")\n'
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
+]
+
 # Chunk similar：用接近源码的片段，期望命中定义文件（行块向量）
 # 评测口径：短列表（top_k=3，检索侧常截到 1～2）；目标 Precision≥0.6 且 Recall=1.0
 PANDO_SIMILAR_CASES = [

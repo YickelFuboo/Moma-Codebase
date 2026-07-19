@@ -446,6 +446,16 @@ class FileAnalysisService:
         ):
             record.last_finished_at = datetime.now()
         await db.commit()
+        if status in (
+            FileAnalysisStatus.COMPLETED.value,
+            FileAnalysisStatus.EMBEDDED.value,
+        ):
+            try:
+                from app.repo_analysis.services.nl2code_enhance.lexicon import RepoIdentifierLexicon
+
+                RepoIdentifierLexicon.invalidate_repo(str(record.repo_id))
+            except Exception:
+                pass
 
     @staticmethod
     async def delete_file_analysis_data(
@@ -507,6 +517,12 @@ class FileAnalysisService:
                         generator.close()
                     except Exception:
                         pass
+        try:
+            from app.repo_analysis.services.nl2code_enhance.lexicon import RepoIdentifierLexicon
+
+            RepoIdentifierLexicon.invalidate_repo(repo_id)
+        except Exception:
+            pass
         return {
             "repo_id": repo_id,
             "file_path": normalized_file_path,

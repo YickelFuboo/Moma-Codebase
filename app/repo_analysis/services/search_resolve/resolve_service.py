@@ -1,12 +1,22 @@
 from __future__ import annotations
 import asyncio
 import logging
+from dataclasses import replace
 from typing import Dict, List, Optional, Set
 from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
 from app.repo_analysis.services.codevector.exact_match import ExactMatchService
+from app.repo_analysis.services.nl2code_enhance import (
+    NlQueryPrep,
+    NlQueryPrepResult,
+    NlQueryRewriter,
+    NlToCodeEnhancement,
+    RelatedKeywordExpander,
+)
+from app.repo_analysis.services.nl2code_enhance.keyword_expander import LexiconExpandable
+from app.repo_analysis.services.nl2code_enhance.weakness import NlRetrievalWeakness
 from app.repo_analysis.services.dir_sibling_expander import DirSiblingExpander
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
 from app.repo_analysis.services.search_resolve.intent import ResolvePlan, SearchIntentRouter
@@ -46,6 +56,25 @@ class SearchResolveService:
             kind = getattr(repo, "kind", None) or RepoKind.CODE
 
         plan = SearchIntentRouter.plan(query, repo_kind=kind, intent_override=intent)
+        base_keywords = list(plan.keywords or ([query] if query else []))
+        nl_rewrite_meta: Optional[Dict[str, object]] = None
+        nl_prep: Optional[NlQueryPrepResult] = None
+        if NlToCodeEnhancement.is_enabled():
+            nl_prep = await NlQueryPrep.prepare(
+                repo_id,
+                query,
+                keywords=base_keywords,
+                rewrite="auto",
+            )
+            if nl_prep.rewrite and nl_prep.rewrite.seeds():
+                nl_rewrite_meta = nl_prep.meta()
+            # 保留原始 query 作为 code_text，改写只进 keywords / embed 种子
+            plan = replace(
+                plan,
+                keywords=list(nl_prep.keywords),
+                code_text=query,
+            )
+
         sections: Dict[str, object] = {}
         channel_errors: Dict[str, str] = {}
         fused_items: List[Dict[str, object]] = []
@@ -53,7 +82,9 @@ class SearchResolveService:
 
         tasks = []
         for channel in plan.channels:
-            tasks.append(cls._run_channel(repo_id, channel, plan, top_k=top_k))
+            tasks.append(
+                cls._run_channel(repo_id, channel, plan, top_k=top_k, nl_prep=nl_prep)
+            )
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for channel, result in zip(plan.channels, results):
             if isinstance(result, Exception):
@@ -81,7 +112,66 @@ class SearchResolveService:
                     fused.setdefault("match_source", "grep")
                 fused_items.append(fused)
 
-        fused_items = cls._fuse_items(fused_items, top_k=top_k)
+        fused_items = cls._fuse_items(fused_items, top_k=max(top_k * 2, top_k))
+        lexicon = (nl_prep.lexicon if nl_prep else None) or await NlToCodeEnhancement.lexicon_for_repo(
+            repo_id
+        )
+        if NlToCodeEnhancement.is_enabled():
+            cls._mark_nl_token_hits(fused_items, plan.keywords or [query], lexicon=lexicon)
+
+        if (
+            NlToCodeEnhancement.is_enabled()
+            and nl_rewrite_meta is None
+            and NlQueryRewriter.should_rewrite_on_weak(query)
+            and cls._is_nl_retrieval_weak(fused_items)
+        ):
+            rewrite_prep = await NlQueryPrep.prepare(
+                repo_id,
+                query,
+                keywords=base_keywords,
+                rewrite="force",
+                rewrite_trigger="weak",
+            )
+            if rewrite_prep.rewrite and rewrite_prep.rewrite.seeds():
+                nl_rewrite_meta = rewrite_prep.meta()
+                rewrite_plan = replace(
+                    plan,
+                    keywords=list(rewrite_prep.keywords),
+                    code_text=query,
+                )
+                extra_channels = ["similar", "grep"]
+                if "related" in plan.channels:
+                    extra_channels.append("related")
+                for channel in extra_channels:
+                    try:
+                        extra = await cls._run_channel(
+                            repo_id,
+                            channel,
+                            rewrite_plan,
+                            top_k=top_k,
+                            nl_prep=rewrite_prep,
+                        )
+                    except Exception as exc:
+                        channel_errors[f"{channel}_nl_rewrite"] = str(exc)
+                        continue
+                    if channel not in channels_used:
+                        channels_used.append(channel)
+                    sections[f"{channel}_nl_rewrite"] = extra
+                    for item in extra.get("items") or []:
+                        fused = dict(item)
+                        fused.setdefault("channel", channel)
+                        fused["nl_rewrite"] = True
+                        if channel == "grep":
+                            fused.setdefault("match_source", "grep")
+                        fused_items.append(fused)
+                fused_items = cls._fuse_items(fused_items, top_k=max(top_k * 2, top_k))
+                if NlToCodeEnhancement.is_enabled():
+                    cls._mark_nl_token_hits(
+                        fused_items,
+                        rewrite_plan.keywords or [query],
+                        lexicon=rewrite_prep.lexicon or lexicon,
+                    )
+
         fallback_used: Optional[str] = None
         if ResolveWeakFallback.is_weak(plan.intent, fused_items):
             fb_item, fb_channel, fb_section, fb_err = await ResolveWeakFallback.try_one(
@@ -118,6 +208,7 @@ class SearchResolveService:
             "intent_reason": plan.reason,
             "fallback_from": plan.fallback_from,
             "fallback_used": fallback_used,
+            "nl_rewrite": nl_rewrite_meta,
             "channels_used": channels_used,
             "channel_errors": channel_errors or None,
             "plan": {
@@ -143,6 +234,26 @@ class SearchResolveService:
             "also_consider": also_consider,
             "sections": sections,
         }
+
+    @classmethod
+    def _is_nl_retrieval_weak(cls, items: List[Dict[str, object]]) -> bool:
+        return NlRetrievalWeakness.needs_nl_rewrite(items)
+
+    @classmethod
+    def _mark_nl_token_hits(
+        cls,
+        items: List[Dict[str, object]],
+        keywords: List[str],
+        *,
+        lexicon: Optional[LexiconExpandable] = None,
+    ) -> None:
+        for it in items:
+            if RelatedKeywordExpander.path_matches_tokens(
+                str(it.get("file_path") or ""),
+                keywords,
+                lexicon=lexicon,
+            ):
+                it["nl_token_hit"] = True
 
     @classmethod
     def _item_dedupe_key(cls, it: Dict[str, object]) -> str:
@@ -183,19 +294,30 @@ class SearchResolveService:
         plan: ResolvePlan,
         *,
         top_k: int,
+        nl_prep: Optional[NlQueryPrepResult] = None,
     ) -> Dict[str, object]:
         if channel == "similar":
             if not settings.code_analysis_line_chunk_enabled:
                 raise ValueError("行块能力已关闭")
-            result = await SearchService.search_similar_code(repo_id, plan.code_text, top_k=top_k)
+            result = await SearchService.search_similar_code(
+                repo_id,
+                plan.code_text,
+                top_k=top_k,
+                nl_prep=nl_prep,
+            )
             return {"total": result.get("total"), "items": result.get("items") or []}
 
         if channel == "grep":
-            return await cls._run_grep_channel(repo_id, plan, top_k=top_k)
+            return await cls._run_grep_channel(repo_id, plan, top_k=top_k, nl_prep=nl_prep)
 
         if channel == "related":
             keywords = plan.keywords or [plan.code_text]
-            result = await SearchService.search_related_files(repo_id, keywords, top_k=top_k)
+            result = await SearchService.search_related_files(
+                repo_id,
+                keywords,
+                top_k=top_k,
+                nl_prep=nl_prep,
+            )
             items = [dict(it) for it in (result.get("items") or [])]
             # related 次层并入融合池，供 resolve 的 also_consider 继承
             for it in result.get("also_consider") or []:
@@ -243,6 +365,7 @@ class SearchResolveService:
         plan: ResolvePlan,
         *,
         top_k: int,
+        nl_prep: Optional[NlQueryPrepResult] = None,
     ) -> Dict[str, object]:
         if not settings.code_analysis_content_grep_enabled:
             raise ValueError("全文 grep 能力已关闭")
@@ -254,9 +377,16 @@ class SearchResolveService:
             if not repo or not repo.local_path:
                 raise ValueError("仓库本地路径不可用")
             local_path = repo.local_path
-        terms = list(plan.keywords or [])
-        if plan.code_text and plan.code_text not in terms:
-            terms.append(plan.code_text)
+        if nl_prep is not None:
+            terms = RelatedKeywordExpander.prioritize_for_grep(list(nl_prep.keywords))
+        else:
+            terms = list(plan.keywords or [])
+            if plan.code_text and plan.code_text not in terms:
+                terms.append(plan.code_text)
+            lexicon = await NlToCodeEnhancement.lexicon_for_repo(repo_id)
+            terms = RelatedKeywordExpander.prioritize_for_grep(
+                RelatedKeywordExpander.expand(terms, lexicon=lexicon)
+            )
         items = ContentGrepService.search(
             local_path,
             terms,

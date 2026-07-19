@@ -1,9 +1,19 @@
 # MomaCodeBase Design
 
-日期：2026-07-18  
+日期：2026-07-18（章节整理：2026-07-20）  
 状态：能力已落地；本文为总设计（已并入原 `docs/superpowers/specs/` 中相关方案）
 
-本文说明：支持的分析/检索场景、各环节**具体技术方案**、准确率关键手段，以及优化前后评测对比。CLI 与 Agent 对接见 [README.md](README.md)。
+**怎么读**
+
+| 章节 | 内容 |
+|------|------|
+| §1–2 | 产品定位与总体架构 |
+| §3–4 | **现状设计**：分析 / 检索怎么做（含 NL→Code） |
+| §5 | **准度与性能**：各优化点的思路、实现与评测证据（含配置消融） |
+| §6–7 | 评测复现与 Agent 对接建议 |
+| §8 | 历史专项文档索引 |
+
+CLI 与 Agent 对接见 [README.md](README.md)。
 
 ---
 
@@ -42,6 +52,8 @@ repo add --kind code|lib
 | `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | 符号摘要 / related 主力通道 |
 | `CODE_GRAPH_ENABLED` / `CODE_GRAPH_PROVIDER` | 图谱；`codegraph`（默认）或 `builtin` |
 | `MR_EXPERIENCE_ENABLED` | 历史经验沉淀与 `search pattern` |
+| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | NL→Code（多视角 / lexicon；默认 ON） |
+| `CODE_ANALYSIS_NL_REWRITE_*` | 可选 LLM 改写（默认 OFF；详见 §5.13） |
 | `ENABLE_INCREMENTAL_SCAN` | 文件变更重分析；新 MR 触发经验更新 |
 | 忽略规则 | 扫描遵循内置排除 + 仓根 `.gitignore` + 可选 `.momaignore` |
 | `analyze status` | 文件计数、`index_age_seconds` / `stale_hint`、增量开关、忽略来源、最近失败 |
@@ -352,63 +364,316 @@ item 带 `match_source`：`exact` | `symbol_summary` | `line_chunk` | `codegraph
 | graph | 适配层清洗；related/resolve 辅助；定义定位仍靠 exact/symbol |
 | api | 独立空间；仅 lib；签名+摘要语义检索 |
 
+### 4.6 NL→Code 检索增强（现状）
+
+中文 / 弱英文 NL 对齐源码标识与向量时，走统一 Prep（`app/repo_analysis/services/nl2code_enhance/`）：
+
+| 组件 | 作用 |
+|------|------|
+| `NlQueryPrep` | 一次准备 lexicon / 可选改写 / embed 多视角 / 关键词；`code_text` 保留原文 |
+| `NlCodeQueryBuilder` | NL 多视角；`looks_like_nl` 收紧；HyDE 多语言轻量片段 |
+| `RepoIdentifierLexicon` | 仓内拉丁标识；analyze/删文件后失效 |
+| `NlQueryRewriter` | 可选 LLM（默认 OFF）；`weak` / `always` |
+| `NlRetrievalWeakness` | 弱判定阈值 0.85（改写与 resolve 兜底共用） |
+
+开关：`CODE_ANALYSIS_NL_TO_CODE_ENABLED`（默认 ON）、`CODE_ANALYSIS_NL_REWRITE_*`。  
+resolve 将 `nl_prep` 传入 similar/related/grep，避免重复 rewrite。优化历程与五档消融见 **§5.10 / §5.12**。
+
 ---
 
-## 5. 优化前后对比数据
+## 5. 准度与性能优化
 
-口径：
+日期：2026-07-16 ~ 2026-07-19  
+范围：分析侧吞吐 / 检索准度 / Agent 可用短列表 / NL→Code  
+专项存档：`docs/superpowers/specs/`（与本文冲突时以本文与当前代码为准）
 
-- **P** = Precision，**R** = Recall（相对 GT 文件或标题集合）  
-- **Top1** = 第一条是否命中期望定义文件  
-- 真仓默认 **Pando-Agent**（`PANDO_AGENT_PATH`）；本仓场景覆盖图谱 + 向量子集  
+§3 / §4 描述**当前方案**；本章记录「为何如此」及**评测证据**。每节含思路、方案与实现、效果对比。末节为配置开关整体对照（符号摘要 × NL2Code）。
 
-### 5.1 similar（Pando）
+口径：**P** = Precision，**R** = Recall（相对 GT）；**Top1** = 首条是否命中期望定义文件。真仓默认 Pando-Agent（`PANDO_AGENT_PATH`）。
 
-| 阶段 | 用例 | avg P | avg R | Top1 | 列表形态 |
-|------|------|-------|-------|------|----------|
-| 优化前（仅宽召回） | 6 近原文 | ~22% | 100% | 未单列（存在首位漂移） | 常填满 top_k≈10 |
-| 多视角 + rerank | 6 近原文 | ~17.5%* | 100% | **6/6** | 更短（如 3～4） |
-| + 短列表截断（0.82 门槛/配额/软上限） | 6 近原文 | **100%** | **100%** | **6/6** | 多数 **n=1** |
-| 弱改写（未做稀有/路径加权） | 4 弱案 | ~62% | 100% | ~2/4 | n≈1.75 |
-| + 稀有 token / 路径加权 | 4 弱案 | **~88%** | **100%** | **4/4** | 短列表 |
+### 5.1 行块切片：行窗 + AST 符号体合并入库
 
-\*截断后分母变小会导致平均 P 数字一度下降；对 Agent 关键的是 **Top1 + 短列表**，故继续收敛到 n≈1。
+#### 优化点思路
 
-本仓 `tests/scenarios/vector_similar/`：**8/8** 通过。
+similar 仅靠固定行窗时，要么切太碎（半截函数），要么整文件进向量噪声大。需要同时覆盖「完整函数」与「非符号区碎片」，又避免同一函数被重复 embedding。
 
-### 5.2 related 通道消融（Pando 同 GT）
+#### 优化点详细方案与实现
+
+实现：`CodeChunkService`（`app/repo_analysis/services/codechunk/code_chunk.py`）  
+调用：`FileAnalysisService._analyze_embed_phase` → `merge_chunks` → 行块向量入库。
+
+| 切片 | 作用 | 关键参数 |
+|------|------|----------|
+| 行窗 `slice_file` | 覆盖非符号区；续行/括号/Python `:` 块向下扩展 | `TARGET/OVERLAP/MAX` 行 |
+| 符号体 `slice_symbol_bodies` | 整段函数/小类入库 | 函数≤500 行、类≤120 行才整段 |
+
+合并规则：`symbol_chunks` 优先；与符号行号区间重叠的行窗**丢弃**，其余保留。空文本 / 超长文本有 embedding 防护。
+
+#### 效果对比测试
+
+| 指标 | 说明 |
+|------|------|
+| 能力 | similar 可命中完整函数，也可命中顶层碎片 |
+| 体积 | 重叠行窗被剔除，避免「整段 + 多个 5 行窗」重复入库 |
+| 回归 | 本仓 `tests/scenarios/vector_similar/` **8/8**；Pando similar 近原文场景见 §5.2 |
+
+---
+
+### 5.2 similar：多视角召回 + hybrid rerank + 短列表截断
+
+#### 优化点思路
+
+宽召回保证 Recall，但 Agent 需要短而准的列表（尤其 Top1）。应在检索侧做多视角召回与融合 rerank，再用相对 top1 门槛截断，而不是盲目加大 `top_k`。
+
+#### 优化点详细方案与实现
+
+实现：`SimilarQueryNormalizer` → 多路向量 → `SimilarRerankService` → `fuse_similar_items` / `_apply_similar_trim`。
+
+1. **多视角 query**：原文 / 去注释归一化 / 签名行；每路搜行块，按位置合并取最高向量分；`fetch_k = max(top_k×4, 40)`。  
+2. **融合分**：向量 0.42 + 词元重叠 0.26 + 符号名 0.10 + 稀有 token 0.12 + 路径段 0.10；按 `file_path` 去重。  
+3. **短列表**：`score ≥ top1×0.82`；同父目录最多 1 条；弱/强/极强信号软上限 3/2/1。
+
+#### 效果对比测试（Pando，近原文 6 案）
+
+| 阶段 | avg P | avg R | Top1 | 列表形态 |
+|------|-------|-------|------|----------|
+| 优化前（仅宽召回） | ~22% | 100% | 未单列（首位漂移） | 常填满 top_k≈10 |
+| 多视角 + rerank | ~17.5%* | 100% | **6/6** | 更短（3～4） |
+| + 短列表截断 | **100%** | **100%** | **6/6** | 多数 **n=1** |
+
+\*截断前分母变化会导致平均 P 数字波动；对 Agent 关键的是 Top1 + 短列表。
+
+专项：`docs/superpowers/specs/2026-07-17-similar-shortlist-precision-design.md`
+
+---
+
+### 5.3 similar 弱查询：稀有 token / 路径加权（Top1）
+
+#### 优化点思路
+
+弱改写 / 短语义 query 时纯向量易漂。不重索引、不拉长列表，仅在 rerank 抬高「稀有标识符 + 路径对齐」信号。
+
+#### 优化点详细方案与实现
+
+实现：`SimilarRerankService`（仅检索侧）。
+
+- 稀有 token：长度≥6 或含 `_`，在 content 命中加分  
+- 路径段：token 与 `file_path` 段/stem 重叠小幅加分  
+- 略降纯向量权重，抬高 lexical / 稀有 / 路径
+
+#### 效果对比测试（Pando，4 弱案）
+
+| 阶段 | avg P | avg R | Top1 |
+|------|-------|-------|------|
+| 弱改写（未加权） | ~62% | 100% | ~2/4 |
+| + 稀有 token / 路径加权 | **~88%** | **100%** | **4/4** |
+
+强案（近原文）保持 100%。专项：`docs/superpowers/specs/2026-07-17-similar-weak-top1-design.md`
+
+---
+
+### 5.4 related：混合检索（exact + 符号向量）与通道收紧
+
+#### 优化点思路
+
+Agent「按描述/符号找位置」不能只靠向量；应用索引元数据做精确匹配并融合，同时避免把 CodeGraph 调用方当成「定义文件」主答案。
+
+#### 优化点详细方案与实现
+
+实现：`ExactMatchService` + `SearchService.search_related_files` / `fuse_related_*`。
+
+| 通道 | 行为 |
+|------|------|
+| exact 符号 | 仅 `symbol_name` 分层打分；短词/弱词禁蹭；**路径不加符号 exact 分** |
+| exact 路径 | 独立 `score_path_keyword` |
+| 符号摘要向量 | related 主力语义 |
+| CodeGraph | 默认**不融入**定位（`CODE_ANALYSIS_RELATED_INCLUDE_GRAPH=false`）；关系查询走 dependents/callers |
+
+融合：exact 置顶 → 向量分 → 按路径去重 → `score ≥ top1×0.55`；有强 exact 时不硬凑满 `top_k`。  
+查询返回只读 `index`（`last_scan_finished_at` / `index_age_seconds`），**查询不 sync**。
+
+调试接口：`search chunks` / `search symbols`（人工验收，非 Agent 主路径）。
+
+#### 效果对比测试（Pando 同 GT）
 
 | 组合 | avg P | avg R | 解读 |
 |------|-------|-------|------|
 | symbol only | ~81% | 100% | 精确定位主力 |
 | chunk only | ~19% | ~90% | 找定义噪声大 |
 | codegraph only | ~10% | ~10% | 返回调用方，不适合作定义检索 |
-| symbol + chunk | ~81% | 100% | ≈ 仅 symbol |
-| chunk + codegraph | ~12% | ~90% | 无 exact 时崩 |
 | **symbol + codegraph** | **~92%** | **100%** | 最佳两两组合 |
 
-全仓 `app/` 早期宽检索：avg **P≈12% / R=100%**。  
-收紧 exact + 融合截断后，精确定位 Precision 显著抬升（核心子集曾 **P≈77% / R=100%**；消融最佳 **92%**）。
+早期宽检索全仓 `app/`：avg **P≈12% / R=100%** → 收紧 exact + 截断后核心子集曾 **P≈77% / R=100%**。  
+专项：`docs/superpowers/specs/2026-07-17-p0-hybrid-related-design.md`
 
-同 GT 参考：Cursor/Codegraph 风格短列表约 **P≈42% / R=100%**——差距在「返回条数与定义优先」，而非漏召回。
+---
 
-### 5.3 resolve（Pando）
+### 5.5 resolve：统一编排 + 弱结果兜底
+
+#### 优化点思路
+
+避免 Agent 手搓 similar/related/pattern/graph；用规则 intent 路由多通道并行融合，弱结果时有限兜底一条，不拖垮主列表。
+
+#### 优化点详细方案与实现
+
+实现：`SearchIntentRouter` → 并行 `_run_channel` → `_fuse_items` → `ResolveWeakFallback` → `ResolveResultPresenter`。
+
+- `auto`：代码形态→similar；经验词→pattern；依赖词→graph；否则 **related+similar+grep** 并联  
+- 融合优先级：`exact` > `grep` > `symbol_summary` > `codegraph`/`graph` > `line_chunk` …  
+- 中文关键词抽取供 related/grep  
+- 弱兜底（intent=related 且无结果或 top1 非 exact 且 score&lt;0.85）：先 pattern 文件命中，再 graph dependents；标记 `fallback=true`
+
+#### 效果对比测试（Pando）
 
 | 阶段 | 结果 |
 |------|------|
 | pattern 通道 bug | `intent=pattern` 失败，只剩 related |
-| 修复 + 中文关键词 + 文件展开 | UT 通过；场景 resolve **3/3** intent+Top1 OK |
+| 修复 + 中文关键词 + pattern 文件展开 | 场景 resolve **intent+Top1** 通过（早期 3/3；现见 §5.12 全套） |
 
-### 5.4 pattern / MR 经验（Pando）
+专项：`docs/superpowers/specs/2026-07-17-search-resolve-design.md`
 
-| 阶段 | ready / skipped | 向量条数 | 检索观感 |
-|------|-----------------|----------|----------|
+---
+
+### 5.6 resolve / related：主列表 `items` + `also_consider`
+
+#### 优化点思路
+
+mcb 与 Agent 分离，一次 CLI 几乎是全部线索。只砍短列表抬 Precision 会漏改面；应主列表保准，次层防漏。
+
+#### 优化点详细方案与实现
+
+实现：`ResolveResultPresenter` + `DirSiblingExpander`；related 同步分层。
+
+| 字段 | 作用 |
+|------|------|
+| `items` | 高置信主列表，可带 snippet |
+| `also_consider` | 同次检索多余候选 + 同目录兄弟文件，默认不带大段源码 |
+| `read_hint` | 先读 items，改前扫 also_consider |
+
+强 exact：`items` cap≤3，`also_consider`≤8；弱语义：`items` cap≤5，其余入次层。
+
+#### 效果对比测试
+
+| 套件 | 结果 |
+|------|------|
+| UT | 相关用例通过（会话内曾累计 resolve/related 场景 **19 passed**） |
+| 口径 | 后续消融同时报 **items R** 与 **union R**（items∪also_consider） |
+
+专项：`docs/superpowers/specs/2026-07-19-resolve-also-consider-design.md`
+
+---
+
+### 5.7 分析两阶段：embedding 快路径 / 符号摘要异步补齐
+
+#### 优化点思路
+
+LLM 符号摘要占满 worker 会拖慢「首次可搜」。行块入库后应立刻可 similar，摘要另抢任务补齐。
+
+#### 优化点详细方案与实现
+
+实现：`FileAnalysisService` 状态机。
+
+1. **embedding 阶段**：AST → 行块向量 → `embedded`（或关摘要时直接 `completed`）  
+2. **符号阶段**：另抢 `embedded` → LLM 摘要向量 → `completed`  
+3. `searchable_files` = completed + embedded  
+
+#### 效果对比测试
+
+| 指标 | 效果 |
+|------|------|
+| 首次可搜 | 行块完成后即可 `search similar`，不等待全仓摘要 |
+| Pando 重建 | 符号 OFF 约数分钟级完成 ~279 文件；符号 ON 需额外 LLM 时间（小时级，视 API） |
+
+---
+
+### 5.8 CodeGraph：已有索引走增量 sync
+
+#### 优化点思路
+
+每次 `analyze` 全量 `init` 图谱成本高；有 `.codegraph` 或曾成功扫描时应 `update_files`/`sync`。
+
+#### 优化点详细方案与实现
+
+实现：`AnalysisService` 图谱编排 + `CodeGraphGateway`。
+
+| 条件 | 行为 |
+|------|------|
+| 无索引且无成功扫描历史 | `generate_graph`（≈ init） |
+| 已有索引或曾有 `last_scan_finished_at` | `update_files`（≈ sync） |
+
+适配层 `GraphResultNormalizer` 降噪；不改开源内核。查询仍不触发 sync。
+
+#### 效果对比测试
+
+| 套件 | 结果 |
+|------|------|
+| `tests/unit/test_codegraph_graph_sync.py` 等 | **15 passed**（增量路径落地时） |
+| 本仓图谱场景 | 15 用例纳入综合 29/29 |
+
+专项：`docs/superpowers/specs/2026-07-17-codegraph-incremental-analyze-design.md`
+
+---
+
+### 5.9 MR 经验：预筛 + 质量过滤 + 检索词面 rerank
+
+#### 优化点思路
+
+changelog 式经验噪声大；应用规则预筛与质量分过滤入库，检索侧词面 rerank 对弱短词即时生效（不必立刻 re-analyze）。
+
+#### 优化点详细方案与实现
+
+实现：`ChangeFilter` → `PatternSummarizer`（extractable 多条）→ 质量/changelog 压分 → 仅 `ready` 入向量；`search pattern` 词面 rerank。
+
+#### 效果对比测试（Pando）
+
+| 阶段 | ready / skipped | 向量条数 | 观感 |
+|------|-----------------|----------|------|
 | 旧 changelog | 13 / 0 | ≈13 | 偏 diff 复述 |
-| 预筛 + extractable | 10 / 3 | ≈10 | 无价值 MR 被 skip |
-| 单 MR 多经验 | 10 / 3 | ≈29 | 更细，但混运维型 |
-| 质量/changelog 过滤 | 10 / 3 | **≈23** | Top 偏架构决策 |
+| 预筛 + extractable | 10 / 3 | ≈10 | 无价值 MR skip |
+| 单 MR 多经验 | 10 / 3 | ≈29 | 更细，混运维型 |
+| 质量过滤 | 10 / 3 | **≈23** | Top 偏架构决策 |
 
-### 5.5 本仓综合场景
+专项：`docs/superpowers/specs/2026-07-17-mr-pattern-accuracy-design.md`
+
+---
+
+### 5.10 NL→Code 检索增强（Prep / lexicon / 可选 LLM 改写）
+
+#### 优化点思路
+
+中文与弱英文 NL 难以对齐源码向量与标识符。拒绝硬编码业务别名；采用 **A（多视角 embed+形态）→ C（仓内 identifier lexicon）→ B（可选 LLM 改写）**，并由统一 Prep 门面避免重复打 LLM、避免改写覆盖原中文 query。
+
+#### 优化点详细方案与实现
+
+包：`app/repo_analysis/services/nl2code_enhance/`
+
+| 组件 | 作用 |
+|------|------|
+| `NlToCodeEnhancement` | 总开关 `CODE_ANALYSIS_NL_TO_CODE_ENABLED`（默认 ON） |
+| `NlQueryPrep` | 一次准备：lexicon / 可选改写 / embed 多视角 / 关键词扩展；`code_text` 保留原文 |
+| `NlCodeQueryBuilder` | NL 多视角 embed；`looks_like_nl` 收紧（短拉丁标识不当 NL）；HyDE 多语言轻量片段 |
+| `RepoIdentifierLexicon` | 从索引路径/符号抽拉丁标识；前缀桶索引；analyze/删文件后 `invalidate_repo` |
+| `NlQueryRewriter` | 可选 LLM；`CODE_ANALYSIS_NL_REWRITE_*`；默认 OFF；`weak`/`always` |
+| `NlRetrievalWeakness` | 统一弱判定阈值 0.85（改写触发与通道兜底共用） |
+
+SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/related/grep，**不重复 rewrite**。
+
+#### 效果对比测试
+
+| 套件 | 结果 |
+|------|------|
+| `tests/unit/search/nl2code_enhance/` 等 | **84 passed**（完备性收口时） |
+| 真仓五档消融 | 见 **§5.12**（E 综合最优；C resolve items 最高；A/D/E related 最稳） |
+
+---
+
+### 5.11 本仓综合场景回归
+
+#### 优化点思路
+
+图谱 + 向量应用统一 P/R 框架，防止单点优化漂。
+
+#### 效果对比测试
 
 | 指标 | 数值 |
 |------|------|
@@ -417,6 +682,95 @@ item 带 `match_source`：`exact` | `symbol_summary` | `line_chunk` | `codegraph
 | avg P / R | **~58% / ~98%** |
 
 ---
+
+### 5.12 整体配置开关对比测试
+
+日期：2026-07-19（E 档补测：2026-07-20）  
+待测仓：Pando-Agent（`app/`）  
+脚本：`python -m tests.scenarios.pando_agent.run_nl2code_ablation`  
+前置：按组 `PANDO_CLEAR=1` 清库重建索引（符号 OFF 评 B/C；符号 ON 评 A/D/E）
+
+#### 主要测试用例
+
+| 类型 | 代表 case | 查询形态 | 期望 |
+|------|-----------|----------|------|
+| resolve 符号定位 | `pando.resolve.related.ReActAgent` / `ContextBuilder` | 中文+符号名 / 纯符号 | 命中定义文件 |
+| resolve 代码 similar | `pando.resolve.similar.think_and_act` | 源码片段 | 命中 `react.py` |
+| resolve 弱英文 NL | `pando.resolve.nl.semantic.memory` | 长英文语义 | 命中 `memory.py` |
+| resolve 中文 NL | `pando.resolve.nl.cn_auth` / `cn_ws` | 「鉴权在哪」「websocket 通道在哪」 | 命中 auth / websocket |
+| related exact | `pando.full.exact.*` | 类名/工厂名 | Top 命中定义 |
+| related 语义/短中文 | `pando.full.semantic.*` / `pando.related.hard.short.cn_*` | 英文短语 / 「记忆」「鉴权」 | 命中对应文件 |
+
+口径：**avg iR** = items Recall；**avg uR** = items∪also_consider Recall；pass = recall ≥ 用例门槛。
+
+#### 对比场景（配置档）
+
+| 档 | 符号摘要 embedding | NL2Code | NL_REWRITE | 含义 |
+|----|-------------------|---------|------------|------|
+| **A** | ON | OFF | OFF | 基线：只靠符号摘要 + 行块 |
+| **B** | OFF | ON | OFF | 无摘要，开 NL 多视角/词表，不改写 |
+| **C** | OFF | ON | ON（`always`） | 无摘要，NL + 每次 NL 查询 LLM 改写 |
+| **D** | ON | ON | OFF | 摘要 + NL，不改写 |
+| **E** | ON | ON | ON（`always`） | 摘要 + NL + 每次 NL 查询 LLM 改写 |
+
+ENV：`CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED`、`CODE_ANALYSIS_NL_TO_CODE_ENABLED`、`CODE_ANALYSIS_NL_REWRITE_ENABLED` / `MODE`。
+
+#### 对比效果
+
+**总表**
+
+| 档 | resolve avg iR / uR · pass | related avg iR / uR · pass |
+|----|----------------------------|----------------------------|
+| **A** | 83% / 83% · 5/6 | **96% / 100% · 13/13** |
+| **B** | 58% / 83% · 4/6 | 69% / 69% · 8/13 |
+| **C** | **100% / 100% · 6/6** | 81% / 85% · 10/13 |
+| **D** | 83% / 83% · 5/6 | **96% / 100% · 13/13** |
+| **E** | **92% / 100% · 6/6** | **96% / 100% · 13/13** |
+
+**焦点 NL resolve（unionR）**
+
+| case | A | B | C | D | E |
+|------|---|---|---|---|---|
+| `cn_auth`（鉴权在哪） | **0%** | **100%** | **100%** | **0%** | **100%** |
+| `cn_ws` | 100% | 100% | 100% | 100% | 100% |
+| `semantic.memory` | 100% | 100% | 100% | 100% | 100% |
+
+**结论（配置取舍）**
+
+1. **要稳 related（exact 类）** → 开符号摘要（A/D/E）。  
+2. **要补纯中文 NL resolve（尤其鉴权）** → rewrite（C/E）或无摘要的 NL2Code（B）；有符号但无 rewrite 的 A/D 仍漏 `cn_auth`。  
+3. **符号 + NL2Code 无 rewrite（D）≈A**：当前 GT 上增益有限。  
+4. **E = D + rewrite**：related 与 A/D 同级（13/13），resolve 全绿且补上 `cn_auth`（items 50%、union 100%）；相对 C 用符号保住了 related。  
+5. **产品默认建议**：符号摘要按产品开；NL2Code 默认 ON、rewrite 默认 OFF；弱中文难例用 `NL_REWRITE`（`weak`/`always`）作增强。若接受 LLM 延迟/成本，E 是当前 GT 上综合最优。
+
+#### 复现命令
+
+```powershell
+cd F:\Product_Dev\MOMA\Moma-CodeBase
+$env:PANDO_CLEAR="1"
+$env:ENABLE_INCREMENTAL_SCAN="false"
+# 可选：$env:PANDO_AGENT_PATH="F:\Product_Dev\PANDO\Pando-Agent"
+.\.venv\Scripts\python.exe -u -m tests.scenarios.pando_agent.run_nl2code_ablation
+
+# 索引已就绪时只跑子集，例如：
+# $env:PANDO_SKIP_REBUILD="1"; $env:PANDO_ABLATION_ONLY="E"
+```
+
+---
+
+### 5.13 相关 ENV 速查
+
+| ENV | 默认倾向 | 作用 |
+|-----|----------|------|
+| `CODE_ANALYSIS_LINE_CHUNK_ENABLED` | ON | 行块 / similar |
+| `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | 产品可配 | 符号摘要 / related 主力 |
+| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | ON | NL 多视角 / lexicon / token 加权 |
+| `CODE_ANALYSIS_NL_REWRITE_ENABLED` | OFF | LLM 改写 |
+| `CODE_ANALYSIS_NL_REWRITE_MODE` | weak | `weak` \| `always` |
+| `CODE_ANALYSIS_RELATED_INCLUDE_GRAPH` | OFF | related 是否融 CodeGraph |
+| `CODE_GRAPH_ENABLED` / `PROVIDER` | ON / codegraph | 图谱 |
+| `ENABLE_INCREMENTAL_SCAN` | 可配 | 后台增量扫描 |
+| `PANDO_CLEAR` / `PANDO_AGENT_PATH` | 评测用 | 真仓消融重建与路径 |
 
 ## 6. 评测与复现
 
@@ -466,3 +820,6 @@ poetry run pytest tests/scenarios/pando_agent/test_related_hybrid_accuracy.py -q
 - `docs/superpowers/specs/2026-07-17-inspect-cli-design.md`
 - `docs/superpowers/specs/2026-07-17-mr-pattern-accuracy-design.md`
 - `docs/superpowers/specs/2026-07-18-find-code-hardcase-design.md`
+- `docs/superpowers/specs/2026-07-19-resolve-also-consider-design.md`
+
+---

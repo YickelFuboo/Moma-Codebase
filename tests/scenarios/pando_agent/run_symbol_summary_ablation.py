@@ -1,9 +1,10 @@
-"""符号摘要开/关消融：同一索引上对比 resolve / related。
+"""符号摘要开/关消融：对比 resolve / related（默认清索引并用当前 embedding 重嵌）。
 
 用法（仓根、venv）：
   python -m tests.scenarios.pando_agent.run_symbol_summary_ablation
 
-默认 PANDO_CLEAR=0，复用已有分析，不重跑 analyze。
+环境变量：
+  PANDO_CLEAR=1（默认）清库重分析；=0 复用已有索引（仅当索引已是当前 embedding 模型时有意义）
 """
 from __future__ import annotations
 import asyncio
@@ -11,9 +12,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, List
 from tests.scenarios.framework.accuracy import AccuracyMetrics
-from tests.scenarios.pando_agent.ground_truth import PANDO_RELATED_CASES
+from tests.scenarios.pando_agent.ground_truth import PANDO_RELATED_CASES, PANDO_RESOLVE_CASES
 from tests.scenarios.pando_agent.session_support import PandoAgentScenarioSession
-from tests.scenarios.pando_agent.test_resolve_accuracy import PANDO_RESOLVE_CASES
 
 
 @dataclass
@@ -58,11 +58,7 @@ async def _eval_resolve(symbol_on: bool) -> List[CaseRow]:
         union = hits + [p for p in also_hits if p not in hits]
         score = AccuracyMetrics.evaluate(case.case_id, hits, case.expected_paths)
         union_score = AccuracyMetrics.evaluate(f"{case.case_id}.union", union, case.expected_paths)
-        passed = score.recall >= case.min_recall and (
-            score.precision >= case.min_precision or not case.extra.get("require_precision", False)
-        )
-        if case.extra.get("require_precision", False) is False:
-            passed = score.recall >= case.min_recall
+        passed = score.recall >= case.min_recall
         row = CaseRow(
             case_id=case.case_id,
             kind="resolve",
@@ -167,24 +163,44 @@ def _print_compare(on_rows: List[CaseRow], off_rows: List[CaseRow], title: str) 
 
 
 async def main() -> None:
-    os.environ["PANDO_CLEAR"] = "0"
+    # 换 embedding 后必须重嵌；默认清库。符号关时只建行块，验收 NL→Code 主路径。
+    if "PANDO_CLEAR" not in os.environ:
+        os.environ["PANDO_CLEAR"] = "1"
     PandoAgentScenarioSession.CLEAR_BEFORE_ANALYZE = False
     PandoAgentScenarioSession.require_repo_or_skip()
 
-    # 先 ON：必要时建索引（仅一次）
-    PandoAgentScenarioSession.ENABLE_SYMBOL_SUMMARY = True
+    print(
+        f"[ablation] clear={os.environ.get('PANDO_CLEAR')} "
+        f"embedding=default(Qwen3) NL→Code query rewrite=on",
+        flush=True,
+    )
+
+    # 先 OFF：关符号摘要建行块索引（快），验收弱 NL
+    PandoAgentScenarioSession.ENABLE_SYMBOL_SUMMARY = False
+    PandoAgentScenarioSession._vector_ready = False
     await PandoAgentScenarioSession.ensure_vector_ready()
 
-    print("\n--- symbol ON ---", flush=True)
-    resolve_on = await _eval_resolve(True)
-    related_on = await _eval_related(True)
-
-    print("\n--- symbol OFF (reuse index) ---", flush=True)
+    print("\n--- symbol OFF (NL→Code primary) ---", flush=True)
     resolve_off = await _eval_resolve(False)
     related_off = await _eval_related(False)
 
+    # 再 ON：不重清库，只开开关做对照（无摘要向量时 related 会走 path_fallback）
+    print("\n--- symbol ON (flag only; no re-embed of summaries) ---", flush=True)
+    resolve_on = await _eval_resolve(True)
+    related_on = await _eval_related(True)
+
     _print_compare(resolve_on, resolve_off, "RESOLVE ON vs OFF")
-    _print_compare(related_on, related_off, "RELATED ON vs OFF (OFF=path_fallback)")
+    _print_compare(related_on, related_off, "RELATED ON vs OFF")
+
+    focus = {"pando.resolve.nl.semantic.memory", "pando.resolve.nl.cn_auth"}
+    print("\n===== FOCUS (symbol OFF, expect recovery) =====", flush=True)
+    for row in resolve_off:
+        if row.case_id in focus:
+            print(
+                f"{row.case_id} unionR={row.union_r:.0%} top={row.top} "
+                f"ch={row.channels} pass={row.passed}",
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

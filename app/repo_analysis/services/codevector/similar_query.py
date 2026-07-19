@@ -1,6 +1,9 @@
 from __future__ import annotations
 import re
-from typing import List, Set
+from typing import List, Optional, Set
+from app.repo_analysis.services.nl2code_enhance.gate import NlToCodeEnhancement
+from app.repo_analysis.services.nl2code_enhance.keyword_expander import LexiconExpandable
+from app.repo_analysis.services.nl2code_enhance.query_builder import NlCodeQueryBuilder
 
 
 _PY_DEF = re.compile(
@@ -35,15 +38,15 @@ class SimilarQueryNormalizer:
                 quote = ""
                 cut = len(stripped)
                 for i, ch in enumerate(stripped):
-                    if in_str:
+                    if ch in ("'", '"'):
+                        if not in_str:
+                            in_str = True
+                            quote = ch
+                            continue
                         if ch == quote:
                             in_str = False
                         continue
-                    if ch in ("'", '"'):
-                        in_str = True
-                        quote = ch
-                        continue
-                    if ch == "#":
+                    if not in_str and ch == "#":
                         cut = i
                         break
                 stripped = stripped[:cut].rstrip()
@@ -85,10 +88,17 @@ class SimilarQueryNormalizer:
         return "\n".join(lines).strip()
 
     @classmethod
-    def build_embed_queries(cls, code_text: str) -> List[str]:
+    def build_embed_queries(
+        cls,
+        code_text: str,
+        *,
+        lexicon: Optional[LexiconExpandable] = None,
+    ) -> List[str]:
         raw = (code_text or "").strip()
         if not raw:
             return []
+        if NlToCodeEnhancement.is_enabled() and NlCodeQueryBuilder.looks_like_nl(raw):
+            return NlCodeQueryBuilder.build_embed_queries(raw, lexicon=lexicon)
         normalized = cls.normalize(raw)
         signatures = cls.signature_lines(raw)
         queries: List[str] = []

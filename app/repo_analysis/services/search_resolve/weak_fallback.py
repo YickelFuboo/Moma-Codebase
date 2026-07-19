@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, List, Optional, Tuple
 from app.config.settings import settings
+from app.repo_analysis.services.nl2code_enhance.weakness import NlRetrievalWeakness
 from app.repo_analysis.services.search_resolve.intent import ResolvePlan, SearchIntent
 from app.repo_analysis.services.search_service import SearchService
 
@@ -9,19 +10,11 @@ from app.repo_analysis.services.search_service import SearchService
 class ResolveWeakFallback:
     """related 结果偏弱时，自动附带 1 条 pattern 或 graph 兜底。"""
 
-    WEAK_SCORE_THRESHOLD = 0.85
+    WEAK_SCORE_THRESHOLD = NlRetrievalWeakness.WEAK_SCORE_THRESHOLD
 
     @classmethod
     def is_weak(cls, intent: SearchIntent, items: List[Dict[str, object]]) -> bool:
-        if intent != SearchIntent.RELATED:
-            return False
-        if not items:
-            return True
-        top = items[0]
-        if str(top.get("match_source") or "") == "exact":
-            return False
-        score = float(top.get("score") or top.get("quality_score") or top.get("similarity") or 0)
-        return score < cls.WEAK_SCORE_THRESHOLD
+        return NlRetrievalWeakness.needs_channel_fallback(intent, items)
 
     @classmethod
     async def try_one(

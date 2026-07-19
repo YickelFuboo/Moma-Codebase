@@ -135,6 +135,21 @@ class Settings(BaseSettings):
         description="是否启用仓库内全文/标识符 grep（resolve auto 并联通道）",
         env="CODE_ANALYSIS_CONTENT_GREP_ENABLED",
     )
+    code_analysis_nl_to_code_enabled: bool = Field(
+        default=True,
+        description="是否启用 NL→Code 检索增强（多视角 embed、仓内词表、token 加权；默认开）",
+        env="CODE_ANALYSIS_NL_TO_CODE_ENABLED",
+    )
+    code_analysis_nl_rewrite_enabled: bool = Field(
+        default=False,
+        description="是否启用 NL→Code 查询 LLM 改写（需总开关开启；默认关）",
+        env="CODE_ANALYSIS_NL_REWRITE_ENABLED",
+    )
+    code_analysis_nl_rewrite_mode: str = Field(
+        default="weak",
+        description="NL 改写触发：always=每次 NL；weak=仅 resolve 首轮召回弱时",
+        env="CODE_ANALYSIS_NL_REWRITE_MODE",
+    )
     code_analysis_file_worker_count: int = Field(default=10, ge=1, le=64, description="单仓库文件分析 worker 并发数", env="CODE_ANALYSIS_FILE_WORKER_COUNT")
     mr_experience_enabled: bool = Field(
         default=True,
