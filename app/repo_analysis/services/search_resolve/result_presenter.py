@@ -9,6 +9,7 @@ class ResolveResultPresenter:
 
     _SOURCE_HINT = {
         "exact": "精确命中",
+        "grep": "全文/标识符命中",
         "symbol_summary": "符号摘要相关",
         "line_chunk": "相似代码块",
         "codegraph": "图谱关系",
@@ -56,13 +57,10 @@ class ResolveResultPresenter:
 
     @classmethod
     def agent_items(cls, items: List[Dict[str, object]]) -> List[Dict[str, object]]:
-        """对外最多 Top3；若有兜底条，强制占 1 席，避免被弱 related 挤掉。"""
+        """对外最多 Top3；精确命中优先；若有兜底条，强制占 1 席。"""
         limit = cls.AGENT_ITEM_LIMIT
         if not items:
             return []
-        fallback = next((it for it in items if it.get("fallback")), None)
-        if fallback is None:
-            return list(items[:limit])
 
         def _key(it: Dict[str, object]) -> str:
             fp = str(it.get("file_path") or "")
@@ -73,9 +71,36 @@ class ResolveResultPresenter:
                 return f"title:{title}"
             return str(it.get("symbol_name") or id(it))
 
+        def _prefer(it: Dict[str, object]) -> tuple:
+            source = str(it.get("match_source") or "")
+            tier = str(it.get("exact_tier") or "")
+            score = float(it.get("score") or it.get("quality_score") or it.get("similarity") or 0)
+            if source == "exact" and tier == "symbol":
+                band = 0
+            elif source == "exact":
+                band = 1
+            elif source == "grep" and score >= 2.5:
+                band = 2
+            elif source == "symbol_summary":
+                band = 3
+            elif source in {"codegraph", "graph"}:
+                band = 4
+            elif source == "grep":
+                band = 5
+            elif source == "line_chunk":
+                band = 6
+            else:
+                band = 7
+            return (band, -score)
+
+        ordered = sorted(items, key=_prefer)
+        fallback = next((it for it in ordered if it.get("fallback")), None)
+        if fallback is None:
+            return list(ordered[:limit])
+
         primary: List[Dict[str, object]] = []
         seen = {_key(fallback)}
-        for it in items:
+        for it in ordered:
             if it.get("fallback"):
                 continue
             k = _key(it)

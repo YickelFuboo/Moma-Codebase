@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     # 图数据库 / CodeGraph
     # =============================================================================
     code_graph_enabled: bool = Field(default=True, description="是否启用代码依赖图谱（分析 + related/图谱检索）", env="CODE_GRAPH_ENABLED")
+    code_analysis_related_include_graph: bool = Field(
+        default=False,
+        description="related/定位是否融入 CodeGraph（默认关：定位与关系分离；关系用 dependents/callers）",
+        env="CODE_ANALYSIS_RELATED_INCLUDE_GRAPH",
+    )
     code_graph_provider: str = Field(
         default="codegraph",
         description="CodeGraph 实现：codegraph（开源 CLI，默认）| builtin（自研 Neo4j）",
@@ -124,6 +129,11 @@ class Settings(BaseSettings):
         default=True,
         description="是否启用符号 LLM 摘要与符号向量（分析 + related 检索）",
         env="CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED",
+    )
+    code_analysis_content_grep_enabled: bool = Field(
+        default=True,
+        description="是否启用仓库内全文/标识符 grep（resolve auto 并联通道）",
+        env="CODE_ANALYSIS_CONTENT_GREP_ENABLED",
     )
     code_analysis_file_worker_count: int = Field(default=10, ge=1, le=64, description="单仓库文件分析 worker 并发数", env="CODE_ANALYSIS_FILE_WORKER_COUNT")
     mr_experience_enabled: bool = Field(

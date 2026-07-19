@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Set
+from app.config.settings import settings
 
 
 class SearchIntent(str, Enum):
@@ -112,6 +113,16 @@ class SearchIntentRouter:
         return intent
 
     @classmethod
+    def locate_channels(cls) -> List[str]:
+        """NL/定位默认并联：related + similar + grep（按开关裁剪）。"""
+        channels = ["related"]
+        if settings.code_analysis_line_chunk_enabled:
+            channels.append("similar")
+        if settings.code_analysis_content_grep_enabled:
+            channels.append("grep")
+        return channels
+
+    @classmethod
     def plan(
         cls,
         query: str,
@@ -173,13 +184,13 @@ class SearchIntentRouter:
             if not graph_file and not graph_symbol:
                 return ResolvePlan(
                     intent=SearchIntent.RELATED,
-                    channels=["related"],
+                    channels=cls.locate_channels(),
                     keywords=cls._keywords_from_query(q),
                     code_text=q,
                     graph_file=None,
                     graph_symbol=None,
                     graph_mode=None,
-                    reason="graph 未能抽出文件/符号，降级 related",
+                    reason="graph 未能抽出文件/符号，降级 NL 定位并联",
                     fallback_from="graph",
                 )
             return ResolvePlan(
@@ -193,15 +204,16 @@ class SearchIntentRouter:
                 reason="图谱依赖/调用关系",
             )
 
+        locate = cls.locate_channels()
         return ResolvePlan(
             intent=SearchIntent.RELATED,
-            channels=["related"],
+            channels=locate,
             keywords=cls._keywords_from_query(q),
             code_text=q,
             graph_file=None,
             graph_symbol=None,
             graph_mode=None,
-            reason="默认关键词/描述定位",
+            reason="NL 定位：related + similar + grep 并联",
         )
 
     @classmethod
@@ -263,7 +275,6 @@ class SearchIntentRouter:
             seen.add(t)
             out.append(t)
 
-        # 标识符优先（精确命中），再补中文短语
         for t in tokens:
             _add(t)
             if len(out) >= 8:

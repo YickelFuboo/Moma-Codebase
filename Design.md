@@ -212,7 +212,7 @@ experience analyze
 | Lib | `search api` | 接口需求 | API 摘要向量 |
 | 图谱 | `dependents` / `dependencies` / `callers` / `callees` | 路径或符号名 | CodeGraph |
 
-当前 related **默认通道**：`symbol` + `codegraph`（chunk 对「找定义」增益有限，默认不作为 related 主力；见 §5.2 消融）。
+当前 related **默认通道**：仅 `symbol`（exact + 符号摘要）。**不把 CodeGraph 融入定位**（`CODE_ANALYSIS_RELATED_INCLUDE_GRAPH` 默认 false）；关系查询走 `dependents` / `callers` 等。弱结果仍可由 resolve 的 `ResolveWeakFallback` 附带一条 graph。
 
 ---
 
@@ -301,10 +301,10 @@ item 带 `match_source`：`exact` | `symbol_summary` | `line_chunk` | `codegraph
 |----|------|------|
 | auto | （默认） | 规则检测 |
 | similar | | similar |
-| related | locate | related |
+| related | locate | related + similar + grep（开关裁剪） |
 | pattern | experience | pattern + related |
 | api | | api（仅 lib） |
-| graph | | dependents/callers 等；抽不出目标则降级 related |
+| graph | | dependents/callers 等；抽不出目标则降级 NL 定位并联 |
 
 `auto` 检测线索（节选）：
 
@@ -312,9 +312,17 @@ item 带 `match_source`：`exact` | `symbol_summary` | `line_chunk` | `codegraph
 - 「怎么改/经验/MR/复盘」→ pattern  
 - 「谁依赖/callers/影响面」→ graph  
 - 「API/公开接口」→ api（lib）  
-- 否则 related  
+- 否则 **NL 定位并联**：`related` + `similar` + `grep`
 
-关键词抽取：英文标识符 + **中文短语**（`[\u4e00-\u9fff]{2,}`，去停用词），供 related 使用。
+| 通道 | 作用 |
+|------|------|
+| related | exact 元数据 + 符号摘要 + 可选图谱 |
+| similar | 整句 NL → 行块向量 |
+| grep | 仓内全文/标识符（`ContentGrepService`，尊重忽略） |
+
+融合优先级：`exact` > `grep` > `symbol_summary` > `codegraph`/`graph` > `line_chunk` > …
+
+关键词抽取：英文标识符 + **中文短语**（`[\u4e00-\u9fff]{2,}`，去停用词），供 related/grep 使用。
 
 #### pattern 文件展开
 

@@ -20,11 +20,12 @@ class SearchResolveService:
     CHANNEL_PRIORITY = {
         "exact": 0,
         "symbol_summary": 1,
-        "codegraph": 2,
+        "grep": 2,
         "line_chunk": 3,
         "mr_experience": 4,
         "api": 5,
-        "graph": 2,
+        "codegraph": 6,
+        "graph": 6,
     }
 
     @classmethod
@@ -74,6 +75,8 @@ class SearchResolveService:
                     fused.setdefault("match_source", "api")
                 elif channel == "graph":
                     fused.setdefault("match_source", "codegraph")
+                elif channel == "grep":
+                    fused.setdefault("match_source", "grep")
                 fused_items.append(fused)
 
         fused_items = cls._fuse_items(fused_items, top_k=top_k)
@@ -174,6 +177,9 @@ class SearchResolveService:
             result = await SearchService.search_similar_code(repo_id, plan.code_text, top_k=top_k)
             return {"total": result.get("total"), "items": result.get("items") or []}
 
+        if channel == "grep":
+            return await cls._run_grep_channel(repo_id, plan, top_k=top_k)
+
         if channel == "related":
             keywords = plan.keywords or [plan.code_text]
             result = await SearchService.search_related_files(repo_id, keywords, top_k=top_k)
@@ -209,6 +215,39 @@ class SearchResolveService:
             return await cls._run_graph_channel(repo_id, plan, top_k=top_k)
 
         raise ValueError(f"未知通道: {channel}")
+
+    @classmethod
+    async def _run_grep_channel(
+        cls,
+        repo_id: str,
+        plan: ResolvePlan,
+        *,
+        top_k: int,
+    ) -> Dict[str, object]:
+        if not settings.code_analysis_content_grep_enabled:
+            raise ValueError("全文 grep 能力已关闭")
+        from app.repo_analysis.services.analysis_service import AnalysisService
+        from app.repo_analysis.services.content_grep import ContentGrepService
+
+        async with get_db_session() as db:
+            repo = await db.scalar(select(GitRepository).where(GitRepository.id == repo_id))
+            if not repo or not repo.local_path:
+                raise ValueError("仓库本地路径不可用")
+            local_path = repo.local_path
+        terms = list(plan.keywords or [])
+        if plan.code_text and plan.code_text not in terms:
+            terms.append(plan.code_text)
+        items = ContentGrepService.search(
+            local_path,
+            terms,
+            extensions=AnalysisService.CODE_EXTENSIONS,
+            top_k=top_k,
+            builtin_dir_names=AnalysisService.EXCLUDED_DIRS,
+        )
+        for it in items:
+            it.setdefault("channel", "grep")
+            it.setdefault("match_source", "grep")
+        return {"total": len(items), "items": items}
 
     @classmethod
     async def _run_graph_channel(

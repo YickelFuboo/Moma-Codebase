@@ -129,16 +129,54 @@ class TestFuseRelatedItems:
         assert "app/utils/auth/jwt_validator.py" in paths
         assert "app/unrelated/foo.py" not in paths
 
+    def test_symbol_summary_ranks_before_codegraph(self):
+        items = SearchService.fuse_related_items(
+            exact_items=[],
+            symbol_docs=[
+                {
+                    "file_path": "app/agents/memorys/default/memory.py",
+                    "_score": 0.55,
+                }
+            ],
+            extra_items=[
+                {
+                    "file_path": "app/agents/core/subagent.py",
+                    "score": 1.0,
+                    "match_source": "codegraph",
+                }
+            ],
+            top_k=5,
+            keywords=["memory", "long-term memory"],
+        )
+        assert items
+        assert items[0]["file_path"] == "app/agents/memorys/default/memory.py"
+        assert items[0]["match_source"] == "symbol_summary"
+
+    def test_weak_trim_shortens_without_strong_exact(self):
+        docs = [{"file_path": f"pkg/f{i}.py", "_score": 0.9 - i * 0.02} for i in range(12)]
+        items = SearchService.fuse_related_items(
+            exact_items=[],
+            symbol_docs=docs,
+            top_k=15,
+            keywords=["memory"],
+        )
+        assert 1 <= len(items) <= SearchService.RELATED_WEAK_CAP
+
 
 class TestRelatedChannelFlags:
-    def test_channel_flags_reflect_capability_settings(self, monkeypatch):
+    def test_channel_flags_default_excludes_graph(self, monkeypatch):
         monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
-        monkeypatch.setattr(settings, "code_graph_enabled", False)
+        monkeypatch.setattr(settings, "code_graph_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
         flags = SearchService.related_channel_flags()
-        assert flags == {
-            "symbol": True,
-            "codegraph": False,
-        }
+        assert flags == {"symbol": True, "codegraph": False}
+
+    def test_channel_flags_can_opt_in_graph(self, monkeypatch):
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_graph_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", True)
+        flags = SearchService.related_channel_flags()
+        assert flags == {"symbol": True, "codegraph": True}
 
     def test_capability_flags(self, monkeypatch):
         monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)

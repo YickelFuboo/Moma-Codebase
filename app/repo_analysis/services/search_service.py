@@ -23,6 +23,10 @@ class SearchService:
     CODEGRAPH_SCORE = 1.0
     # related：相对 top1 的分数门槛
     SCORE_RATIO_FLOOR = 0.55
+    # 无强 exact 时的弱语义短列表（抬 Precision，保 Top1）
+    RELATED_WEAK_SCORE_RATIO = 0.72
+    RELATED_WEAK_CAP = 5
+    RELATED_WEAK_DIR_QUOTA = 2
     # 存在强符号定义命中时，不再硬凑满 top_k
     STRONG_SYMBOL_CAP = 5
     STRONG_SYMBOL_RAW = 2.8
@@ -219,12 +223,18 @@ class SearchService:
             group = 1
         elif source == "exact":
             group = 2
-        elif source == "codegraph":
+        elif source == "symbol_summary":
             group = 3
-        elif source == "mr_experience":
+        elif source == "grep":
             group = 4
-        else:
+        elif source == "line_chunk":
             group = 5
+        elif source == "mr_experience":
+            group = 6
+        elif source == "codegraph":
+            group = 7
+        else:
+            group = 8
         return (group, -score, str(item.get("file_path") or ""))
 
     @classmethod
@@ -250,12 +260,12 @@ class SearchService:
     ) -> List[Dict[str, object]]:
         if not unique:
             return []
-        top_score = float(unique[0].get("score") or 0)
-        floor = top_score * cls.SCORE_RATIO_FLOOR
-        trimmed = [it for it in unique if float(it.get("score") or 0) >= floor]
-        if not trimmed:
-            trimmed = unique[:1]
-        if cls._has_strong_symbol(trimmed):
+        if cls._has_strong_symbol(unique):
+            top_score = float(unique[0].get("score") or 0)
+            floor = top_score * cls.SCORE_RATIO_FLOOR
+            trimmed = [it for it in unique if float(it.get("score") or 0) >= floor]
+            if not trimmed:
+                trimmed = unique[:1]
             defs = [
                 it
                 for it in trimmed
@@ -266,7 +276,15 @@ class SearchService:
                 trimmed = defs
             cap = min(max(1, top_k), cls.STRONG_SYMBOL_CAP)
             return trimmed[:cap]
-        return trimmed[: max(1, top_k)]
+
+        top_score = float(unique[0].get("score") or 0)
+        floor = top_score * cls.RELATED_WEAK_SCORE_RATIO
+        trimmed = [it for it in unique if float(it.get("score") or 0) >= floor]
+        if not trimmed:
+            trimmed = unique[:1]
+        trimmed = cls._apply_dir_quota(trimmed, cls.RELATED_WEAK_DIR_QUOTA)
+        cap = min(max(1, top_k), cls.RELATED_WEAK_CAP)
+        return trimmed[:cap]
 
     @classmethod
     def fuse_related_items(
@@ -278,12 +296,8 @@ class SearchService:
         extra_items: Optional[List[Dict[str, object]]] = None,
         keywords: Optional[List[str]] = None,
     ) -> List[Dict[str, object]]:
-        """精确强符号 > 弱符号 > 路径 > 图谱/向量；按文件去重后做分数门槛与强符号截断。"""
-        path_keywords = [
-            str(k).strip().lower().replace("\\", "/")
-            for k in (keywords or [])
-            if k and len(str(k).strip()) >= 4
-        ]
+        """精确定位：强符号 > 符号摘要/路径；图谱默认不进主通道。"""
+        path_keywords = cls._path_keywords_for_bonus(keywords)
         ranked: List[Dict[str, object]] = []
         for it in exact_items:
             raw = float(it.get("_score") or 0)
@@ -313,6 +327,8 @@ class SearchService:
         for it in extra_items or []:
             row = dict(it)
             fp = str(row.get("file_path") or "").replace("\\", "/")
+            if str(row.get("match_source") or "") == "codegraph":
+                row["score"] = float(row.get("score") or 0) * 0.35
             row["score"] = float(row.get("score") or 0) + cls._keyword_path_bonus(fp, path_keywords)
             ranked.append(row)
 
@@ -328,6 +344,20 @@ class SearchService:
         unique = sorted(best_by_file.values(), key=cls._rank_key)
         return cls._apply_precision_trim(unique, top_k)
 
+    @classmethod
+    def _path_keywords_for_bonus(cls, keywords: Optional[List[str]]) -> List[str]:
+        out: List[str] = []
+        seen: Set[str] = set()
+        for raw in keywords or []:
+            parts = RelatedKeywordExpander.core_tokens(str(raw or "")) + [str(raw or "").strip()]
+            for part in parts:
+                k = part.strip().lower().replace("\\", "/")
+                if not k or len(k) < 3 or k in seen:
+                    continue
+                seen.add(k)
+                out.append(k)
+        return out
+
     @staticmethod
     def _keyword_path_bonus(file_path: str, path_keywords: List[str]) -> float:
         """路径命中关键词加分：文件名整段匹配优先于路径子串。"""
@@ -335,14 +365,24 @@ class SearchService:
             return 0.0
         fp = file_path.replace("\\", "/").lower()
         stem = fp.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+        segments = [s for s in fp.split("/") if s]
         best = 0.0
         for k in path_keywords:
             if not k:
                 continue
-            if stem == k or stem.endswith(f"_{k}") or stem.startswith(f"{k}_"):
+            kl = k.lower().replace("-", "_")
+            if stem == kl or stem.endswith(f"_{kl}") or stem.startswith(f"{kl}_"):
                 best = max(best, 1.25)
-            elif k in fp:
+            elif kl in segments:
+                best = max(best, 1.05)
+            elif kl in fp:
                 best = max(best, 0.85)
+            elif kl.rstrip("s") and any(
+                seg.startswith(kl) or kl.startswith(seg.rstrip("s"))
+                for seg in segments
+                if len(seg) >= 4
+            ):
+                best = max(best, 0.95)
         return best
 
     @classmethod
@@ -394,10 +434,13 @@ class SearchService:
 
     @staticmethod
     def related_channel_flags() -> Dict[str, bool]:
-        """related 仅 symbol + codegraph（与能力 ENV 同源）。"""
+        """定位默认仅 symbol；图谱需 CODE_ANALYSIS_RELATED_INCLUDE_GRAPH=true。"""
         return {
             "symbol": bool(settings.code_analysis_symbol_summary_enabled),
-            "codegraph": bool(settings.code_graph_enabled),
+            "codegraph": bool(
+                settings.code_graph_enabled
+                and bool(getattr(settings, "code_analysis_related_include_graph", False))
+            ),
         }
 
     @staticmethod
@@ -464,8 +507,8 @@ class SearchService:
         channels = cls.related_channel_flags()
         if not any(channels.values()):
             raise ValueError(
-                "related 能力全部关闭：请至少开启 CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED / "
-                "CODE_GRAPH_ENABLED 之一"
+                "related 能力全部关闭：请开启 CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED"
+                "（或 CODE_ANALYSIS_RELATED_INCLUDE_GRAPH=true 且 CODE_GRAPH_ENABLED）"
             )
 
         async with get_db_session() as db:

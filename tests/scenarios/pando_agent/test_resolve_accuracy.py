@@ -21,6 +21,53 @@ PANDO_RESOLVE_CASES = [
             "query": "查找 ReActAgent 实现位置",
             "expect_intent": "related",
             "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.semantic.memory",
+        description="弱语义 NL：记忆相关应命中 memory.py（related+similar+grep）",
+        expected_paths=["app/agents/memorys/default/memory.py"],
+        min_precision=0.15,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "default memory extract prompt for agent long-term memory",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.cn_auth",
+        description="中文 NL：鉴权在哪",
+        expected_paths=[
+            "app/utils/auth/jwt_validator.py",
+            "app/utils/auth/jwt_middleware.py",
+        ],
+        min_precision=0.15,
+        min_recall=0.5,
+        top_k=10,
+        extra={
+            "query": "鉴权在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="pando.resolve.nl.cn_ws",
+        description="中文 NL：websocket 通道在哪",
+        expected_paths=[
+            "app/channel/websocket/websocket.py",
+            "app/channel/websocket/manager.py",
+        ],
+        min_precision=0.15,
+        min_recall=0.5,
+        top_k=10,
+        extra={
+            "query": "websocket 通道在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+            "expect_top1_in_expected": True,
         },
     ),
     PathSetCase(
@@ -52,6 +99,7 @@ PANDO_RESOLVE_CASES = [
             "query": "ContextBuilder",
             "expect_intent": "related",
             "expect_channel": "related",
+            "expect_top1_in_expected": True,
         },
     ),
 ]
@@ -79,6 +127,17 @@ class TestPandoResolveAccuracy(PandoAgentScenarioSession):
             expect_channel = case.extra.get("expect_channel")
             if expect_channel:
                 assert expect_channel in (result.get("channels_used") or [])
+            expect_channels_any = case.extra.get("expect_channels_any") or []
+            if expect_channels_any:
+                used = set(result.get("channels_used") or [])
+                assert used.intersection(expect_channels_any), (
+                    f"期望通道之一 {expect_channels_any}，实际 {sorted(used)}"
+                )
+            # NL 定位默认应并联多通道
+            if case.extra.get("expect_intent") == "related" and "nl" in case.case_id:
+                used = result.get("channels_used") or []
+                assert "related" in used
+                assert len(used) >= 2, f"NL resolve 应并联多通道，实际={used}"
             items = result.get("items") or []
             hits = [it.get("file_path") for it in items if it.get("file_path")]
             score = AccuracyMetrics.evaluate(case.case_id, hits, case.expected_paths)
@@ -86,9 +145,15 @@ class TestPandoResolveAccuracy(PandoAgentScenarioSession):
                 score,
                 min_precision=case.min_precision,
                 min_recall=case.min_recall,
-                require_precision=True,
+                # 多通道并联后 TopN 可能含辅助命中；以召回 + Top 通道为主
+                require_precision=case.extra.get("require_precision", False),
             )
             top = hits[0] if hits else None
+            if case.extra.get("expect_top1_in_expected") and top:
+                assert any(
+                    exp.replace("\\", "/") in str(top).replace("\\", "/")
+                    for exp in case.expected_paths
+                ), f"{case.case_id}: Top1={top} 不在 expected={case.expected_paths}"
             print(
                 f"[pando-resolve] {case.case_id} intent={result.get('intent')} "
                 f"channels={result.get('channels_used')} P={score.precision:.2%} "

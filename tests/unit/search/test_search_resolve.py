@@ -33,8 +33,20 @@ class TestSearchIntentRouter:
     def test_detect_related_default(self):
         plan = SearchIntentRouter.plan("ReActAgent ContextBuilder", repo_kind="code")
         assert plan.intent == SearchIntent.RELATED
-        assert plan.channels == ["related"]
+        assert "related" in plan.channels
+        assert "similar" in plan.channels
+        assert "grep" in plan.channels
         assert "ReActAgent" in plan.keywords
+
+    def test_locate_channels_respect_flags(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", False)
+        assert SearchIntentRouter.locate_channels() == ["related"]
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
+        assert SearchIntentRouter.locate_channels() == ["related", "similar", "grep"]
 
     def test_lib_defaults_to_api(self):
         plan = SearchIntentRouter.plan("读取文本文件", repo_kind="lib")
@@ -115,6 +127,12 @@ class TestSearchResolveService:
                         ],
                     }
                 ),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_similar_code",
+                AsyncMock(return_value={"total": 0, "items": []}),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchResolveService._run_grep_channel",
+                AsyncMock(return_value={"total": 0, "items": []}),
             ):
                 return await SearchResolveService.resolve(
                     "r1",
@@ -125,7 +143,7 @@ class TestSearchResolveService:
 
         result = asyncio.run(_run())
         assert result["intent"] == "related"
-        assert result["channels_used"] == ["related"]
+        assert "related" in result["channels_used"]
         assert result["items"][0]["file_path"] == "a.py"
         assert result["items"][0].get("why")
         assert "a.py" in str(result.get("summary") or "")
@@ -436,3 +454,113 @@ class TestSearchResolveService:
             fallback_used=None,
         )
         assert "融合池 5" in summary
+
+    def test_agent_items_prefers_exact_over_line_chunk_noise(self):
+        items = [
+            {
+                "file_path": "noise/a.py",
+                "score": 0.99,
+                "match_source": "line_chunk",
+                "channel": "similar",
+            },
+            {
+                "file_path": "noise/b.py",
+                "score": 2.0,
+                "match_source": "grep",
+                "channel": "grep",
+            },
+            {
+                "file_path": "target.py",
+                "score": 1.0,
+                "match_source": "exact",
+                "exact_tier": "symbol",
+                "channel": "related",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items)
+        assert out[0]["file_path"] == "target.py"
+        assert out[0]["match_source"] == "exact"
+
+    def test_resolve_nl_runs_related_similar_grep(self, monkeypatch):
+        class _Repo:
+            id = "r1"
+            kind = "code"
+            local_path = "."
+
+        class _CM:
+            async def __aenter__(self):
+                db = AsyncMock()
+                db.scalar = AsyncMock(return_value=_Repo())
+                return db
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.get_db_session",
+            lambda: _CM(),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.SearchIndexMeta.for_repo",
+            AsyncMock(return_value={}),
+        )
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_related_files",
+                AsyncMock(
+                    return_value={
+                        "total": 1,
+                        "items": [
+                            {
+                                "file_path": "memory.py",
+                                "score": 1.5,
+                                "match_source": "exact",
+                                "exact_tier": "symbol",
+                            }
+                        ],
+                    }
+                ),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_similar_code",
+                AsyncMock(
+                    return_value={
+                        "total": 1,
+                        "items": [
+                            {
+                                "file_path": "other.py",
+                                "score": 0.9,
+                                "match_source": "line_chunk",
+                            }
+                        ],
+                    }
+                ),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchResolveService._run_grep_channel",
+                AsyncMock(
+                    return_value={
+                        "total": 1,
+                        "items": [
+                            {
+                                "file_path": "memory.py",
+                                "score": 2.8,
+                                "match_source": "grep",
+                            }
+                        ],
+                    }
+                ),
+            ):
+                return await SearchResolveService.resolve(
+                    "r1",
+                    "记忆提取提示词在哪",
+                    intent="auto",
+                    top_k=5,
+                )
+
+        result = asyncio.run(_run())
+        used = result.get("channels_used") or []
+        assert "related" in used
+        assert "similar" in used
+        assert "grep" in used
+        assert result["items"][0]["file_path"] == "memory.py"
+        assert result["items"][0]["match_source"] == "exact"
