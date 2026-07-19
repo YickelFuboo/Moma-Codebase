@@ -54,19 +54,20 @@ repo add --kind code|lib
 
 ### 3.1 代码仓镜像（`kind=code`）
 
-`analyze --path` 启动扫描 → 文件状态入队 → 全局调度器拉起每仓 worker 池 → 单文件 `_analyze_file`。
+`analyze --path` 启动扫描 → 文件状态入队 → 全局调度器拉起每仓 worker 池 → 单文件两阶段调度（快路径）。
 
-单文件在开关允许时并行（或串行）做：
+单文件在开关允许时按调度解耦执行：
 
-1. AST 解析（`FileAstAnalyzer`）→ `FileInfo`（类/函数/方法 + 源码体）
-2. **行块向量化**（见 §3.1.1）
-3. **符号摘要向量化**（见 §3.1.2）
-4. 仓级 **CodeGraph** 生成/增量（见 §3.1.3）
+1. **embedding 阶段**（`_analyze_embed_phase`）：AST → 行块向量入库 → 状态 `embedded`（已可 `similar`）或直接 `completed`（未开符号摘要）
+2. **符号补齐阶段**（另抢 `embedded` 任务，`_analyze_symbol_phase`）：AST → LLM 符号摘要向量 → `completed`
+3. 仓级 **CodeGraph** 生成/增量（见 §3.1.3；与文件队列并行，不阻塞行块可搜）
+
+说明：embedding 与符号摘要**共用 AST 能力但不同任务抢占**，避免 LLM 摘要占满 worker、拖慢「首次可搜」。`analyze status` 中 `searchable_files` = completed + embedded。
 
 #### 3.1.1 行块切片：行窗 + AST 符号体合并入库
 
 实现：`CodeChunkService`（`app/repo_analysis/services/codechunk/code_chunk.py`）  
-调用：`FileAnalysisService._analyze_file` → `merge_chunks` → `CodeVectorService.vectorize_and_store_line_chunks`
+调用：`FileAnalysisService._analyze_embed_phase` → `merge_chunks` → `CodeVectorService.vectorize_and_store_line_chunks`
 
 **为什么两套切片？**
 

@@ -118,7 +118,7 @@ poetry run mcb repo delete --path F:\myproject
 
 ```text
 analyze --path F:\myproject
-analyze status --path F:\myproject   # 进度 / 新鲜度 / 忽略规则 / 最近失败
+analyze status --path F:\myproject   # 进度（含 searchable/embedded）/ 新鲜度 / 忽略 / 失败
 analyze stop --path F:\myproject
 analyze clear --path F:\myproject
 ```

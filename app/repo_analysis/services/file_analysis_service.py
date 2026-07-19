@@ -106,6 +106,14 @@ class FileAnalysisService:
                 await asyncio.sleep(poll_interval)
 
     @staticmethod
+    def _claimable_statuses() -> list[str]:
+        return [
+            FileAnalysisStatus.PENDING.value,
+            FileAnalysisStatus.FAILED.value,
+            FileAnalysisStatus.EMBEDDED.value,
+        ]
+
+    @staticmethod
     async def _list_repos_with_pending_records() -> list[str]:
         async with get_db_session() as db:
             rows = (
@@ -113,7 +121,7 @@ class FileAnalysisService:
                     select(RepoFileAnalysisState.repo_id)
                     .where(
                         RepoFileAnalysisState.status.in_(
-                            [FileAnalysisStatus.PENDING.value, FileAnalysisStatus.FAILED.value]
+                            FileAnalysisService._claimable_statuses()
                         )
                     )
                     .distinct()
@@ -176,40 +184,42 @@ class FileAnalysisService:
     ) -> None:
         idle_rounds = 0
         while True:
-            pending_record = await FileAnalysisService._get_one_record_and_mark_running(repo_id)
-            if not pending_record:
+            claimed = await FileAnalysisService._get_one_record_and_mark_running(repo_id)
+            if not claimed:
                 idle_rounds += 1
                 if idle_rounds >= 3:
                     return
                 await asyncio.sleep(0.3)
                 continue
             idle_rounds = 0
-            await FileAnalysisService._analysis_one_file(pending_record.id)
+            record, prior_status = claimed
+            await FileAnalysisService._analysis_one_file(record.id, prior_status=prior_status)
 
     @staticmethod
     async def _get_one_record_and_mark_running(
         repo_id: str,
-    ) -> Optional[RepoFileAnalysisState]:
+    ) -> Optional[tuple[RepoFileAnalysisState, str]]:
+        claimable = FileAnalysisService._claimable_statuses()
         async with get_db_session() as db:
             state = await db.scalar(
                 select(RepoFileAnalysisState)
                 .where(
                     RepoFileAnalysisState.repo_id == repo_id,
-                    RepoFileAnalysisState.status.in_([FileAnalysisStatus.PENDING.value, FileAnalysisStatus.FAILED.value]),
+                    RepoFileAnalysisState.status.in_(claimable),
                 )
                 .order_by(RepoFileAnalysisState.updated_at.asc())
                 .limit(1)
             )
             if not state:
                 return None
-            # 标记记录为运行中
+            prior_status = str(state.status or "")
             now = datetime.now()
             try:
                 updated = await db.execute(
                     update(RepoFileAnalysisState)
                     .where(
                         RepoFileAnalysisState.id == state.id,
-                        RepoFileAnalysisState.status.in_([FileAnalysisStatus.PENDING.value, FileAnalysisStatus.FAILED.value]),
+                        RepoFileAnalysisState.status.in_(claimable),
                     )
                     .values(
                         status=FileAnalysisStatus.RUNNING.value,
@@ -217,7 +227,7 @@ class FileAnalysisService:
                         last_error=None,
                     )
                 )
-                if (updated.rowcount or 0) == 0: # 如果更新失败，则回滚
+                if (updated.rowcount or 0) == 0:
                     await db.rollback()
                     return None
                 await db.commit()
@@ -233,11 +243,13 @@ class FileAnalysisService:
                     e,
                 )
                 return None
-            return state
+            return state, prior_status
 
     @staticmethod
     async def _analysis_one_file(
         record_id: str,
+        *,
+        prior_status: str = FileAnalysisStatus.PENDING.value,
     ) -> None:
         async with get_db_session() as db:
             record = await db.scalar(select(RepoFileAnalysisState).where(RepoFileAnalysisState.id == record_id))
@@ -253,7 +265,6 @@ class FileAnalysisService:
                 )
                 return
             
-            # 获取文件绝对路径
             abs_file_path = os.path.join(repo.local_path, *record.file_path.split("/"))
             if not os.path.exists(abs_file_path):
                 await FileAnalysisService.delete_file_analysis_data(
@@ -263,7 +274,6 @@ class FileAnalysisService:
                 )
                 return
 
-            # 分析文件（按 kind 分流：lib → 公开接口管线）
             try:
                 from app.repo_mgmt.models.git_repo_mgmt import RepoKind
 
@@ -277,27 +287,59 @@ class FileAnalysisService:
                         rel_file_path=record.file_path,
                         abs_file_path=abs_file_path,
                     )
-                else:
-                    ok, err_detail = await FileAnalysisService._analyze_file(
+                    await FileAnalysisService._finish_record(
+                        db=db,
+                        record=record,
+                        status=(
+                            FileAnalysisStatus.COMPLETED.value
+                            if ok
+                            else FileAnalysisStatus.FAILED.value
+                        ),
+                        last_error=None if ok else err_detail,
+                    )
+                    return
+
+                symbol_phase = prior_status == FileAnalysisStatus.EMBEDDED.value
+                if symbol_phase:
+                    ok, err_detail = await FileAnalysisService._analyze_symbol_phase(
                         repo_id=record.repo_id,
                         repo_path=repo.local_path,
                         rel_file_path=record.file_path,
                         abs_file_path=abs_file_path,
                     )
-                if ok:
+                    # 符号失败仍保留 embedded：行块可搜，稍后重试摘要
                     await FileAnalysisService._finish_record(
                         db=db,
                         record=record,
-                        status=FileAnalysisStatus.COMPLETED.value,
-                        last_error=None,
+                        status=(
+                            FileAnalysisStatus.COMPLETED.value
+                            if ok
+                            else FileAnalysisStatus.EMBEDDED.value
+                        ),
+                        last_error=None if ok else err_detail,
                     )
-                else:
+                    return
+
+                ok, err_detail, next_status = await FileAnalysisService._analyze_embed_phase(
+                    repo_id=record.repo_id,
+                    repo_path=repo.local_path,
+                    rel_file_path=record.file_path,
+                    abs_file_path=abs_file_path,
+                )
+                if not ok:
                     await FileAnalysisService._finish_record(
                         db=db,
                         record=record,
                         status=FileAnalysisStatus.FAILED.value,
                         last_error=err_detail,
                     )
+                    return
+                await FileAnalysisService._finish_record(
+                    db=db,
+                    record=record,
+                    status=next_status,
+                    last_error=None,
+                )
             except Exception as e:
                 logging.error("文件分析失败 repo_id=%s file_path=%s error=%s", record.repo_id, record.file_path, e)
                 await FileAnalysisService._finish_record(
@@ -308,12 +350,13 @@ class FileAnalysisService:
                 )
 
     @staticmethod
-    async def _analyze_file(
+    async def _analyze_embed_phase(
         repo_id: str,
         repo_path: str,
         rel_file_path: str,
         abs_file_path: str,
-    ) -> tuple[bool, Optional[str]]:
+    ) -> tuple[bool, Optional[str], str]:
+        """快路径：AST + 行块 embedding。若还需符号摘要则落到 embedded，否则 completed。"""
         try:
             chunk_on = bool(settings.code_analysis_line_chunk_enabled)
             symbol_on = bool(settings.code_analysis_symbol_summary_enabled)
@@ -323,53 +366,69 @@ class FileAnalysisService:
                     repo_id,
                     rel_file_path,
                 )
-                return True, None
+                return True, None, FileAnalysisStatus.COMPLETED.value
+
+            # 仅符号、无行块：本阶段直接做符号并 completed（无 embedding 可搜阶段）
+            if not chunk_on and symbol_on:
+                ok, err = await FileAnalysisService._analyze_symbol_phase(
+                    repo_id, repo_path, rel_file_path, abs_file_path
+                )
+                return ok, err, FileAnalysisStatus.COMPLETED.value
 
             source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
             file_ext = os.path.splitext(abs_file_path)[1].lower()
-            file_info = None
-            if chunk_on or symbol_on:
-                file_info = await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
-
-            async def _line_chunk_vectors() -> None:
-                line_chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
-                if file_info:
-                    symbol_chunks = CodeChunkService.slice_symbol_bodies(file_info, file_ext=file_ext)
-                    chunks = CodeChunkService.merge_chunks(line_chunks, symbol_chunks)
-                else:
-                    chunks = line_chunks
-                await CodeVectorService.vectorize_and_store_line_chunks(
-                    repo_id,
-                    rel_file_path,
-                    chunks,
-                )
-
-            async def _symbol_vectors() -> None:
-                if not file_info:
-                    return
-                await CodeVectorService.vectorize_and_store_symbol_summaries(
-                    repo_id,
-                    rel_file_path,
-                    file_info,
-                )
-
-            if chunk_on and symbol_on:
-                r_line, r_sym = await asyncio.gather(
-                    _line_chunk_vectors(),
-                    _symbol_vectors(),
-                    return_exceptions=True,
-                )
-                if isinstance(r_line, Exception):
-                    raise r_line
-                if isinstance(r_sym, Exception):
-                    raise r_sym
-            elif chunk_on:
-                await _line_chunk_vectors()
+            file_info = await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
+            line_chunks = CodeChunkService.slice_file(abs_file_path, source_text=source)
+            if file_info:
+                symbol_chunks = CodeChunkService.slice_symbol_bodies(file_info, file_ext=file_ext)
+                chunks = CodeChunkService.merge_chunks(line_chunks, symbol_chunks)
             else:
-                await _symbol_vectors()
+                chunks = line_chunks
+            await CodeVectorService.vectorize_and_store_line_chunks(
+                repo_id,
+                rel_file_path,
+                chunks,
+            )
+            if symbol_on:
+                return True, None, FileAnalysisStatus.EMBEDDED.value
+            return True, None, FileAnalysisStatus.COMPLETED.value
+        except Exception as e:
+            logging.error(
+                "文件 embedding 阶段失败 repo_id=%s file_path=%s error=%s",
+                repo_id,
+                rel_file_path,
+                e,
+            )
+            return False, str(e), FileAnalysisStatus.FAILED.value
+
+    @staticmethod
+    async def _analyze_symbol_phase(
+        repo_id: str,
+        repo_path: str,
+        rel_file_path: str,
+        abs_file_path: str,
+    ) -> tuple[bool, Optional[str]]:
+        """异步补齐：AST + 符号摘要向量。"""
+        try:
+            if not bool(settings.code_analysis_symbol_summary_enabled):
+                return True, None
+            source = strip_utf8_bom(Path(abs_file_path).read_text(encoding="utf-8", errors="ignore"))
+            file_info = await FileAstAnalyzer(repo_path, abs_file_path).analyze_file(source=source)
+            if not file_info:
+                return True, None
+            await CodeVectorService.vectorize_and_store_symbol_summaries(
+                repo_id,
+                rel_file_path,
+                file_info,
+            )
             return True, None
         except Exception as e:
-            logging.error("文件分析子步骤失败 repo_id=%s file_path=%s error=%s", repo_id, rel_file_path, e)
+            logging.error(
+                "文件符号摘要阶段失败 repo_id=%s file_path=%s error=%s",
+                repo_id,
+                rel_file_path,
+                e,
+            )
             return False, str(e)
 
     @staticmethod
@@ -381,7 +440,10 @@ class FileAnalysisService:
     ) -> None:
         record.status = status
         record.last_error = last_error
-        if status == FileAnalysisStatus.COMPLETED.value:
+        if status in (
+            FileAnalysisStatus.COMPLETED.value,
+            FileAnalysisStatus.EMBEDDED.value,
+        ):
             record.last_finished_at = datetime.now()
         await db.commit()
 

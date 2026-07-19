@@ -14,6 +14,8 @@ class RepoAnalysisStatus(str, enum.Enum):
 class FileAnalysisStatus(str, enum.Enum):
     PENDING = "pending"
     RUNNING = "running"
+    # 行块 embedding 已入库、可搜；符号摘要仍待补齐（快路径）
+    EMBEDDED = "embedded"
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"

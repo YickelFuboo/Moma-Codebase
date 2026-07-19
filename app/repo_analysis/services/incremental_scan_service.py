@@ -141,6 +141,7 @@ class IncrementalScanService:
                         [
                             FileAnalysisStatus.PENDING.value,
                             FileAnalysisStatus.FAILED.value,
+                            FileAnalysisStatus.EMBEDDED.value,
                         ]
                     ),
                 )

@@ -781,9 +781,12 @@ class AnalysisService:
 
         pending = by_status.get(FileAnalysisStatus.PENDING.value, 0)
         running = by_status.get(FileAnalysisStatus.RUNNING.value, 0)
+        embedded = by_status.get(FileAnalysisStatus.EMBEDDED.value, 0)
         completed = by_status.get(FileAnalysisStatus.COMPLETED.value, 0)
         failed = by_status.get(FileAnalysisStatus.FAILED.value, 0)
         skipped = by_status.get(FileAnalysisStatus.SKIPPED.value, 0)
+        # 行块已入库即可 similar；completed + embedded 均算可搜
+        searchable_files = completed + embedded
 
         finished_raw = scan.get("last_scan_finished_at")
         index_age_seconds: Optional[int] = None
@@ -801,6 +804,8 @@ class AnalysisService:
             stale_reasons.append("never_scanned")
         if pending > 0:
             stale_reasons.append("pending_files")
+        if embedded > 0:
+            stale_reasons.append("symbol_enrichment_pending")
         if running > 0 or in_memory_scan or scan.get("scan_status") == RepoAnalysisStatus.RUNNING.value:
             stale_reasons.append("scan_or_analysis_running")
         if index_age_seconds is not None and index_age_seconds >= 86400:
@@ -822,9 +827,13 @@ class AnalysisService:
             "total_files": total,
             "pending_files": pending,
             "running_files": running,
+            "embedded_files": embedded,
             "completed_files": completed,
             "failed_files": failed,
             "skipped_files": skipped,
+            "searchable_files": searchable_files,
+            "searchable": searchable_files > 0,
+            "enrichment_pending": embedded > 0,
             "scan_active_in_process": in_memory_scan,
         }
         return {

@@ -25,6 +25,7 @@ class TestAnalyzeStatusVisualization:
             repo = SimpleNamespace(local_path=str(tmp_path))
             status_rows = [
                 (FileAnalysisStatus.COMPLETED.value, 3),
+                (FileAnalysisStatus.EMBEDDED.value, 2),
                 (FileAnalysisStatus.PENDING.value, 1),
                 (FileAnalysisStatus.FAILED.value, 1),
             ]
@@ -60,8 +61,13 @@ class TestAnalyzeStatusVisualization:
 
         out = asyncio.run(_run())
         assert out["analysis_summary"]["pending_files"] == 1
+        assert out["analysis_summary"]["embedded_files"] == 2
+        assert out["analysis_summary"]["searchable_files"] == 5
+        assert out["analysis_summary"]["searchable"] is True
+        assert out["analysis_summary"]["enrichment_pending"] is True
         assert out["stale"] is True
         assert "pending_files" in (out["stale_hint"] or "")
+        assert "symbol_enrichment_pending" in (out["stale_hint"] or "")
         assert out["incremental_scan"]["enabled"] is True
         assert out["incremental_scan"]["interval_sec"] == 120
         assert out["index_age_seconds"] is not None
