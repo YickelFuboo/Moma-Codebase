@@ -4,7 +4,10 @@ from typing import Any, Dict, List, Mapping, Optional
 
 
 class SearchSnippetAttacher:
-    """为检索命中从本地源码附加 snippet，供 Agent 直接喂上下文。"""
+        """为检索命中从本地源码附加 snippet，供 Agent 直接喂上下文。
+
+        仅处理 payload['items']；also_consider 默认不挂 snippet，避免冲上下文。
+        """
 
     DEFAULT_MAX_LINES = 40
     DEFAULT_FALLBACK_LINES = 24

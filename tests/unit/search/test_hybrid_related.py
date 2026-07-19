@@ -162,6 +162,42 @@ class TestFuseRelatedItems:
         )
         assert 1 <= len(items) <= SearchService.RELATED_WEAK_CAP
 
+    def test_weak_layers_put_overflow_in_also_consider(self):
+        docs = [{"file_path": f"pkg/f{i}.py", "_score": 0.9 - i * 0.02} for i in range(12)]
+        primary, also = SearchService.fuse_related_layers(
+            exact_items=[],
+            symbol_docs=docs,
+            top_k=15,
+            keywords=["memory"],
+        )
+        assert 1 <= len(primary) <= SearchService.RELATED_WEAK_CAP
+        assert also
+        primary_paths = {it["file_path"] for it in primary}
+        also_paths = {it["file_path"] for it in also}
+        assert primary_paths.isdisjoint(also_paths)
+        assert len(also) <= SearchService.RELATED_ALSO_CONSIDER_CAP
+
+    def test_strong_layers_short_primary_keeps_also(self):
+        exact = [
+            {
+                "file_path": f"app/svc/a{i}.py",
+                "symbol_name": "Foo",
+                "symbol_kind": "class",
+                "_score": 3.0 - i * 0.01,
+                "exact_tier": "symbol",
+            }
+            for i in range(6)
+        ]
+        primary, also = SearchService.fuse_related_layers(
+            exact_items=exact,
+            symbol_docs=[],
+            top_k=10,
+            keywords=["Foo"],
+        )
+        assert 1 <= len(primary) <= SearchService.STRONG_SYMBOL_CAP
+        assert also
+        assert len(primary) + len(also) <= 6
+
 
 class TestRelatedChannelFlags:
     def test_channel_flags_default_excludes_graph(self, monkeypatch):

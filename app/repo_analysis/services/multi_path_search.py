@@ -121,11 +121,13 @@ class MultiPathSearchService:
             return one
 
         batches: List[List[Dict[str, object]]] = []
+        also_batches: List[List[Dict[str, object]]] = []
         repos: List[Dict[str, object]] = []
         paths: List[str] = []
         errors: Dict[str, str] = {}
         channels_used: List[str] = []
         intents: List[str] = []
+        read_hint: Optional[str] = None
         for payload in payloads:
             path = str(payload.get("path") or "")
             if path:
@@ -146,6 +148,8 @@ class MultiPathSearchService:
                     channels_used.append(str(ch))
             if payload.get("intent"):
                 intents.append(str(payload.get("intent")))
+            if payload.get("read_hint") and not read_hint:
+                read_hint = str(payload.get("read_hint"))
             items = []
             for it in payload.get("items") or []:
                 items.append(
@@ -157,15 +161,33 @@ class MultiPathSearchService:
                     )
                 )
             batches.append(items)
+            also_items = []
+            for it in payload.get("also_consider") or []:
+                also_items.append(
+                    cls.tag_item(
+                        dict(it),
+                        repo_id=str(payload.get("repo_id") or it.get("repo_id") or ""),
+                        path=path or str(it.get("path") or ""),
+                        kind=str(payload.get("kind") or it.get("kind") or RepoKind.CODE),
+                    )
+                )
+            also_batches.append(also_items)
 
         merged = cls.merge_items(batches, top_k=top_k)
+        primary_keys = {cls._dedupe_key(it) for it in merged}
+        also_merged_raw = cls.merge_items(also_batches, top_k=max(top_k, 8))
+        also_merged = [it for it in also_merged_raw if cls._dedupe_key(it) not in primary_keys]
         out: Dict[str, object] = {
             "paths": paths,
             "repos": repos,
             "total": len(merged),
             "items": merged,
+            "also_consider": also_merged,
+            "also_consider_total": len(also_merged),
             **(query_fields or {}),
         }
+        if read_hint:
+            out["read_hint"] = read_hint
         if channels_used:
             out["channels_used"] = channels_used
         if intents:

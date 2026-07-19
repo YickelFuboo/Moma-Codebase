@@ -25,8 +25,16 @@ class TestPandoRelatedHybridAccuracy(PandoAgentScenarioSession):
             assert index.get("last_scan_finished_at"), "分析后应有 last_scan_finished_at"
 
             items = result.get("items") or []
+            also = result.get("also_consider") or []
             hits = [it.get("file_path") for it in items]
+            also_hits = [it.get("file_path") for it in also if it.get("file_path")]
+            union_hits = hits + [p for p in also_hits if p not in hits]
             score = AccuracyMetrics.evaluate(case.case_id, hits, case.expected_paths)
+            union_score = AccuracyMetrics.evaluate(
+                f"{case.case_id}.union",
+                union_hits,
+                case.expected_paths,
+            )
             AccuracyMetrics.assert_pass(
                 score,
                 min_precision=case.min_precision,
@@ -43,7 +51,9 @@ class TestPandoRelatedHybridAccuracy(PandoAgentScenarioSession):
                     for exp in case.expected_paths
                 ), f"{case.case_id}: exact 置顶路径不符 top={top}"
             print(
-                f"[pando] {case.case_id} P={score.precision:.2%} R={score.recall:.2%} "
+                f"[pando] {case.case_id} itemsP={score.precision:.2%} itemsR={score.recall:.2%} "
+                f"unionP={union_score.precision:.2%} unionR={union_score.recall:.2%} "
+                f"n_items={len(hits)} n_also={len(also_hits)} "
                 f"top_source={((items[0] or {}).get('match_source') if items else None)} "
                 f"hits={score.hits}",
                 flush=True,

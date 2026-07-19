@@ -183,6 +183,23 @@ class ExactMatchService:
         return [it for _, it in scored[: max(1, top_k)]]
 
     @classmethod
+    async def list_indexed_file_paths(cls, repo_id: str) -> List[str]:
+        """已索引文件路径列表（供同目录兄弟扩展），去重保序。"""
+        dim = await cls._embedding_dim()
+        if not dim:
+            return []
+        rows = await cls._list_path_rows(repo_id, dim)
+        out: List[str] = []
+        seen: set[str] = set()
+        for row in rows:
+            fp = str(row.get("file_path") or "").replace("\\", "/").strip()
+            if not fp or fp in seen:
+                continue
+            seen.add(fp)
+            out.append(fp)
+        return out
+
+    @classmethod
     async def match_paths(
         cls,
         repo_id: str,

@@ -6,6 +6,8 @@ from sqlalchemy import select
 from app.config.settings import settings
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.services.codegraph.gateway import CodeGraphGateway
+from app.repo_analysis.services.codevector.exact_match import ExactMatchService
+from app.repo_analysis.services.dir_sibling_expander import DirSiblingExpander
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
 from app.repo_analysis.services.search_resolve.intent import ResolvePlan, SearchIntentRouter
 from app.repo_analysis.services.search_resolve.result_presenter import ResolveResultPresenter
@@ -100,7 +102,14 @@ class SearchResolveService:
                     channels_used.append(fb_channel)
 
         annotated = ResolveResultPresenter.annotate(fused_items)
-        agent_items = ResolveResultPresenter.agent_items(annotated)
+        agent_items, also_consider = ResolveResultPresenter.split_for_agent(annotated)
+        if agent_items:
+            indexed_paths = await ExactMatchService.list_indexed_file_paths(repo_id)
+            also_consider = DirSiblingExpander.expand(
+                primary=agent_items,
+                also=also_consider,
+                candidate_paths=indexed_paths,
+            )
         index = await SearchIndexMeta.for_repo(repo_id)
         return {
             "repo_id": repo_id,
@@ -123,11 +132,15 @@ class SearchResolveService:
                 items=agent_items,
                 fused_total=len(annotated),
                 fallback_used=fallback_used,
+                also_count=len(also_consider),
             ),
+            "read_hint": ResolveResultPresenter.READ_HINT,
             "total": len(agent_items),
+            "also_consider_total": len(also_consider),
             "fused_total": len(annotated),
             "index": index,
             "items": agent_items,
+            "also_consider": also_consider,
             "sections": sections,
         }
 
@@ -183,7 +196,14 @@ class SearchResolveService:
         if channel == "related":
             keywords = plan.keywords or [plan.code_text]
             result = await SearchService.search_related_files(repo_id, keywords, top_k=top_k)
-            return {"total": result.get("total"), "items": result.get("items") or []}
+            items = [dict(it) for it in (result.get("items") or [])]
+            # related 次层并入融合池，供 resolve 的 also_consider 继承
+            for it in result.get("also_consider") or []:
+                row = dict(it)
+                row["score"] = float(row.get("score") or 0) * 0.9
+                row.setdefault("channel", "related")
+                items.append(row)
+            return {"total": len(items), "items": items}
 
         if channel == "pattern":
             if not settings.mr_experience_enabled:

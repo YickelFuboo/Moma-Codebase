@@ -133,8 +133,9 @@ for line_chunk in line_chunks:
 #### 3.1.2 符号摘要向量
 
 1. 对 `FileInfo` 中每个符号调 LLM 生成业务向摘要（prompt 强调**业务词 + 使用场景**，少写语法废话）。
-2. **入库 embedding 文本**拼接：`路径 + 符号名 + 摘要`（提升 related 对路径/标识符的可召回性）。
-3. **对外展示**的 `summary` 仍用摘要原文，避免把路径噪音显示给用户。
+2. **LLM 失败/空结果** → `CodeSummary.fallback_summary`（签名 + docstring/注释 + 预览），保证仍可嵌入。
+3. **入库 embedding 文本**拼接：`路径 + 符号名 + 摘要`（提升 related 对路径/标识符的可召回性）。
+4. **对外展示**的 `summary` 仍用摘要原文，避免把路径噪音显示给用户。
 4. 写入独立 `symbol_summary` 向量空间；`search related` / `search symbols` 使用。
 
 说明：摘要质量依赖 **re-analyze 后的新写入**；旧向量不会自动变。
@@ -318,7 +319,7 @@ item 带 `match_source`：`exact` | `symbol_summary` | `line_chunk` | `codegraph
 |------|------|
 | related | exact 元数据 + 符号摘要 + 可选图谱 |
 | similar | 整句 NL → 行块向量 |
-| grep | 仓内全文/标识符（`ContentGrepService`，尊重忽略） |
+| grep | 仓内全文/标识符（`ContentGrepService`：词项预编译、强命中早停，尊重忽略） |
 
 融合优先级：`exact` > `grep` > `symbol_summary` > `codegraph`/`graph` > `line_chunk` > …
 
@@ -439,10 +440,11 @@ poetry run pytest tests/scenarios/pando_agent/test_related_hybrid_accuracy.py -q
 ## 7. Agent 使用建议（与准度对齐）
 
 1. **主路径** `search resolve`，少手搓多通道。  
-2. 贴代码 → similar；符号/中文定位 → related；「以前怎么改」→ pattern。  
-3. 改影响面 → dependents / callers，不要用 related 硬凑调用链。  
-4. 索引过期先 `analyze`；经验过期先 `experience analyze`。  
-5. 对接方式：仅 CLI；注册 `search resolve`（见 README / `skills/mcb-resolve`），全部 `search *` 查询输出结构见 `app/cli/schemes.py` 与 `docs/cli-schemes.md`（`ok` 信封、退出码、`--timeout-ms`）。无需额外服务进程。
+2. **先读 `items`，改前扫 `also_consider`**：分离式对接；主列表保准（可带 snippet），次层含同目录兄弟文件防漏。  
+3. 贴代码 → similar；符号/中文定位 → related；「以前怎么改」→ pattern。  
+4. 改影响面 → dependents / callers，不要用 related 硬凑调用链。  
+5. 索引由人工 `analyze` 就绪后再开编码任务；经验过期先 `experience analyze`。  
+6. 对接方式：仅 CLI；注册 `search resolve`（见 README / `skills/mcb-resolve`），全部 `search *` 查询输出结构见 `app/cli/schemes.py` 与 `docs/cli-schemes.md`（`ok` 信封、退出码、`--timeout-ms`）。无需额外服务进程。
 
 ---
 

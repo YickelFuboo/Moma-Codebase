@@ -11,6 +11,7 @@ from app.repo_analysis.services.codevector.similar_rerank import SimilarRerankSe
 from app.repo_analysis.services.codevector.vector_search import CodeVectorSearchService
 from app.repo_analysis.services.mr_experience.pattern_vector import PatternVectorService
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
+from app.repo_analysis.services.dir_sibling_expander import DirSiblingExpander
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
 
 
@@ -27,9 +28,12 @@ class SearchService:
     RELATED_WEAK_SCORE_RATIO = 0.72
     RELATED_WEAK_CAP = 5
     RELATED_WEAK_DIR_QUOTA = 2
-    # 存在强符号定义命中时，不再硬凑满 top_k
-    STRONG_SYMBOL_CAP = 5
+    # 存在强符号定义命中时，主列表更短；其余进 also_consider
+    STRONG_SYMBOL_CAP = 3
     STRONG_SYMBOL_RAW = 2.8
+    RELATED_ALSO_CONSIDER_CAP = 8
+    RELATED_ALSO_SCORE_RATIO = 0.55
+    READ_HINT = "优先读 items；改代码前扫 also_consider，防漏相关文件"
     SIMILAR_FETCH_MULTIPLIER = 4
     SIMILAR_MIN_FETCH = 40
     # similar：短列表高精度（与 related 截断解耦）
@@ -253,13 +257,28 @@ class SearchService:
         return False
 
     @classmethod
+    def _file_key(cls, it: Dict[str, object]) -> str:
+        return str(it.get("file_path") or "")
+
+    @classmethod
     def _apply_precision_trim(
         cls,
         unique: List[Dict[str, object]],
         top_k: int,
     ) -> List[Dict[str, object]]:
+        primary, _also = cls._split_precision_layers(unique, top_k)
+        return primary
+
+    @classmethod
+    def _split_precision_layers(
+        cls,
+        unique: List[Dict[str, object]],
+        top_k: int,
+    ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+        """主列表保准；挤出的候选进 also_consider 防漏。"""
         if not unique:
-            return []
+            return [], []
+
         if cls._has_strong_symbol(unique):
             top_score = float(unique[0].get("score") or 0)
             floor = top_score * cls.SCORE_RATIO_FLOOR
@@ -275,19 +294,33 @@ class SearchService:
             if defs:
                 trimmed = defs
             cap = min(max(1, top_k), cls.STRONG_SYMBOL_CAP)
-            return trimmed[:cap]
+            primary = trimmed[:cap]
+        else:
+            top_score = float(unique[0].get("score") or 0)
+            floor = top_score * cls.RELATED_WEAK_SCORE_RATIO
+            trimmed = [it for it in unique if float(it.get("score") or 0) >= floor]
+            if not trimmed:
+                trimmed = unique[:1]
+            trimmed = cls._apply_dir_quota(trimmed, cls.RELATED_WEAK_DIR_QUOTA)
+            cap = min(max(1, top_k), cls.RELATED_WEAK_CAP)
+            primary = trimmed[:cap]
 
-        top_score = float(unique[0].get("score") or 0)
-        floor = top_score * cls.RELATED_WEAK_SCORE_RATIO
-        trimmed = [it for it in unique if float(it.get("score") or 0) >= floor]
-        if not trimmed:
-            trimmed = unique[:1]
-        trimmed = cls._apply_dir_quota(trimmed, cls.RELATED_WEAK_DIR_QUOTA)
-        cap = min(max(1, top_k), cls.RELATED_WEAK_CAP)
-        return trimmed[:cap]
+        primary_keys = {cls._file_key(it) for it in primary if cls._file_key(it)}
+        also_floor = float(unique[0].get("score") or 0) * cls.RELATED_ALSO_SCORE_RATIO
+        also: List[Dict[str, object]] = []
+        for it in unique:
+            fp = cls._file_key(it)
+            if not fp or fp in primary_keys:
+                continue
+            if float(it.get("score") or 0) < also_floor:
+                continue
+            also.append(it)
+            if len(also) >= cls.RELATED_ALSO_CONSIDER_CAP:
+                break
+        return primary, also
 
     @classmethod
-    def fuse_related_items(
+    def fuse_related_layers(
         cls,
         *,
         exact_items: List[Dict[str, object]],
@@ -295,8 +328,8 @@ class SearchService:
         top_k: int,
         extra_items: Optional[List[Dict[str, object]]] = None,
         keywords: Optional[List[str]] = None,
-    ) -> List[Dict[str, object]]:
-        """精确定位：强符号 > 符号摘要/路径；图谱默认不进主通道。"""
+    ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+        """精确定位分层：items 保准，also_consider 防漏；图谱默认不进主通道。"""
         path_keywords = cls._path_keywords_for_bonus(keywords)
         ranked: List[Dict[str, object]] = []
         for it in exact_items:
@@ -342,7 +375,27 @@ class SearchService:
             if prev is None or cls._rank_key(it) < cls._rank_key(prev):
                 best_by_file[fp] = it
         unique = sorted(best_by_file.values(), key=cls._rank_key)
-        return cls._apply_precision_trim(unique, top_k)
+        return cls._split_precision_layers(unique, top_k)
+
+    @classmethod
+    def fuse_related_items(
+        cls,
+        *,
+        exact_items: List[Dict[str, object]],
+        symbol_docs: List[Dict[str, object]],
+        top_k: int,
+        extra_items: Optional[List[Dict[str, object]]] = None,
+        keywords: Optional[List[str]] = None,
+    ) -> List[Dict[str, object]]:
+        """精确定位：强符号 > 符号摘要/路径；图谱默认不进主通道。"""
+        primary, _also = cls.fuse_related_layers(
+            exact_items=exact_items,
+            symbol_docs=symbol_docs,
+            top_k=top_k,
+            extra_items=extra_items,
+            keywords=keywords,
+        )
+        return primary
 
     @classmethod
     def _path_keywords_for_bonus(cls, keywords: Optional[List[str]]) -> List[str]:
@@ -532,14 +585,22 @@ class SearchService:
                 await cls._search_codegraph_files(repo_id, keywords, top_k=fetch_k)
             )
 
-        unique = cls.fuse_related_items(
+        primary, also_consider = cls.fuse_related_layers(
             exact_items=exact_items,
             symbol_docs=symbol_docs,
             top_k=top_k,
             extra_items=extra_items,
             keywords=keywords,
         )
-        for it in unique:
+        indexed_paths = await ExactMatchService.list_indexed_file_paths(repo_id)
+        also_consider = DirSiblingExpander.expand(
+            primary=primary,
+            also=also_consider,
+            candidate_paths=indexed_paths,
+        )
+        for it in primary:
+            it.pop("_raw_score", None)
+        for it in also_consider:
             it.pop("_raw_score", None)
         index = await SearchIndexMeta.for_repo(repo_id)
         return {
@@ -547,9 +608,12 @@ class SearchService:
             "keywords": keywords,
             "keywords_raw": raw_keywords,
             "channels": channels,
-            "total": len(unique),
+            "read_hint": cls.READ_HINT,
+            "total": len(primary),
+            "also_consider_total": len(also_consider),
             "index": index,
-            "items": unique,
+            "items": primary,
+            "also_consider": also_consider,
         }
 
     @staticmethod

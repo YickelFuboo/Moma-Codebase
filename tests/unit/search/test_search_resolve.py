@@ -338,8 +338,23 @@ class TestSearchResolveService:
         assert result["fused_total"] == 8
         assert result["total"] == 3
         assert len(result["items"]) == 3
+        assert result.get("also_consider_total") == 5
+        assert len(result.get("also_consider") or []) == 5
+        assert result.get("read_hint")
         assert "推荐 3 条" in str(result.get("summary") or "")
+        assert "also_consider" in str(result.get("summary") or "")
 
+    def test_split_for_agent_keeps_overflow_in_also_consider(self):
+        items = [
+            {"file_path": f"f{i}.py", "score": 3.0 - i * 0.01, "match_source": "exact"}
+            for i in range(6)
+        ]
+        primary, also = ResolveResultPresenter.split_for_agent(items)
+        assert len(primary) == 3
+        assert len(also) == 3
+        primary_paths = {it["file_path"] for it in primary}
+        also_paths = {it["file_path"] for it in also}
+        assert primary_paths.isdisjoint(also_paths)
     def test_weak_related_attaches_pattern_fallback(self, monkeypatch):
         class _Repo:
             id = "r1"

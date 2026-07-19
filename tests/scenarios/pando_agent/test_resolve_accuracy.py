@@ -139,8 +139,16 @@ class TestPandoResolveAccuracy(PandoAgentScenarioSession):
                 assert "related" in used
                 assert len(used) >= 2, f"NL resolve 应并联多通道，实际={used}"
             items = result.get("items") or []
+            also = result.get("also_consider") or []
             hits = [it.get("file_path") for it in items if it.get("file_path")]
+            also_hits = [it.get("file_path") for it in also if it.get("file_path")]
+            union_hits = hits + [p for p in also_hits if p not in hits]
             score = AccuracyMetrics.evaluate(case.case_id, hits, case.expected_paths)
+            union_score = AccuracyMetrics.evaluate(
+                f"{case.case_id}.union",
+                union_hits,
+                case.expected_paths,
+            )
             AccuracyMetrics.assert_pass(
                 score,
                 min_precision=case.min_precision,
@@ -156,8 +164,10 @@ class TestPandoResolveAccuracy(PandoAgentScenarioSession):
                 ), f"{case.case_id}: Top1={top} 不在 expected={case.expected_paths}"
             print(
                 f"[pando-resolve] {case.case_id} intent={result.get('intent')} "
-                f"channels={result.get('channels_used')} P={score.precision:.2%} "
-                f"R={score.recall:.2%} top={top}",
+                f"channels={result.get('channels_used')} "
+                f"itemsP={score.precision:.2%} itemsR={score.recall:.2%} "
+                f"unionP={union_score.precision:.2%} unionR={union_score.recall:.2%} "
+                f"n_items={len(hits)} n_also={len(also_hits)} top={top}",
                 flush=True,
             )
 

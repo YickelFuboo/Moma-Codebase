@@ -33,6 +33,12 @@
 
 `resolve` 额外：必填 `query`；每条 item 至少含 `file_path` / `symbol_name` / `title` / `api_name` 之一。默认可带 `snippet`（`--with-content`）。
 
+分离式 Agent 分层（resolve / related）：
+
+- `items`：主推荐（可带 snippet）
+- `also_consider`：防漏候选（默认不带 snippet）；`also_consider_total` 为其长度
+- `read_hint`：约定先读 `items`，改前扫 `also_consider`
+
 图谱类会同时保留原字段（如 `dependents` / `dependencies`），并归一到 `items`。
 
 ## 失败信封

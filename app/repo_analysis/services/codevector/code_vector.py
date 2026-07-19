@@ -414,12 +414,8 @@ class CodeVectorService:
 
     @staticmethod
     def _fallback_summary_from_source(source_code: str, ct: ContentType) -> str:
-        """LLM 摘要为空时，用源码前几行拼成短文本作为回退描述。"""
-        lines = [ln.strip() for ln in (source_code or "").splitlines() if ln.strip()]
-        preview = " ".join(lines[:4])[:280]
-        if ct == ContentType.CLASS:
-            return f"类型摘要（回退）。内容预览: {preview}"
-        return f"函数摘要（回退）。内容预览: {preview}"
+        """LLM 摘要为空时，委托 CodeSummary 确定性回退。"""
+        return CodeSummary.fallback_summary(source_code, ct)
 
     @staticmethod
     def _dedupe_texts(texts: List[str]) -> Tuple[List[str], List[int]]:
