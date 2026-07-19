@@ -224,7 +224,7 @@ def search_related(
     top_k: int,
     timeout_ms: int,
 ) -> None:
-    """相关代码检索：符号 exact/摘要 + CodeGraph（仅 kind=code）。"""
+    """相关代码检索：符号 exact/摘要；符号关闭时路径 exact 兜底；可选 CodeGraph（仅 kind=code）。"""
 
     async def _related() -> dict:
         keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]

@@ -487,9 +487,12 @@ class SearchService:
 
     @staticmethod
     def related_channel_flags() -> Dict[str, bool]:
-        """定位默认仅 symbol；图谱需 CODE_ANALYSIS_RELATED_INCLUDE_GRAPH=true。"""
+        """定位通道开关：符号摘要优先；关闭时用路径 exact（行块元数据）兜底；图谱需显式打开。"""
+        symbol_on = bool(settings.code_analysis_symbol_summary_enabled)
+        chunk_on = bool(settings.code_analysis_line_chunk_enabled)
         return {
-            "symbol": bool(settings.code_analysis_symbol_summary_enabled),
+            "symbol": symbol_on,
+            "path_fallback": (not symbol_on) and chunk_on,
             "codegraph": bool(
                 settings.code_graph_enabled
                 and bool(getattr(settings, "code_analysis_related_include_graph", False))
@@ -561,6 +564,7 @@ class SearchService:
         if not any(channels.values()):
             raise ValueError(
                 "related 能力全部关闭：请开启 CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED"
+                "或 CODE_ANALYSIS_LINE_CHUNK_ENABLED"
                 "（或 CODE_ANALYSIS_RELATED_INCLUDE_GRAPH=true 且 CODE_GRAPH_ENABLED）"
             )
 
@@ -580,6 +584,8 @@ class SearchService:
             symbol_docs = await CodeVectorSearchService.search_code_symbol_summary_vectors(
                 repo_id, keywords, fetch_k
             )
+        elif channels.get("path_fallback"):
+            exact_items.extend(await ExactMatchService.match_paths(repo_id, keywords, top_k=fetch_k))
         if channels["codegraph"]:
             extra_items.extend(
                 await cls._search_codegraph_files(repo_id, keywords, top_k=fetch_k)

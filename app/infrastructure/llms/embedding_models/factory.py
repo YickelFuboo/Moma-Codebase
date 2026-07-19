@@ -6,6 +6,7 @@ from .bedrock_embed import BedrockEmbed
 from .cohere_embed import CoHereEmbed
 from .gemini_embed import GeminiEmbed
 from .huggingface_embed import HuggingFaceEmbed
+from .jina_embed import JinaEmbed
 from .mistral_embed import MistralEmbed
 from .nvidia_embed import NvidiaEmbed
 from .ollama_embed import OllamaEmbed
@@ -37,6 +38,7 @@ class EmbeddingModelFactory(BaseModelFactory[BaseEmbedding]):
             "mistral": MistralEmbed,
             "baidu_yiyan": BaiduYiyanEmbed,
             "voyage": VoyageEmbed,
+            "jina": JinaEmbed,
             "huggingface": HuggingFaceEmbed,
         }
 

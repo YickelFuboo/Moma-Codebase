@@ -24,13 +24,22 @@ class TestSearchIntentRouter:
         assert plan.intent == SearchIntent.SIMILAR
         assert plan.channels == ["similar"]
 
-    def test_detect_pattern_for_experience_query(self):
+    def test_detect_pattern_for_experience_query(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
         plan = SearchIntentRouter.plan("怎么改告警名称的历史经验", repo_kind="code")
         assert plan.intent == SearchIntent.PATTERN
         assert "pattern" in plan.channels
         assert "related" in plan.channels
 
-    def test_detect_related_default(self):
+    def test_detect_related_default(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
         plan = SearchIntentRouter.plan("ReActAgent ContextBuilder", repo_kind="code")
         assert plan.intent == SearchIntent.RELATED
         assert "related" in plan.channels
@@ -41,12 +50,33 @@ class TestSearchIntentRouter:
     def test_locate_channels_respect_flags(self, monkeypatch):
         from app.config.settings import settings
 
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
         monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)
         monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", False)
         assert SearchIntentRouter.locate_channels() == ["related"]
         monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
         monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
         assert SearchIntentRouter.locate_channels() == ["related", "similar", "grep"]
+
+    def test_locate_channels_omit_related_when_symbol_off(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", False)
+        monkeypatch.setattr(settings, "code_graph_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
+        assert SearchIntentRouter.locate_channels() == ["similar", "grep"]
+
+    def test_pattern_omits_related_when_symbol_off(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", False)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
+        plan = SearchIntentRouter.plan("怎么改告警名称的历史经验", repo_kind="code")
+        assert plan.intent == SearchIntent.PATTERN
+        assert plan.channels == ["pattern"]
 
     def test_lib_defaults_to_api(self):
         plan = SearchIntentRouter.plan("读取文本文件", repo_kind="lib")
@@ -90,6 +120,12 @@ class TestSearchIntentRouter:
 
 class TestSearchResolveService:
     def test_resolve_related_channel(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
+
         class _Repo:
             id = "r1"
             kind = "code"
@@ -152,6 +188,11 @@ class TestSearchResolveService:
         assert "related" in result["sections"]
 
     def test_resolve_channel_failure_degrades(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
+
         class _Repo:
             id = "r1"
             kind = "code"
@@ -296,6 +337,12 @@ class TestSearchResolveService:
         assert all(it.get("why") for it in result["items"])
 
     def test_agent_items_capped_at_three(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", False)
+
         class _Repo:
             id = "r1"
             kind = "code"
@@ -497,6 +544,12 @@ class TestSearchResolveService:
         assert out[0]["match_source"] == "exact"
 
     def test_resolve_nl_runs_related_similar_grep(self, monkeypatch):
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
+
         class _Repo:
             id = "r1"
             kind = "code"

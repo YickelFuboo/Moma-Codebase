@@ -114,8 +114,17 @@ class SearchIntentRouter:
 
     @classmethod
     def locate_channels(cls) -> List[str]:
-        """NL/定位默认并联：related + similar + grep（按开关裁剪）。"""
-        channels = ["related"]
+        """NL/定位默认并联：related（符号/图谱可用时）+ similar + grep（按开关裁剪）。
+
+        符号摘要关闭时 related 不进定位并联（避免弱路径兜底冒充语义相关）；
+        独立 `search related` 仍可走 path_fallback。
+        """
+        from app.repo_analysis.services.search_service import SearchService
+
+        channels: List[str] = []
+        flags = SearchService.related_channel_flags()
+        if flags.get("symbol") or flags.get("codegraph"):
+            channels.append("related")
         if settings.code_analysis_line_chunk_enabled:
             channels.append("similar")
         if settings.code_analysis_content_grep_enabled:
@@ -168,15 +177,21 @@ class SearchIntentRouter:
             )
 
         if intent == SearchIntent.PATTERN:
+            from app.repo_analysis.services.search_service import SearchService
+
+            pattern_channels = ["pattern"]
+            flags = SearchService.related_channel_flags()
+            if flags.get("symbol") or flags.get("codegraph"):
+                pattern_channels.append("related")
             return ResolvePlan(
                 intent=intent,
-                channels=["pattern", "related"],
+                channels=pattern_channels,
                 keywords=cls._keywords_from_query(q),
                 code_text=q,
                 graph_file=None,
                 graph_symbol=None,
                 graph_mode=None,
-                reason="历史经验为主，related 辅助定位",
+                reason="历史经验为主，related 辅助定位（按开关）",
             )
 
         if intent == SearchIntent.GRAPH:
@@ -213,7 +228,7 @@ class SearchIntentRouter:
             graph_file=None,
             graph_symbol=None,
             graph_mode=None,
-            reason="NL 定位：related + similar + grep 并联",
+            reason="NL 定位：可用通道并联（related/similar/grep 按开关）",
         )
 
     @classmethod

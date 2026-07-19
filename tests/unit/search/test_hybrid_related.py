@@ -202,17 +202,27 @@ class TestFuseRelatedItems:
 class TestRelatedChannelFlags:
     def test_channel_flags_default_excludes_graph(self, monkeypatch):
         monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
         monkeypatch.setattr(settings, "code_graph_enabled", True)
         monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
         flags = SearchService.related_channel_flags()
-        assert flags == {"symbol": True, "codegraph": False}
+        assert flags == {"symbol": True, "path_fallback": False, "codegraph": False}
 
     def test_channel_flags_can_opt_in_graph(self, monkeypatch):
         monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
         monkeypatch.setattr(settings, "code_graph_enabled", True)
         monkeypatch.setattr(settings, "code_analysis_related_include_graph", True)
         flags = SearchService.related_channel_flags()
-        assert flags == {"symbol": True, "codegraph": True}
+        assert flags == {"symbol": True, "path_fallback": False, "codegraph": True}
+
+    def test_path_fallback_when_symbol_off(self, monkeypatch):
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", False)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_graph_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
+        flags = SearchService.related_channel_flags()
+        assert flags == {"symbol": False, "path_fallback": True, "codegraph": False}
 
     def test_capability_flags(self, monkeypatch):
         monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", False)
@@ -347,6 +357,8 @@ class TestSearchChunksSymbolsGuards:
         asyncio.run(_run())
 
     def test_symbols_rejects_lib(self, monkeypatch):
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+
         class _Repo:
             kind = "lib"
             id = "r1"

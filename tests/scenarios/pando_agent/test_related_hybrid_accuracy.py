@@ -13,6 +13,8 @@ class TestPandoRelatedHybridAccuracy(PandoAgentScenarioSession):
     @pytest.mark.parametrize("case", PANDO_RELATED_CASES, ids=lambda c: c.case_id)
     def test_related_accuracy(self, case) -> None:
         self.require_repo_or_skip()
+        if not self.ENABLE_SYMBOL_SUMMARY:
+            pytest.skip("related 混合准确率依赖符号摘要，ENABLE_SYMBOL_SUMMARY=False 时跳过")
 
         async def _run():
             await self.ensure_vector_ready()

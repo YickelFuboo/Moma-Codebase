@@ -32,6 +32,8 @@ class SILICONFLOWEmbed(BaseEmbedding):
             "content-type": "application/json",
             "authorization": f"Bearer {api_key}",
         }
+        dims = self.configs.get("dimensions")
+        self._dimensions = int(dims) if dims is not None else None
 
     @staticmethod
     def _batch_len_info(texts: List[str]) -> str:
@@ -62,7 +64,9 @@ class SILICONFLOWEmbed(BaseEmbedding):
                     "input": texts_batch,
                     "encoding_format": "float",
                 }
-                
+                if self._dimensions is not None:
+                    payload["dimensions"] = self._dimensions
+
                 # 重试逻辑
                 for attempt in range(MAX_RETRY_ATTEMPTS):
                     try:
@@ -113,7 +117,9 @@ class SILICONFLOWEmbed(BaseEmbedding):
             "input": text,
             "encoding_format": "float",
         }
-        
+        if self._dimensions is not None:
+            payload["dimensions"] = self._dimensions
+
         # 重试逻辑
         for attempt in range(MAX_RETRY_ATTEMPTS):
             try:
