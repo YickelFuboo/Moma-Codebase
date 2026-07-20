@@ -1,11 +1,12 @@
-"""NL2Code × 符号摘要 五档消融：重建索引后对比 resolve/related 准确率。
+"""NL2Code × 符号摘要 六档消融：重建索引后对比 resolve/related 准确率。
 
 档位：
   A. 符号 ON  + NL2Code OFF + rewrite OFF
   B. 符号 OFF + NL2Code ON  + rewrite OFF
-  C. 符号 OFF + NL2Code ON  + rewrite ON（mode=always，保证改写会触发）
+  C. 符号 OFF + NL2Code ON  + rewrite ON（mode=always）
   D. 符号 ON  + NL2Code ON  + rewrite OFF
   E. 符号 ON  + NL2Code ON  + rewrite ON（mode=always）
+  F. 符号 ON  + NL2Code ON  + rewrite ON（mode=weak，弱召回才改写）
 
 用法（仓根、venv）：
   PANDO_CLEAR=1 python -m tests.scenarios.pando_agent.run_nl2code_ablation
@@ -13,7 +14,7 @@
 环境变量：
   PANDO_CLEAR=1（默认）每组索引重建前清库
   PANDO_AGENT_PATH 可选，默认 F:\\Product_Dev\\PANDO\\Pando-Agent
-  PANDO_ABLATION_ONLY=E 只跑指定档（逗号分隔）
+  PANDO_ABLATION_ONLY=F 只跑指定档（逗号分隔）
   PANDO_SKIP_REBUILD=1 跳过清库重建（索引已与目标符号开关一致时）
   PANDO_ABLATION_KIND=resolve|related|all（默认 all）
 """
@@ -59,6 +60,7 @@ CONFIGS = [
     AblationConfig("C", symbol_on=False, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
     AblationConfig("D", symbol_on=True, nl2code=True, nl_rewrite=False),
     AblationConfig("E", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
+    AblationConfig("F", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="weak"),
 ]
 
 ALL_LABELS = [c.label for c in CONFIGS]
@@ -138,7 +140,10 @@ async def _eval_resolve(cfg: AblationConfig) -> List[CaseRow]:
             nl_rewrite_meta=result.get("nl_rewrite"),
         )
         rows.append(row)
-        rw = "Y" if row.nl_rewrite_meta else "N"
+        rw = "N"
+        if row.nl_rewrite_meta:
+            trigger = row.nl_rewrite_meta.get("trigger") if isinstance(row.nl_rewrite_meta, dict) else None
+            rw = f"Y:{trigger}" if trigger else "Y"
         print(
             f"[{cfg.label}/resolve] {case.case_id} "
             f"iR={row.items_r:.0%} uR={row.union_r:.0%} rw={rw} "
@@ -214,13 +219,14 @@ def _print_summary(all_rows: List[CaseRow]) -> None:
     print("\n===== SUMMARY (by config × kind) =====", flush=True)
     print(
         f"{'cfg':<4} {'kind':<8} {'avg_iR':>7} {'avg_uR':>7} {'pass':>8} "
-        f"{'symbol':>7} {'nl2c':>5} {'rewr':>5}",
+        f"{'symbol':>7} {'nl2c':>5} {'rewr':>5} {'mode':>6}",
         flush=True,
     )
     cfg_map = {c.label: c for c in CONFIGS}
     present = [lbl for lbl in ALL_LABELS if any(r.config == lbl for r in all_rows)]
     for label in present:
         cfg = cfg_map[label]
+        mode = cfg.rewrite_mode if cfg.nl_rewrite else "-"
         for kind in ("resolve", "related"):
             rows = [r for r in all_rows if r.config == label and r.kind == kind]
             if not rows:
@@ -231,7 +237,8 @@ def _print_summary(all_rows: List[CaseRow]) -> None:
                 f"{sum(1 for r in rows if r.passed)}/{len(rows):<4} "
                 f"{'ON' if cfg.symbol_on else 'OFF':>7} "
                 f"{'ON' if cfg.nl2code else 'OFF':>5} "
-                f"{'ON' if cfg.nl_rewrite else 'OFF':>5}",
+                f"{'ON' if cfg.nl_rewrite else 'OFF':>5} "
+                f"{mode:>6}",
                 flush=True,
             )
 
@@ -269,7 +276,8 @@ async def main() -> None:
 
     print(
         "[nl2code-ablation] A=symbol+noNL | B=noSymbol+NL | "
-        "C=noSymbol+NL+rewrite | D=symbol+NL | E=symbol+NL+rewrite "
+        "C=noSymbol+NL+rewrite(always) | D=symbol+NL | "
+        "E=symbol+NL+rewrite(always) | F=symbol+NL+rewrite(weak) "
         f"only={only or 'ALL'} kind={kind} skip_rebuild={skip_rebuild} "
         f"resolve_cases={len(PANDO_RESOLVE_CASES)}",
         flush=True,
@@ -300,7 +308,7 @@ async def main() -> None:
                 continue
             await _eval_cfg(cfg)
 
-    # 组2：有符号索引 → A、D、E
+    # 组2：有符号索引 → A、D、E、F
     with_symbol = {c.label for c in CONFIGS if c.symbol_on}
     if want & with_symbol:
         if not skip_rebuild:

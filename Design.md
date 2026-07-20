@@ -663,7 +663,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | 套件 | 结果 |
 |------|------|
 | `tests/unit/search/nl2code_enhance/` 等 | **84 passed**（完备性收口时） |
-| 真仓五档消融 | 见 **§5.12**（17 案：D/E 16/17；产品默认 D） |
+| 真仓六档消融 | 见 **§5.12**（17 案：D/F 94%/97%·16/17；产品默认 D；F=weak 未抬 cn_auth） |
 
 ---
 
@@ -685,7 +685,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 
 ### 5.12 整体配置开关对比测试
 
-日期：2026-07-19（17 案五档补齐：2026-07-20）  
+日期：2026-07-19（17 案六档含 F/`weak`：2026-07-20）  
 待测仓：Pando-Agent（`app/`）  
 脚本：`python -m tests.scenarios.pando_agent.run_nl2code_ablation`  
 前置：按组 `PANDO_CLEAR=1` 清库重建索引（符号 OFF 评 B/C；符号 ON 评 A/D/E）
@@ -714,20 +714,22 @@ resolve 用例已扩至 **17** 条（`PANDO_RESOLVE_CASES`，`ground_truth.py`�
 | **C** | OFF | ON | ON（`always`） | 无摘要，NL + 每次 NL 查询 LLM 改写 |
 | **D** ★产品默认 | ON | ON | OFF | 摘要 + NL，不改写（= 当前 `env.example`） |
 | **E** | ON | ON | ON（`always`） | 摘要 + NL + 每次 NL 查询 LLM 改写 |
+| **F** | ON | ON | ON（`weak`） | 摘要 + NL + **弱召回才** LLM 改写 |
 
 产品默认 **D**：`CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED=true`、`CODE_ANALYSIS_NL_TO_CODE_ENABLED=true`、`CODE_ANALYSIS_NL_REWRITE_ENABLED=false`（mode 预留 `weak`）。
 
 #### 对比效果
 
-**Agent 主路径 resolve（17 案，五档齐全，2026-07-20）**
+**Agent 主路径 resolve（17 案，含 F，2026-07-20）**
 
 | 档 | 符号 | NL2Code | rewrite | resolve iR / uR · pass |
 |----|------|---------|---------|-------------------------|
 | **A** | ON | OFF | OFF | 88% / 97% · **15/17** |
 | **B** | OFF | ON | OFF | 68% / 88% · **12/17** |
-| **C** | OFF | ON | ON | 76% / 94% · **13/17** |
+| **C** | OFF | ON | ON/`always` | 76% / 94% · **13/17** |
 | **D** ★ | ON | ON | OFF | **94% / 97% · 16/17** |
-| **E** | ON | ON | ON | 91% / 94% · **16/17** |
+| **E** | ON | ON | ON/`always` | 91% / 94% · **16/17** |
+| **F** | ON | ON | ON/`weak` | **94% / 97% · 16/17** |
 
 **通道对照（旧 resolve 6 案 + related 13 案）**
 
@@ -741,19 +743,38 @@ resolve 用例已扩至 **17** 条（`PANDO_RESOLVE_CASES`，`ground_truth.py`�
 
 **焦点 NL（17 案 resolve，unionR）**
 
-| case | A | B | C | D | E |
-|------|---|---|---|---|---|
-| `cn_auth` | 50% | **100%** | **100%** | 50% | **100%** |
-| `cn_memory` | **100%** | **100%** | **100%** | **100%** | **0%**（`always` rewrite 噪声） |
-| `cn_ws` | 100% | 100% | 100% | 100% | 100% |
+| case | A | B | C | D | E | F |
+|------|---|---|---|---|---|---|
+| `cn_auth` | 50% | **100%** | **100%** | 50% | **100%** | 50%（弱改写触发仍未补上） |
+| `cn_memory` | **100%** | **100%** | **100%** | **100%** | **0%**（always 噪声） | **100%**（弱改写触发未伤） |
+| `cn_ws` | 100% | 100% | 100% | 100% | 100% | 100% |
 
 **结论（配置取舍）**
 
-1. **产品默认 = D**：17 案上与 E 同为 **16/17**，平均 iR/uR 略优，且无每次 NL 打 LLM 的成本；与 `env.example` 一致。  
-2. **必须开符号摘要**：无符号的 B/C（12～13/17）明显弱于有符号的 A/D/E。  
-3. **旧 6 案上 C「全绿」不可信**：扩案后 C 掉到 13/17（exact 类暴露）。  
-4. **E 适合难例增强**：补 `cn_auth`，但 `always` 可能伤 `cn_memory`；若开 rewrite，产品侧优先 `weak` 而非默认 `always`。  
-5. **不要默认 C / 不要默认 E(always)**。
+1. **产品默认仍 = D**：F≈D（同为 16/17、94%/97%），弱改写未抬 `cn_auth`，不必为 F 改默认。  
+2. **F vs E**：F 保住 `cn_memory`（E 的 always 会带偏）；E 靠 always 补 `cn_auth`，但代价高。  
+3. **`weak` 不是免费增益**：本仓 `cn_auth` 首轮弱召回后虽触发 rewrite（`rw=Y:weak`），改写种子仍不足以把鉴权文件顶进主列表。  
+4. **必须开符号摘要**：无符号的 B/C（12～13/17）明显弱于有符号档。  
+5. **旧 6 案上 C「全绿」不可信**；不要默认 C / 不要默认 E(`always`)。  
+6. **后续若要补鉴权**：优先改 lexicon / 中文短语→路径，或专项评测 rewrite 质量，而不是默认开 always。
+
+**第二真仓 KnowledegBase-Service（12 案 resolve，默认 D vs F，2026-07-20）**
+
+脚本：`python -m tests.scenarios.knowledge_base.run_resolve_eval`
+
+| 档 | rewrite | resolve iR / uR · pass |
+|----|---------|-------------------------|
+| **D** | OFF | 75% / 100% · **9/12** |
+| **F** | weak | **92% / 100% · 11/12** |
+
+中文 NL（unionR 均为 100%；差别在 items 主列表）：
+
+| case | D items | F items |
+|------|---------|---------|
+| `cn_kb` / `cn_parse` / `cn_session` | fail（落 also） | **pass**（weak 改写抬主列表） |
+| `cn_retrieval` | pass | fail（weak 偶发带偏，union 仍 100%） |
+
+解读：第二仓上 **F 对短中文更有用**（3 个中文难例 items 从 fail→pass）；与 Pando 上 F≈D 不同，说明 weak 增益依赖仓/问法。产品默认仍可 D；难中文仓可考虑开 `NL_REWRITE=weak`。
 
 #### 复现命令
 

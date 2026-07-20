@@ -76,6 +76,218 @@ KB_RELATED_CASES = [
         top_k=15,
         extra={"keywords": ["agent session create_session storage manager"]},
     ),
+    PathSetCase(
+        case_id="kb.related.hard.short.cn_session",
+        description="短中文：会话管理",
+        expected_paths=["app/agent_frame/session/manager.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={"keywords": ["会话管理"]},
+    ),
+    PathSetCase(
+        case_id="kb.related.hard.short.cn_retrieval",
+        description="短中文：向量检索",
+        expected_paths=["app/rag_core/rag/retrieval/search.py"],
+        min_precision=0.1,
+        min_recall=0.5,
+        top_k=10,
+        extra={"keywords": ["向量检索"]},
+    ),
+]
+
+# Agent 主路径 search resolve：符号 + 中文 NL + similar（第二真仓）
+KB_RESOLVE_CASES = [
+    PathSetCase(
+        case_id="kb.resolve.related.KBService",
+        description="纯符号：KBService",
+        expected_paths=["app/domains/services/kb_service.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "KBService",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.related.DocParserService",
+        description="中文+符号：DocParserService 在哪",
+        expected_paths=["app/domains/services/doc_parser_service.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "DocParserService 实现在哪",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.related.SessionManager",
+        description="纯符号：SessionManager",
+        expected_paths=["app/agent_frame/session/manager.py"],
+        min_precision=0.4,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "SessionManager",
+            "expect_intent": "related",
+            "expect_channel": "related",
+            "expect_top1_in_expected": True,
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.related.Dealer",
+        description="纯符号：Dealer 检索",
+        expected_paths=["app/rag_core/rag/retrieval/search.py"],
+        min_precision=0.25,
+        min_recall=1.0,
+        top_k=5,
+        extra={
+            "query": "Dealer",
+            "expect_intent": "related",
+            "expect_channel": "related",
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.nl.cn_kb",
+        description="中文 NL：知识库服务在哪",
+        expected_paths=["app/domains/services/kb_service.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "知识库服务在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.nl.cn_parse",
+        description="中文 NL：文档解析在哪",
+        expected_paths=["app/domains/services/doc_parser_service.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "文档解析在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.nl.cn_session",
+        description="中文 NL：会话管理在哪",
+        expected_paths=["app/agent_frame/session/manager.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "会话管理在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.nl.cn_retrieval",
+        description="中文 NL：向量检索重排在哪",
+        expected_paths=["app/rag_core/rag/retrieval/search.py"],
+        min_precision=0.1,
+        min_recall=0.5,
+        top_k=10,
+        extra={
+            "query": "向量检索重排在哪",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.nl.semantic_retrieval",
+        description="弱英文 NL：document retrieval rerank",
+        expected_paths=["app/rag_core/rag/retrieval/search.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={
+            "query": "document retrieval rerank vector search dealer",
+            "expect_intent": "related",
+            "expect_channels_any": ["related", "similar", "grep"],
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.similar.kb_service_create",
+        description="代码片段：create_kb → kb_service.py",
+        expected_paths=["app/domains/services/kb_service.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "class KBService:\n"
+                "    @staticmethod\n"
+                "    async def create_kb(\n"
+                "        session: AsyncSession,\n"
+                "        name: str,\n"
+                "        owner_id: str,\n"
+                "        description: str = None,\n"
+                "        language: str = \"Chinese\",\n"
+                "        tenant_id: str = None,\n"
+                "    ) -> KB:\n"
+                "        if not tenant_id:\n"
+                "            raise ValueError(\"缺少租户信息\")\n"
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.similar.session_manager",
+        description="代码片段：SessionManager.create_session",
+        expected_paths=["app/agent_frame/session/manager.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "class SessionManager:\n"
+                "    async def create_session(\n"
+                "        self,\n"
+                "        session_type: str,\n"
+                "        user_id: str = \"anonymous\",\n"
+                "        description: str = \"\",\n"
+                "        metadata: Optional[Dict[str, Any]] = None,\n"
+                "        llm_name: Optional[str] = None\n"
+                "    ) -> str:\n"
+                "        session_id = f\"session_{timestamp}_{random_suffix}\"\n"
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
+    PathSetCase(
+        case_id="kb.resolve.similar.dealer_get_vector",
+        description="代码片段：Dealer._get_vector",
+        expected_paths=["app/rag_core/rag/retrieval/search.py"],
+        min_precision=0.5,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "class Dealer:\n"
+                "    async def _get_vector(self, txt, emb_mdl, topk=10, similarity=0.1):\n"
+                "        qv, _ = await emb_mdl.encode_queries(txt)\n"
+                "        embedding_data = [get_float(v) for v in qv]\n"
+                "        vector_column_name = f\"q_{len(embedding_data)}_vec\"\n"
+                "        return MatchDenseExpr(vector_column_name, embedding_data, 'float', 'cosine', topk)\n"
+            ),
+            "expect_intent": "similar",
+            "expect_channel": "similar",
+        },
+    ),
 ]
 
 KB_SIMILAR_CASES = [
