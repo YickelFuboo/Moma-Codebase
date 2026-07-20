@@ -663,7 +663,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | 套件 | 结果 |
 |------|------|
 | `tests/unit/search/nl2code_enhance/` 等 | **84 passed**（完备性收口时） |
-| 真仓五档消融 | 见 **§5.12**（E 综合最优；C resolve items 最高；A/D/E related 最稳） |
+| 真仓五档消融 | 见 **§5.12**（17 案：D/E 16/17；产品默认 D） |
 
 ---
 
@@ -685,23 +685,25 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 
 ### 5.12 整体配置开关对比测试
 
-日期：2026-07-19（E 档补测：2026-07-20）  
+日期：2026-07-19（17 案五档补齐：2026-07-20）  
 待测仓：Pando-Agent（`app/`）  
 脚本：`python -m tests.scenarios.pando_agent.run_nl2code_ablation`  
 前置：按组 `PANDO_CLEAR=1` 清库重建索引（符号 OFF 评 B/C；符号 ON 评 A/D/E）
 
 #### 主要测试用例
 
+resolve 用例已扩至 **17** 条（`PANDO_RESOLVE_CASES`，`ground_truth.py`），覆盖 Agent 主路径常见问法：
+
 | 类型 | 代表 case | 查询形态 | 期望 |
 |------|-----------|----------|------|
-| resolve 符号定位 | `pando.resolve.related.ReActAgent` / `ContextBuilder` | 中文+符号名 / 纯符号 | 命中定义文件 |
-| resolve 代码 similar | `pando.resolve.similar.think_and_act` | 源码片段 | 命中 `react.py` |
-| resolve 弱英文 NL | `pando.resolve.nl.semantic.memory` | 长英文语义 | 命中 `memory.py` |
-| resolve 中文 NL | `pando.resolve.nl.cn_auth` / `cn_ws` | 「鉴权在哪」「websocket 通道在哪」 | 命中 auth / websocket |
-| related exact | `pando.full.exact.*` | 类名/工厂名 | Top 命中定义 |
-| related 语义/短中文 | `pando.full.semantic.*` / `pando.related.hard.short.cn_*` | 英文短语 / 「记忆」「鉴权」 | 命中对应文件 |
+| resolve 符号 exact | `related.BaseAgent` / `PlanningAgent` / `LangGraphExecutor` / `EmbeddingModelFactory` / `OpenAIModels` / `jwt_validator` | 纯符号或路径标识 | Top1 命中定义（拉开有无符号摘要） |
+| resolve 中文+符号 | `related.ReActAgent` / `ContextBuilder` | 「查找 Xxx」「Xxx」 | 命中定义文件 |
+| resolve 代码 similar | `similar.think_and_act` / `agent_state` / `jwt_validator` / `websocket_endpoint` | 源码片段 | 命中对应文件 |
+| resolve 弱英文 NL | `nl.semantic.memory` / `nl.semantic.websocket` | 长英文语义 | 命中 memory / websocket |
+| resolve 中文 NL | `nl.cn_auth` / `cn_memory` / `cn_ws` | 「鉴权/记忆/websocket 在哪」 | 命中 auth / memory / websocket |
+| related（通道对照） | `pando.full.exact.*` 等 13 条 | 关键词 | 见下表 related 列 |
 
-口径：**avg iR** = items Recall；**avg uR** = items∪also_consider Recall；pass = recall ≥ 用例门槛。
+口径：**avg iR** = items Recall；**avg uR** = items∪also_consider Recall；pass = items recall ≥ 用例门槛。
 
 #### 对比场景（配置档）
 
@@ -710,38 +712,48 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | **A** | ON | OFF | OFF | 基线：只靠符号摘要 + 行块 |
 | **B** | OFF | ON | OFF | 无摘要，开 NL 多视角/词表，不改写 |
 | **C** | OFF | ON | ON（`always`） | 无摘要，NL + 每次 NL 查询 LLM 改写 |
-| **D** | ON | ON | OFF | 摘要 + NL，不改写 |
+| **D** ★产品默认 | ON | ON | OFF | 摘要 + NL，不改写（= 当前 `env.example`） |
 | **E** | ON | ON | ON（`always`） | 摘要 + NL + 每次 NL 查询 LLM 改写 |
 
-ENV：`CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED`、`CODE_ANALYSIS_NL_TO_CODE_ENABLED`、`CODE_ANALYSIS_NL_REWRITE_ENABLED` / `MODE`。
+产品默认 **D**：`CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED=true`、`CODE_ANALYSIS_NL_TO_CODE_ENABLED=true`、`CODE_ANALYSIS_NL_REWRITE_ENABLED=false`（mode 预留 `weak`）。
 
 #### 对比效果
 
-**总表**
+**Agent 主路径 resolve（17 案，五档齐全，2026-07-20）**
 
-| 档 | resolve avg iR / uR · pass | related avg iR / uR · pass |
-|----|----------------------------|----------------------------|
+| 档 | 符号 | NL2Code | rewrite | resolve iR / uR · pass |
+|----|------|---------|---------|-------------------------|
+| **A** | ON | OFF | OFF | 88% / 97% · **15/17** |
+| **B** | OFF | ON | OFF | 68% / 88% · **12/17** |
+| **C** | OFF | ON | ON | 76% / 94% · **13/17** |
+| **D** ★ | ON | ON | OFF | **94% / 97% · 16/17** |
+| **E** | ON | ON | ON | 91% / 94% · **16/17** |
+
+**通道对照（旧 resolve 6 案 + related 13 案）**
+
+| 档 | resolve（旧 6） | related（13） |
+|----|-----------------|---------------|
 | **A** | 83% / 83% · 5/6 | **96% / 100% · 13/13** |
 | **B** | 58% / 83% · 4/6 | 69% / 69% · 8/13 |
-| **C** | **100% / 100% · 6/6** | 81% / 85% · 10/13 |
+| **C** | 100% / 100% · 6/6 | 81% / 85% · 10/13 |
 | **D** | 83% / 83% · 5/6 | **96% / 100% · 13/13** |
-| **E** | **92% / 100% · 6/6** | **96% / 100% · 13/13** |
+| **E** | 92% / 100% · 6/6 | **96% / 100% · 13/13** |
 
-**焦点 NL resolve（unionR）**
+**焦点 NL（17 案 resolve，unionR）**
 
 | case | A | B | C | D | E |
 |------|---|---|---|---|---|
-| `cn_auth`（鉴权在哪） | **0%** | **100%** | **100%** | **0%** | **100%** |
+| `cn_auth` | 50% | **100%** | **100%** | 50% | **100%** |
+| `cn_memory` | **100%** | **100%** | **100%** | **100%** | **0%**（`always` rewrite 噪声） |
 | `cn_ws` | 100% | 100% | 100% | 100% | 100% |
-| `semantic.memory` | 100% | 100% | 100% | 100% | 100% |
 
 **结论（配置取舍）**
 
-1. **要稳 related（exact 类）** → 开符号摘要（A/D/E）。  
-2. **要补纯中文 NL resolve（尤其鉴权）** → rewrite（C/E）或无摘要的 NL2Code（B）；有符号但无 rewrite 的 A/D 仍漏 `cn_auth`。  
-3. **符号 + NL2Code 无 rewrite（D）≈A**：当前 GT 上增益有限。  
-4. **E = D + rewrite**：related 与 A/D 同级（13/13），resolve 全绿且补上 `cn_auth`（items 50%、union 100%）；相对 C 用符号保住了 related。  
-5. **产品默认建议**：符号摘要按产品开；NL2Code 默认 ON、rewrite 默认 OFF；弱中文难例用 `NL_REWRITE`（`weak`/`always`）作增强。若接受 LLM 延迟/成本，E 是当前 GT 上综合最优。
+1. **产品默认 = D**：17 案上与 E 同为 **16/17**，平均 iR/uR 略优，且无每次 NL 打 LLM 的成本；与 `env.example` 一致。  
+2. **必须开符号摘要**：无符号的 B/C（12～13/17）明显弱于有符号的 A/D/E。  
+3. **旧 6 案上 C「全绿」不可信**：扩案后 C 掉到 13/17（exact 类暴露）。  
+4. **E 适合难例增强**：补 `cn_auth`，但 `always` 可能伤 `cn_memory`；若开 rewrite，产品侧优先 `weak` 而非默认 `always`。  
+5. **不要默认 C / 不要默认 E(always)**。
 
 #### 复现命令
 
@@ -752,8 +764,9 @@ $env:ENABLE_INCREMENTAL_SCAN="false"
 # 可选：$env:PANDO_AGENT_PATH="F:\Product_Dev\PANDO\Pando-Agent"
 .\.venv\Scripts\python.exe -u -m tests.scenarios.pando_agent.run_nl2code_ablation
 
-# 索引已就绪时只跑子集，例如：
-# $env:PANDO_SKIP_REBUILD="1"; $env:PANDO_ABLATION_ONLY="E"
+# 只跑 resolve 五档 / 子集：
+# $env:PANDO_ABLATION_KIND="resolve"; $env:PANDO_ABLATION_ONLY="A,B,C,D,E"
+# 索引已就绪：$env:PANDO_SKIP_REBUILD="1"; $env:PANDO_ABLATION_ONLY="D"
 ```
 
 ---
@@ -763,10 +776,10 @@ $env:ENABLE_INCREMENTAL_SCAN="false"
 | ENV | 默认倾向 | 作用 |
 |-----|----------|------|
 | `CODE_ANALYSIS_LINE_CHUNK_ENABLED` | ON | 行块 / similar |
-| `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | 产品可配 | 符号摘要 / related 主力 |
-| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | ON | NL 多视角 / lexicon / token 加权 |
-| `CODE_ANALYSIS_NL_REWRITE_ENABLED` | OFF | LLM 改写 |
-| `CODE_ANALYSIS_NL_REWRITE_MODE` | weak | `weak` \| `always` |
+| `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | **ON**（D） | 符号摘要 / related 主力 |
+| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | **ON**（D） | NL 多视角 / lexicon / token 加权 |
+| `CODE_ANALYSIS_NL_REWRITE_ENABLED` | **OFF**（D） | LLM 改写；难例可开 |
+| `CODE_ANALYSIS_NL_REWRITE_MODE` | weak | `weak` \| `always`（勿默认 always） |
 | `CODE_ANALYSIS_RELATED_INCLUDE_GRAPH` | OFF | related 是否融 CodeGraph |
 | `CODE_GRAPH_ENABLED` / `PROVIDER` | ON / codegraph | 图谱 |
 | `ENABLE_INCREMENTAL_SCAN` | 可配 | 后台增量扫描 |

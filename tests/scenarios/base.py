@@ -120,16 +120,21 @@ class CodebaseScenarioBase(ABC):
             a = summary.get("analysis_summary") or {}
             pending = int(a.get("pending_files") or 0)
             running = int(a.get("running_files") or 0)
+            embedded = int(a.get("embedded_files") or 0)
             completed = int(a.get("completed_files") or 0)
             failed = int(a.get("failed_files") or 0)
             skipped = int(a.get("skipped_files") or 0)
+            searchable = int(a.get("searchable_files") or (completed + embedded))
+            total = int(a.get("total_files") or 0)
             in_mem = bool(a.get("scan_active_in_process"))
             scan_done = scan_status in (
                 RepoAnalysisStatus.COMPLETED.value,
                 RepoAnalysisStatus.FAILED.value,
                 RepoAnalysisStatus.IDLE.value,
             ) and not in_mem
-            if scan_done and pending == 0 and running == 0 and (completed + failed + skipped) > 0:
+            # embedded = 行块已入库、待符号摘要；须等其归零才算分析收口
+            files_idle = pending == 0 and running == 0 and embedded == 0
+            if scan_done and files_idle and (completed + failed + skipped) > 0:
                 stable += 1
                 if stable >= 2:
                     break
@@ -137,7 +142,9 @@ class CodebaseScenarioBase(ABC):
                 stable = 0
             print(
                 f"[scenario] analyze poll status={scan_status} "
-                f"completed={completed} pending={pending} running={running} failed={failed}",
+                f"total={total} completed={completed} embedded={embedded} "
+                f"pending={pending} running={running} failed={failed} "
+                f"searchable={searchable}",
                 flush=True,
             )
             await asyncio.sleep(cls.POLL_INTERVAL_SEC)
