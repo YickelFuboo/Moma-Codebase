@@ -1,12 +1,12 @@
 """NL2Code × 符号摘要 六档消融：重建索引后对比 resolve/related 准确率。
 
 档位：
-  A. 符号 ON  + NL2Code OFF + rewrite OFF
-  B. 符号 OFF + NL2Code ON  + rewrite OFF
-  C. 符号 OFF + NL2Code ON  + rewrite ON（mode=always）
-  D. 符号 ON  + NL2Code ON  + rewrite OFF
-  E. 符号 ON  + NL2Code ON  + rewrite ON（mode=always）
-  F. 符号 ON  + NL2Code ON  + rewrite ON（mode=weak，弱召回才改写）
+  A. 符号 ON  + NL2Code OFF + rewrite OFF          → 符号
+  B. 符号 OFF + NL2Code ON  + rewrite OFF          → NL
+  C. 符号 OFF + NL2Code ON  + rewrite ON(always)   → NL+always
+  D. 符号 ON  + NL2Code ON  + rewrite OFF          → 符号+NL
+  E. 符号 ON  + NL2Code ON  + rewrite ON(always)   → 符号+NL+always
+  F. 符号 ON  + NL2Code ON  + rewrite ON(weak)     → 符号+NL+weak（弱召回才改写）
 
 用法（仓根、venv）：
   PANDO_CLEAR=1 python -m tests.scenarios.pando_agent.run_nl2code_ablation
@@ -275,9 +275,8 @@ async def main() -> None:
     do_related = kind in {"all", "related"}
 
     print(
-        "[nl2code-ablation] A=symbol+noNL | B=noSymbol+NL | "
-        "C=noSymbol+NL+rewrite(always) | D=symbol+NL | "
-        "E=symbol+NL+rewrite(always) | F=symbol+NL+rewrite(weak) "
+        "[nl2code-ablation] A=符号 | B=NL | C=NL+always | D=符号+NL | "
+        "E=符号+NL+always | F=符号+NL+weak "
         f"only={only or 'ALL'} kind={kind} skip_rebuild={skip_rebuild} "
         f"resolve_cases={len(PANDO_RESOLVE_CASES)}",
         flush=True,
