@@ -33,7 +33,7 @@ class GoOssScenarioSession(CodebaseScenarioBase):
     CLEAR_BEFORE_ANALYZE = False
     ANALYZE_TIMEOUT_SEC = 14400
     POLL_INTERVAL_SEC = 8
-    FILE_WORKER_COUNT = 6
+    FILE_WORKER_COUNT = 10
     EXTRA_EXCLUDED_DIRS = (_GO_SRC_ALL - _GO_SRC_ALLOW) | {
         "testdata",
         "node_modules",

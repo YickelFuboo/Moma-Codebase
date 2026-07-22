@@ -18,7 +18,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 18390.445299999556
+      "elapsed_ms": 5277.6836000266485
     },
     {
       "config": "A",
@@ -37,7 +37,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 26540.070299990475
+      "elapsed_ms": 11712.545200018212
     },
     {
       "config": "A",
@@ -56,7 +56,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 30279.112799995346
+      "elapsed_ms": 13682.731200009584
     },
     {
       "config": "A",
@@ -75,7 +75,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 16428.941999998642
+      "elapsed_ms": 9332.70759996958
     },
     {
       "config": "A",
@@ -94,7 +94,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 15943.35119999596
+      "elapsed_ms": 7429.2390999617055
     },
     {
       "config": "A",
@@ -113,7 +113,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 5545.489499985706
+      "elapsed_ms": 6056.423900008667
     },
     {
       "config": "A",
@@ -132,7 +132,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 29207.267899997532
+      "elapsed_ms": 7177.948199969251
     },
     {
       "config": "A",
@@ -151,7 +151,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 13186.628700001165
+      "elapsed_ms": 7383.784300007392
     },
     {
       "config": "A",
@@ -170,7 +170,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 12180.987100000493
+      "elapsed_ms": 11144.953799957875
     },
     {
       "config": "A",
@@ -189,7 +189,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 27256.5048999968
+      "elapsed_ms": 5607.279499992728
     },
     {
       "config": "A",
@@ -209,7 +209,7 @@
         "pattern"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 24241.310199984582
+      "elapsed_ms": 14964.832000026945
     },
     {
       "config": "A",
@@ -229,7 +229,7 @@
         "pattern"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 13652.164099999936
+      "elapsed_ms": 10379.259999957867
     },
     {
       "config": "A",
@@ -248,7 +248,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 18329.207500006305
+      "elapsed_ms": 6234.805399959441
     },
     {
       "config": "A",
@@ -265,7 +265,7 @@
         "similar"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 9291.374899999937
+      "elapsed_ms": 6386.79320004303
     },
     {
       "config": "A",
@@ -282,7 +282,7 @@
         "similar"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 4813.154799980111
+      "elapsed_ms": 8280.896200041752
     },
     {
       "config": "A",
@@ -299,7 +299,7 @@
         "similar"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 6215.787699999055
+      "elapsed_ms": 2648.7221000134014
     },
     {
       "config": "A",
@@ -316,7 +316,7 @@
         "similar"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 4265.297600009944
+      "elapsed_ms": 1754.2748999549076
     },
     {
       "config": "A",
@@ -335,7 +335,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 4523.604699992575
+      "elapsed_ms": 10154.573399981018
     },
     {
       "config": "A",
@@ -354,7 +354,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 9211.389499978395
+      "elapsed_ms": 14203.622600005474
     },
     {
       "config": "A",
@@ -373,7 +373,7 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 11434.627400012687
+      "elapsed_ms": 6645.838099997491
     },
     {
       "config": "A",
@@ -392,17 +392,17 @@
         "grep"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 5809.7614999860525
+      "elapsed_ms": 7503.82919999538
     },
     {
       "config": "A",
       "case_id": "pando.resolve.hard.short_cn_react",
       "items_p": 0.3333333333333333,
       "items_r": 1.0,
-      "union_p": 0.05555555555555555,
+      "union_p": 0.05263157894736842,
       "union_r": 1.0,
       "n_items": 3,
-      "n_also": 15,
+      "n_also": 16,
       "top": "app/agents/core/react.py",
       "passed": true,
       "channels": [
@@ -412,7 +412,7 @@
         "pattern"
       ],
       "nl_rewrite_meta": null,
-      "elapsed_ms": 12881.114000017988
+      "elapsed_ms": 18490.292500006035
     }
   ],
   "summary": [
@@ -421,9 +421,9 @@
       "avg_iR": 0.8636363636363636,
       "avg_uR": 0.9090909090909091,
       "pass": "19/22",
-      "avg_ms": 14528.526981814966,
-      "p50_ms": 12881.114000017988,
-      "p95_ms": 29207.267899997532,
+      "avg_ms": 8747.865272722927,
+      "p50_ms": 7429.2390999617055,
+      "p95_ms": 14964.832000026945,
       "symbol": true
     }
   ]

@@ -16,6 +16,7 @@ from app.repo_analysis.services.codesummary.code_summary import (
 )
 from app.repo_analysis.services.codesummary.model import ContentType
 
+
 @dataclass(frozen=True)
 class SymbolSummaryRequest:
     """单条待摘要符号。"""
@@ -26,7 +27,13 @@ class SymbolSummaryRequest:
 
 
 class SymbolBatchSummarizer:
-    """同文件多符号一次 LLM 调用批量摘要；失败按批回退单条。"""
+    """同文件多符号一次 LLM 调用批量摘要。
+
+    失败策略：
+    - context overflow / 判定超长 → 折半再试，直至单条
+    - 其它 LLM/JSON 失败 → 该批回退单条
+    - 部分缺 id → 仅对缺失项补跑单条
+    """
 
     _JSON_ARRAY = re.compile(r"\[[\s\S]*\]")
     _TYPE_LABEL = {
@@ -105,6 +112,39 @@ class SymbolBatchSummarizer:
         return list(await asyncio.gather(*[one(r) for r in items]))
 
     @classmethod
+    def is_context_overflow_text(cls, text: str) -> bool:
+        t = (text or "").lower()
+        if not t:
+            return False
+        keys = (
+            "context_overflow",
+            "context length",
+            "maximum context",
+            "max context",
+            "context window",
+            "too many tokens",
+            "prompt is too long",
+            "input is too long",
+            "context_limit",
+        )
+        return any(k in t for k in keys)
+
+    @classmethod
+    async def _retry_by_halves(
+        cls,
+        items: Sequence[SymbolSummaryRequest],
+    ) -> List[str]:
+        """超长时折半重试，最终落到单条。"""
+        n = len(items)
+        if n <= 1:
+            return await cls._summarize_singles(items, concurrency=1)
+        mid = max(1, n // 2)
+        logging.warning("批量符号摘要超长，折半重试 n=%s -> %s+%s", n, mid, n - mid)
+        left = await cls._summarize_one_batch(list(items[:mid]))
+        right = await cls._summarize_one_batch(list(items[mid:]))
+        return left + right
+
+    @classmethod
     async def _summarize_one_batch(cls, items: Sequence[SymbolSummaryRequest]) -> List[str]:
         if len(items) == 1:
             return [await CodeSummary.llm_summarize(items[0].source, items[0].content_type)]
@@ -119,6 +159,8 @@ class SymbolBatchSummarizer:
             async for chunk in stream:
                 chunks.append(chunk)
             full = "".join(chunks)
+            if cls.is_context_overflow_text(full):
+                return await cls._retry_by_halves(items)
             if _is_stream_error_text(full):
                 logging.warning("批量符号摘要 LLM 错误文本，回退单条 n=%s", len(items))
                 return await cls._summarize_singles(items, concurrency=1)
@@ -149,6 +191,8 @@ class SymbolBatchSummarizer:
                     result[idx] = text
             return result
         except Exception as e:
+            if cls.is_context_overflow_text(str(e)):
+                return await cls._retry_by_halves(items)
             logging.error("批量符号摘要失败，回退单条: %s", e)
             return await cls._summarize_singles(items, concurrency=1)
 

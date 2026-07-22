@@ -24,7 +24,7 @@ class KnowledgeBaseScenarioSession(CodebaseScenarioBase):
     CLEAR_BEFORE_ANALYZE = False
     ANALYZE_TIMEOUT_SEC = 7200
     POLL_INTERVAL_SEC = 5
-    FILE_WORKER_COUNT = 4
+    FILE_WORKER_COUNT = 10
     EXTRA_EXCLUDED_DIRS = {
         "alembic",
         "data",

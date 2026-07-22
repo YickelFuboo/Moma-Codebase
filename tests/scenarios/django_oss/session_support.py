@@ -23,7 +23,7 @@ class DjangoOssScenarioSession(CodebaseScenarioBase):
     CLEAR_BEFORE_ANALYZE = False
     ANALYZE_TIMEOUT_SEC = 18000
     POLL_INTERVAL_SEC = 8
-    FILE_WORKER_COUNT = 6
+    FILE_WORKER_COUNT = 10
     EXTRA_EXCLUDED_DIRS = {
         "tests",
         "docs",

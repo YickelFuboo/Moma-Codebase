@@ -183,3 +183,40 @@ class TestSymbolBatchSummarize:
         assert out[0] == "仅有0"
         assert "补齐1" in out[1]
         assert llm.calls == 2
+
+    def test_context_overflow_splits_then_succeeds(self):
+        half0 = json.dumps(
+            [{"id": 0, "summary": "H0"}, {"id": 1, "summary": "H1"}],
+            ensure_ascii=False,
+        )
+        half1 = json.dumps(
+            [{"id": 0, "summary": "H2"}, {"id": 1, "summary": "H3"}],
+            ensure_ascii=False,
+        )
+        llm = _CountingLLM(
+            [
+                "llm error: context_overflow",
+                half0,
+                half1,
+            ]
+        )
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.codesummary.batch_summarizer.llm_factory.create_model",
+                return_value=llm,
+            ):
+                return await SymbolBatchSummarizer.summarize_many(
+                    [
+                        SymbolSummaryRequest("def a():\n  return 1\n", ContentType.FUNCTION, "a"),
+                        SymbolSummaryRequest("def b():\n  return 2\n", ContentType.FUNCTION, "b"),
+                        SymbolSummaryRequest("def c():\n  return 3\n", ContentType.FUNCTION, "c"),
+                        SymbolSummaryRequest("def d():\n  return 4\n", ContentType.FUNCTION, "d"),
+                    ],
+                    batch_size=6,
+                    concurrency=1,
+                )
+
+        out = asyncio.run(_run())
+        assert out == ["H0", "H1", "H2", "H3"]
+        assert llm.calls == 3

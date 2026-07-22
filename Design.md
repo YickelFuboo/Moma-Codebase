@@ -144,13 +144,15 @@ for line_chunk in line_chunks:
 
 #### 3.1.2 符号摘要向量
 
-1. 对 `FileInfo` 中每个符号调 LLM 生成业务向摘要（prompt 强调**业务词 + 使用场景**，少写语法废话）。
-2. **LLM 失败/空结果** → `CodeSummary.fallback_summary`（签名 + docstring/注释 + 预览），保证仍可嵌入。
-3. **入库 embedding 文本**拼接：`路径 + 符号名 + 摘要`（提升 related 对路径/标识符的可召回性）。
-4. **对外展示**的 `summary` 仍用摘要原文，避免把路径噪音显示给用户。
-4. 写入独立 `symbol_summary` 向量空间；`search related` / `search symbols` 使用。
+1. 对 `FileInfo` 中符号调 LLM 生成业务向摘要（prompt：业务词 + 场景 + 检索词；少堆标识符；禁臆造）。
+2. **批量调用**：同文件按 `BATCH_SIZE`（默认 6）打包一次 LLM，返回 JSON `[{id, summary}, ...]`；`CONCURRENCY` 控制并行批次数。
+3. **超长/失败重试**：`context_overflow` → **折半再试**直至单条；其它 LLM/JSON 失败 → 该批回退单条；缺 id → 仅补跑缺失项。
+4. **LLM 失败/空结果** → `CodeSummary.fallback_summary`（签名 + docstring/注释 + 预览），保证仍可嵌入。
+5. **入库 embedding 文本**拼接：`路径 + 符号名 + 摘要`（提升 related 对路径/标识符的可召回性）。
+6. **对外展示**的 `summary` 仍用摘要原文，避免把路径噪音显示给用户。
+7. 写入独立 `symbol_summary` 向量空间；`search related` / `search symbols` 使用。
 
-说明：摘要质量依赖 **re-analyze 后的新写入**；旧向量不会自动变。
+说明：摘要质量依赖 **re-analyze 后的新写入**；旧向量不会自动变。实现见 `SymbolBatchSummarizer`（§5.7.1）。
 
 #### 3.1.3 CodeGraph（仓级）
 
@@ -586,6 +588,40 @@ LLM 符号摘要占满 worker 会拖慢「首次可搜」。行块入库后应�
 
 ---
 
+### 5.7.1 符号摘要：批量 LLM + 超长折半重试
+
+#### 优化点思路
+
+符号摘要原先「一符号一次 LLM」，大仓耗时长。改为同文件批量打包可显著降 round-trip；大函数连批可能撑爆上下文，故在 LLM 返回超长失败时折半重试，而不是整文件失败。
+
+#### 优化点详细方案与实现
+
+实现：`SymbolBatchSummarizer`（`codesummary/batch_summarizer.py`），由 `CodeVectorService.vectorize_and_store_symbol_summaries` 调用。
+
+| 步骤 | 行为 |
+|------|------|
+| 打包 | 按 `BATCH_SIZE`（默认 6）切批 |
+| 调用 | 一批一次 `chat_stream`，要求 JSON `[{id, summary}, ...]` |
+| 超长 | 识别 `context_overflow` / context length 类错误 → **折半再试**，直至单条 |
+| 其它失败 | JSON 坏 / 非超长 LLM 错 → 该批回退单条 `CodeSummary.llm_summarize` |
+| 缺 id | 保留已解析项，仅对缺失补跑单条 |
+| 单条仍失败 | `fallback_summary` 确定性文案，保证可嵌入 |
+
+配置：
+
+- `CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_BATCH_SIZE`
+- `CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY`（并行批次数）
+
+#### 效果对比测试
+
+| 指标 | 效果 |
+|------|------|
+| LLM 次数 | 理想约 `ceil(N / BATCH_SIZE)`；超长时折半，介于批量与逐条之间 |
+| UT | `tests/unit/codesummary/test_symbol_batch_summarize.py`（成功批量 / 坏 JSON 回退 / 缺 id / **overflow 折半**） |
+| 功能 | `tests/functional/codesummary/test_symbol_batch_summarize_flow.py`（贯通入库路径） |
+
+---
+
 ### 5.8 CodeGraph：已有索引走增量 sync
 
 #### 优化点思路
@@ -890,6 +926,8 @@ $env:DJANGO_SKIP_REBUILD="1"; $env:DJANGO_ABLATION_ONLY="ALL"
 |-----|----------|------|
 | `CODE_ANALYSIS_LINE_CHUNK_ENABLED` | ON | 行块 / similar |
 | `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | **ON**（A） | 符号摘要 / related 主力 |
+| `CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_BATCH_SIZE` | 6 | 符号摘要单次打包数；1=逐条；超长折半重试 |
+| `CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY` | 4 | 并行批次数（batch=1 时为并行符号数） |
 | `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | **OFF**（A） | NL 多视角 / lexicon；开则为 D |
 | `CODE_ANALYSIS_NL_REWRITE_ENABLED` | **OFF**（A） | LLM 改写；难例可开 F |
 | `CODE_ANALYSIS_NL_REWRITE_MODE` | weak | `weak` \| `always`（勿默认 always=E） |

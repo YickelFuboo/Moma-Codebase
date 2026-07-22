@@ -21,7 +21,7 @@ class PandoAgentScenarioSession(CodebaseScenarioBase):
     ANALYZE_TIMEOUT_SEC = 7200
     POLL_INTERVAL_SEC = 5
     # SQLite + LLM 摘要时过高并发易 database is locked；场景侧压到 4
-    FILE_WORKER_COUNT = 4
+    FILE_WORKER_COUNT = 10
     EXTRA_EXCLUDED_DIRS = {
         "website",
         "packaging",
