@@ -5,41 +5,42 @@ from app.repo_analysis.services.codesummary.model import ContentType
 from app.infrastructure.llms import llm_factory
 
 
-FUNCTION_SUMMARY_PROMPT = """请基于如下函数定义，总结本函数主要功能。要求内容精准、简洁，150字以内，并便于后续用自然语言检索定位。格式要求如下：
-功能：函数主要功能描述（用业务/领域词，如鉴权、记忆、会话，不要只复述代码标识符）
-场景：什么需求下会改到这个函数
-关键参数：主要函数参数描述
+_SUMMARY_COMMON_RULES = """约束：
+- 只依据给定源码可推断的事实，禁止臆造业务背景；不确定则写「不确定」
+- 用业务/领域词（鉴权、会话、缓存、持久化等），不要只复述标识符
+- 输出短段落，少用冒号字段标签；总长控制在约 180 字内
+- 末行单独给出「检索词：」后跟 2～4 个中英近义词或领域词，空格分隔
 """
 
-CLASS_SUMMARY_PROMPT = """请基于如下类/结构体定义，总结本类/结构体主要功能。要求内容精准、简洁，200字以内，并便于后续用自然语言检索定位。格式要求如下：
-功能：类主要功能描述（用业务/领域词）
-场景：什么需求下会改到这个类
-关键属性：主要的类属性字段说明
-关键方法：主要的类方法说明
-"""
+FUNCTION_SUMMARY_PROMPT = f"""请基于如下函数/方法定义，写一段便于自然语言检索的摘要。
+写清：做什么、何时会改到它、关键参数、可见的副作用或外部依赖（写库/发消息/调 API 等；无则省略）。
+{_SUMMARY_COMMON_RULES}"""
 
-STRUCT_SUMMARY_PROMPT = """请基于如下结构体定义，总结本结构体主要功能。要求内容精准、简洁，200字以内，并便于后续用自然语言检索定位。格式要求如下：
-功能：结构体主要功能描述（用业务/领域词）
-场景：什么需求下会改到这个结构体
-关键属性：主要的结构体属性字段说明
-关键方法：主要的结构体方法说明
-"""
+CLASS_SUMMARY_PROMPT = f"""请基于如下类定义，写一段便于自然语言检索的摘要。
+写清：职责边界、何时会改到它、关键属性与核心方法（挑最重要的，勿逐条罗列）。
+{_SUMMARY_COMMON_RULES}"""
 
-INTERFACE_SUMMARY_PROMPT = """请基于如下接口定义，总结本接口主要功能。要求内容精准、简洁，200字以内，并便于后续用自然语言检索定位。格式要求如下：
-功能：接口主要功能描述（用业务/领域词）
-场景：什么需求下会改到这个接口
-关键方法：主要的接口方法说明
-"""
+STRUCT_SUMMARY_PROMPT = f"""请基于如下结构体定义，写一段便于自然语言检索的摘要。
+写清：承载的数据/职责、何时会改到它、关键字段与相关方法（挑最重要的）。
+{_SUMMARY_COMMON_RULES}"""
 
-FILE_SUMMARY_PROMPT = """请基于如下源码文件内容，总结本代码文件的主要功能。要求内容精准、简洁，150字以内，并便于后续用自然语言检索定位。格式要求如下：
-功能：文件主要功能描述（用业务/领域词，如鉴权、记忆、消息通道）
-场景：什么需求下会改到这个文件
-"""
+INTERFACE_SUMMARY_PROMPT = f"""请基于如下接口定义，写一段便于自然语言检索的摘要。
+写清：契约职责、何时会改到它、关键方法（挑最重要的）。
+{_SUMMARY_COMMON_RULES}"""
 
-FOLDER_SUMMARY_PROMPT = """请基于如下文件夹（模块）中子文件夹和子文件功能描述。总结本文件夹（模块）主要功能，要求内容精准、简洁，150字以内，并便于后续用自然语言检索定位。格式要求如下：
-功能：文件夹（模块）主要功能描述（用业务/领域词）
-场景：什么需求下会改到这个模块
-"""
+FILE_SUMMARY_PROMPT = f"""请基于如下源码文件，写一段便于自然语言检索的摘要。
+写清：文件职责、何时会改到它、与外部模块的关键协作（可见则写）。
+{_SUMMARY_COMMON_RULES}"""
+
+FOLDER_SUMMARY_PROMPT = f"""请基于如下文件夹（模块）中子项功能描述，写一段便于自然语言检索的摘要。
+写清：模块职责、何时会改到该模块。
+{_SUMMARY_COMMON_RULES}"""
+
+SYMBOL_SUMMARY_SYSTEM_PROMPT = (
+    "你是代码检索摘要助手：把符号/文件总结成便于自然语言命中的业务描述，"
+    "支撑「用自然语言找该改哪个符号或文件」。"
+    "优先领域词与同义检索词；禁止只堆标识符；禁止编造源码未体现的业务。"
+)
 
 _DOCSTRING_RE = re.compile(
     r'^\s*(?:[ruRU]{0,2})("""|\'\'\')(.*?)\1',
@@ -129,12 +130,6 @@ class CodeSummary:
         """使用 LLM 生成代码内容摘要；失败则确定性回退。"""
         fallback = CodeSummary.fallback_summary(content, content_type)
         try:
-            system_prompt = (
-                "你是一个代码分析专家，擅长把符号功能总结成便于检索的业务描述："
-                "优先使用领域词（鉴权/JWT/记忆/会话/流式/工具调用等），"
-                "避免只堆砌标识符；摘要要能支撑「用自然语言找该改哪个文件」。"
-            )
-
             if content_type == ContentType.FILE:
                 user_prompt = FILE_SUMMARY_PROMPT
             elif content_type == ContentType.CLASS:
@@ -152,7 +147,7 @@ class CodeSummary:
 
             llm = llm_factory.create_model()
             stream, _usage = await llm.chat_stream(
-                system_prompt=system_prompt,
+                system_prompt=SYMBOL_SUMMARY_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 user_question=content,
             )

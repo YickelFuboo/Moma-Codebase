@@ -124,7 +124,14 @@ class Settings(BaseSettings):
         description="单条 embedding 文本最大字符数（超限跳过不截断；防超长行打爆 API）",
         env="CODE_ANALYSIS_EMBED_MAX_CHARS",
     )
-    code_analysis_symbol_summary_llm_concurrency: int = Field(default=4, ge=1, le=32, description="符号摘要阶段 LLM 并发上限", env="CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY")
+    code_analysis_symbol_summary_llm_concurrency: int = Field(default=4, ge=1, le=32, description="符号摘要阶段 LLM 并发上限（批量时为并行批次数）", env="CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_CONCURRENCY")
+    code_analysis_symbol_summary_llm_batch_size: int = Field(
+        default=6,
+        ge=1,
+        le=32,
+        description="符号摘要单次 LLM 打包符号数；1=逐条（旧行为）",
+        env="CODE_ANALYSIS_SYMBOL_SUMMARY_LLM_BATCH_SIZE",
+    )
     code_analysis_symbol_summary_enabled: bool = Field(
         default=True,
         description="是否启用符号 LLM 摘要与符号向量（分析 + related 检索）",

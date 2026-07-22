@@ -4,11 +4,20 @@ from app.infrastructure.llms import llm_factory
 from app.lib_analysis.schemes.public_api import PublicApi
 
 
-API_SUMMARY_PROMPT = """请基于如下公开接口定义，总结该接口的功能与参数。要求内容精准、简洁，200字以内。格式要求如下：
-功能：接口主要功能描述
-关键参数：主要参数含义与约束
-返回：返回值含义（若无则写无）
+API_SUMMARY_PROMPT = """请基于如下公开接口定义，写一段便于自然语言检索的摘要。
+写清：接口做什么、关键参数含义与约束、返回值含义（无则省略）、调用时可见的副作用或外部依赖（无则省略）。
+约束：
+- 只依据给定签名/文档/源码可推断的事实，禁止臆造业务背景；不确定则写「不确定」
+- 用业务/领域词，不要只复述标识符
+- 输出短段落，少用冒号字段标签；总长控制在约 180 字内
+- 末行单独给出「检索词：」后跟 2～4 个中英近义词或领域词，空格分隔
 """
+
+API_SUMMARY_SYSTEM_PROMPT = (
+    "你是库接口检索摘要助手：把公开 API 总结成便于自然语言命中的说明，"
+    "支撑编码 Agent 按需求检索可调用接口。"
+    "优先领域词与同义检索词；禁止只堆标识符；禁止编造输入未体现的业务。"
+)
 
 
 def _is_stream_error_text(text: str) -> bool:
@@ -33,10 +42,7 @@ class ApiSummaryService:
         try:
             llm = llm_factory.create_model()
             stream, _usage = await llm.chat_stream(
-                system_prompt=(
-                    "你是一个库接口文档专家，擅长把公开 API 的功能与参数说明写清楚，"
-                    "便于编码 Agent 按需求检索可调用接口。"
-                ),
+                system_prompt=API_SUMMARY_SYSTEM_PROMPT,
                 user_prompt=API_SUMMARY_PROMPT,
                 user_question=content,
             )

@@ -9,6 +9,10 @@ from app.repo_analysis.constants import line_chunk_space_name, symbol_summary_sp
 from app.repo_analysis.models.analysis_status import RepoAnalysisType as AnalysisType
 from app.repo_analysis.services.codeast.model import FileInfo
 from app.repo_analysis.services.codechunk.code_chunk import LineTextChunk
+from app.repo_analysis.services.codesummary.batch_summarizer import (
+    SymbolBatchSummarizer,
+    SymbolSummaryRequest,
+)
 from app.repo_analysis.services.codesummary.code_summary import CodeSummary
 from app.repo_analysis.services.codesummary.model import ContentType
 from app.infrastructure.llms import embedding_factory
@@ -201,15 +205,14 @@ class CodeVectorService:
                 )
         if not symbols:
             return
-        
-        # 生成符号摘要（并发可配置，默认与历史行为一致）
-        sem = asyncio.Semaphore(max(1, settings.code_analysis_symbol_summary_llm_concurrency))
-        async def one_summary(src: str, ct: ContentType) -> str:
-            """对单个符号源码调用 LLM 摘要（受信号量限制并发）。"""
-            async with sem:
-                return await CodeSummary.llm_summarize(src, ct)
 
-        summaries = await asyncio.gather(*[one_summary(src, ct) for _, _, _, _, src, ct in symbols])
+        # 批量 LLM 摘要（batch_size>1 时一轮多符号；失败按批回退单条）
+        summaries = await SymbolBatchSummarizer.summarize_many(
+            [
+                SymbolSummaryRequest(source=src, content_type=ct, name=name)
+                for _, name, _, _, src, ct in symbols
+            ],
+        )
         kept_symbols: List[Tuple[str, str, int, int, str, ContentType]] = []
         raw_summaries: List[str] = []
         texts: List[str] = []
