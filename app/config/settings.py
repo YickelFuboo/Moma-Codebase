@@ -136,8 +136,8 @@ class Settings(BaseSettings):
         env="CODE_ANALYSIS_CONTENT_GREP_ENABLED",
     )
     code_analysis_nl_to_code_enabled: bool = Field(
-        default=True,
-        description="是否启用 NL→Code 检索增强（多视角 embed、仓内词表、token 加权；默认开）",
+        default=False,
+        description="是否启用 NL→Code 检索增强（多视角 embed、仓内词表、token 加权；默认关=档位 A）",
         env="CODE_ANALYSIS_NL_TO_CODE_ENABLED",
     )
     code_analysis_nl_rewrite_enabled: bool = Field(

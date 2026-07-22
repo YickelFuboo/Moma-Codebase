@@ -14,7 +14,7 @@ DEFAULT_DJANGO_PATH = Path(r"F:\开源项目\django")
 
 
 class DjangoOssScenarioSession(CodebaseScenarioBase):
-    """登记并分析 Django 源码包（默认 D：符号摘要 ON）。"""
+    """登记并分析 Django 源码包（默认 A：符号摘要 ON，NL2Code OFF）。"""
 
     ENABLE_SYMBOL_SUMMARY = True
     ENABLE_CODE_GRAPH = False

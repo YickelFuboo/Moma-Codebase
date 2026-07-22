@@ -52,7 +52,7 @@ repo add --kind code|lib
 | `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | 符号摘要 / related 主力通道 |
 | `CODE_GRAPH_ENABLED` / `CODE_GRAPH_PROVIDER` | 图谱；`codegraph`（默认）或 `builtin` |
 | `MR_EXPERIENCE_ENABLED` | 历史经验沉淀与 `search pattern` |
-| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | NL→Code（多视角 / lexicon；默认 ON） |
+| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | NL→Code（多视角 / lexicon；**默认 OFF**=档位 A） |
 | `CODE_ANALYSIS_NL_REWRITE_*` | 可选 LLM 改写（默认 OFF；详见 §5.13） |
 | `ENABLE_INCREMENTAL_SCAN` | 文件变更重分析；新 MR 触发经验更新 |
 | 忽略规则 | 扫描遵循内置排除 + 仓根 `.gitignore` + 可选 `.momaignore` |
@@ -376,7 +376,7 @@ item 带 `match_source`：`exact` | `symbol_summary` | `line_chunk` | `codegraph
 | `NlQueryRewriter` | 可选 LLM（默认 OFF）；`weak` / `always` |
 | `NlRetrievalWeakness` | 弱判定阈值 0.85（改写与 resolve 兜底共用） |
 
-开关：`CODE_ANALYSIS_NL_TO_CODE_ENABLED`（默认 ON）、`CODE_ANALYSIS_NL_REWRITE_*`。  
+开关：`CODE_ANALYSIS_NL_TO_CODE_ENABLED`（**默认 OFF**=A；开则为 D）、`CODE_ANALYSIS_NL_REWRITE_*`。  
 resolve 将 `nl_prep` 传入 similar/related/grep，避免重复 rewrite。优化历程与五档消融见 **§5.10 / §5.12**。
 
 ---
@@ -649,7 +649,7 @@ changelog 式经验噪声大；应用规则预筛与质量分过滤入库，检�
 
 | 组件 | 作用 |
 |------|------|
-| `NlToCodeEnhancement` | 总开关 `CODE_ANALYSIS_NL_TO_CODE_ENABLED`（默认 ON） |
+| `NlToCodeEnhancement` | 总开关 `CODE_ANALYSIS_NL_TO_CODE_ENABLED`（**默认 OFF**=A） |
 | `NlQueryPrep` | 一次准备：lexicon / 可选改写 / embed 多视角 / 关键词扩展；`code_text` 保留原文 |
 | `NlCodeQueryBuilder` | NL 多视角 embed；`looks_like_nl` 收紧（短拉丁标识不当 NL）；HyDE 多语言轻量片段 |
 | `RepoIdentifierLexicon` | 从索引路径/符号抽拉丁标识；前缀桶索引；analyze/删文件后 `invalidate_repo` |
@@ -663,7 +663,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | 套件 | 结果 |
 |------|------|
 | `tests/unit/search/nl2code_enhance/` 等 | **84 passed**（完备性收口时） |
-| 真仓六档消融 | 见 **§5.12**（新 GT：Pando 22 / KB 17 / Go 32 / Django 33；产品默认 D；含每用例耗时） |
+| 真仓六档消融 | 见 **§5.12**（新 GT：Pando 22 / KB 17 / Go 32 / Django 33；**产品默认 A**；含每用例耗时） |
 
 ---
 
@@ -691,15 +691,15 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 
 | 档 | 符号摘要 | NL2Code | NL_REWRITE | 短标签 |
 |----|----------|---------|------------|--------|
-| **A** | ON | OFF | OFF | 符号 |
+| **A** ★产品默认 | ON | OFF | OFF | 符号 |
 | **B** | OFF | ON | OFF | NL |
 | **C** | OFF | ON | ON（`always`） | NL+always |
-| **D** ★产品默认 | ON | ON | OFF | 符号+NL |
+| **D** | ON | ON | OFF | 符号+NL |
 | **E** | ON | ON | ON（`always`） | 符号+NL+always |
 | **F** | ON | ON | ON（`weak`） | 符号+NL+weak |
 
 口径：**avg iR** = items Recall；**avg uR** = items∪also_consider Recall；**pass** = items recall ≥ 用例门槛；**avg_ms** = 单次 resolve 墙钟均值。  
-产品默认 **D**：符号 ON + NL2Code ON + rewrite OFF。
+产品默认 **A**：符号 ON + NL2Code OFF + rewrite OFF。完整对比表、仓内①–⑥排序、纯中文 A/D 专项与**选型逻辑**见下文「A vs D 专项」「产品默认选型逻辑」。
 
 #### Agent 向用例配比（目标）
 
@@ -727,10 +727,10 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 
 | 档 | 短标签 | Pando 22 | KB 17 | Go 32† | Django 33 |
 |----|--------|----------|-------|--------|-----------|
-| **A** | 符号 | 86%/91% · 19/22 ④ | 71%/94% · 12/17 ⑤ | 58%/89% · 20/32 ② | 82%/98% · 27/33 ① |
+| **A** ★ | 符号 | 86%/91% · 19/22 ④ | 71%/94% · 12/17 ⑤ | 58%/89% · 20/32 ② | 82%/98% · 27/33 ① |
 | **B** | NL | 70%/95% · 16/22 ⑥ | 82%/94% · 14/17 ② | 31%/58% · 11/32 ⑥ | 40%/78% · 14/33 ⑤ |
 | **C** | NL+always | 80%/91% · 18/22 ⑤ | 65%/82% · 11/17 ⑥ | 39%/66% · 14/32 ⑤ | 36%/68% · 12/33 ⑥ |
-| **D** ★ | 符号+NL | 91%/95% · 20/22 ② | 71%/100% · 12/17 ④ | 58%/78% · 20/32 ③ | 76%/96% · 25/33 ③ |
+| **D** | 符号+NL | 91%/95% · 20/22 ② | 71%/100% · 12/17 ④ | 58%/78% · 20/32 ③ | 76%/96% · 25/33 ③ |
 | **E** | 符号+NL+always | 93%/95% · 21/22 ① | 76%/94% · 13/17 ③ | 62%/83% · 21/32 ① | 80%/97% · 27/33 ② |
 | **F** | 符号+NL+weak | 89%/95% · 20/22 ③ | 82%/100% · 14/17 ① | 58%/78% · 20/32 ④ | 74%/94% · 25/33 ④ |
 
@@ -752,10 +752,10 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 
 | 档 | Pando | KB | Go | Django |
 |----|-------|----|----|--------|
-| **A** | ① 9.1k | ② 26k | ② 24k | ② 15k |
+| **A** ★ | ① 9.1k | ② 26k | ② 24k | ② 15k |
 | **B** | ② 13k | ① 8k | ① 14k | ① 11k |
 | **C** | ④ 68k | ④ 144k | ⑤ 95k | ⑤ 58k |
-| **D** ★ | ③ 17k | ③ 32k | ③ 34k | ③ 20k |
+| **D** | ③ 17k | ③ 32k | ③ 34k | ③ 20k |
 | **E** | ⑥ 116k | ⑥ 185k | ⑥ 176k | ⑥ 82k |
 | **F** | ⑤ 70k | ⑤ 149k | ④ 38k | ④ 39k |
 
@@ -770,13 +770,69 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 
 每用例 × 档位耗时见各仓 artifact（含 p50/p95）：`.tmp_pando_ablation_newgt.md` / `.tmp_kb_ablation_newgt.md` / `.tmp_go_ablation_newgt.md` / `.tmp_django_ablation_newgt.md`。
 
+#### A vs D 专项（决定默认值）
+
+争议点：总表上 Pando 的 D 略高于 A（20/22 vs 19/22），是否应默认 D？对中国区（更多中文问）是否必须开 NL2Code？
+
+**1）按 `case_kind` 看 A/D（pass）**
+
+| 仓 | nl | hard | 其它 NL 向结论 |
+|----|----|------|----------------|
+| Pando / KB | A=D | A=D | **无 pass 翻转** |
+| Go | D 略好（5/10 vs 4/10） | D 略好（1/3 vs 0/3） | 仅个别条 D 赢 |
+| Django | A=D | **A 更好** | sym_nl / hard 上 D 偶发把 A 搞挂 |
+
+→ 分类型后 **没有稳定的「非符号问法上 D 系统性优于 A」**。
+
+**2）纯中文子集（无拉丁字母，中国区最相关）**
+
+四仓合计 **19** 条纯中文（如 `鉴权在哪`、`知识库服务在哪`、`用户认证在哪`、`登录`、`路由`）：
+
+| 指标 | A | D |
+|------|---|---|
+| pass | **10/19** | **10/19** |
+| pass 翻转（D 多过 / A 多过） | — | **0 / 0** |
+
+仅 2 条出现 **uR** 软差异（答案进 `also_consider`，仍不算 pass）：KB `文档解析在哪`、Django `用户认证在哪`。  
+→ **以 items/pass 为准，纯中文上对比不出 A、D 效果差**；不是「没有中文用例」，而是 NL2Code（D 相对 A 多开的部分）**没有把这些中文问抬进 items**。
+
+**3）延迟**
+
+同仓速度序上 A 恒快于 D（约 0.5～0.7×）；E/F 因 LLM 改写可再慢一个数量级。
+
+**4）E 慢的原因（排除作默认）**
+
+`rewrite_mode=always` → 凡 `looks_like_nl` **先打一轮 LLM 改写再检索**，再叠加更多 embed 视角；墙钟常到几十秒～数分钟。F（weak）仅弱召回才改写，仍明显贵于 A/D。
+
+#### 产品默认选型逻辑（2026-07-22 起 = **A**）
+
+决策顺序：
+
+1. **先保证符号通道**：无符号的 B/C 在 Go/Django（及 Pando）上明显弱 → 默认必须 **symbol ON**（排除 B/C）。  
+2. **在有符号的 A/D/E/F 中比收益/成本**：  
+   - E：准度常①，但延迟⑥ → **不默认**。  
+   - F：KB 可①，但平均延迟远高于 A/D → **不默认**；难例可开。  
+   - D vs A：总表接近；分类型无稳定 D 胜；**19 条纯中文 pass 全平**；D 更慢 → **不默认开 NL2Code**。  
+3. **落点 A**：`SYMBOL_SUMMARY=ON` + `NL_TO_CODE=OFF` + `NL_REWRITE=OFF`。  
+4. **可选增强**：业务仓确认中文/意图难例收益 > 延迟时，再开 D；弱改写开 F；勿默认 always（E）。
+
+配置映射：
+
+| 档 | `SYMBOL_SUMMARY` | `NL_TO_CODE` | `NL_REWRITE` / mode |
+|----|------------------|--------------|---------------------|
+| **A ★默认** | true | **false** | false / — |
+| D 可选 | true | true | false / — |
+| F 可选 | true | true | true / weak |
+| E 不推荐默认 | true | true | true / always |
+
+落地文件：`app/config/settings.py`（字段默认）、`env` / `env.example`、本文 §5.13。
+
 #### 四仓交叉结论（新 GT）
 
 1. **必须开符号**：Go/Django 上 B/C 仍明显弱于有符号档；Pando 无符号也掉分。  
-2. **产品默认仍 = D**：相对 A，Pando 提升（19→20/22）；KB/Go 持平；Django 略降（27→25/33）但 uR 仍高。相对 E 准确率接近，**延迟低一个数量级**。  
-3. **F**：KB 最优（14/17）；Pando/Go≈D；Django≈D。弱改写有收益但代价仍高。  
-4. **E**：四仓 pass 多为最高或并列最高，**avg_ms 常 >80k～180k**，不宜默认。  
-5. **新 GT 更贴近 Agent**：NL/hard 增多后，纯符号 A 在业务仓不再独大；开源大仓 A 仍偏稳，但 D 作为跨仓默认仍合理。
+2. **产品默认 = A**：见上节选型逻辑；NL2Code（D）与 LLM 改写（F/E）作可选，不默认开。  
+3. **仓内效果序不一**：Pando 偏 E→D→F；KB 偏 F→B；Go 偏 E→A；Django 偏 **A→E**——跨仓没有「唯一最优档」，故默认取 **准度够用且最快的有符号档 A**。  
+4. **中国区**：已有纯中文用例；在这些用例上 A≈D，默认 A 与中文证据一致。若日后补「无码词长句转述」且 D 稳定翻盘，再评估改回 D。
 
 ---
 
@@ -793,6 +849,8 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 | 本仓 related | **11** | 36% | 27% | 27% | — | 9% |
 
 相对旧版主要变化：Go/Django **砍冗余纯符号**、补 **符号+NL / 难例 / 英文 NL / similar**；Pando/KB **补混合问法与短中文难例**；本仓 related **补中文 NL 与 MR 经验定位**。
+
+纯中文（query 无拉丁字母）规模约：Pando 3 / KB 7 / Go 2 / Django 7（合计 19）；A vs D 专项见 §5.12。
 
 路径默认：Pando `PANDO_AGENT_PATH`；KB `KB_SERVICE_PATH`；Go `GO_OSS_PATH`（三包子集）；Django `DJANGO_OSS_PATH`。
 
@@ -826,13 +884,15 @@ $env:DJANGO_SKIP_REBUILD="1"; $env:DJANGO_ABLATION_ONLY="ALL"
 
 ### 5.13 相关 ENV 速查
 
+产品默认 **A**（选型逻辑与消融证据见 **§5.12「产品默认选型逻辑」**）。
+
 | ENV | 默认倾向 | 作用 |
 |-----|----------|------|
 | `CODE_ANALYSIS_LINE_CHUNK_ENABLED` | ON | 行块 / similar |
-| `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | **ON**（D） | 符号摘要 / related 主力 |
-| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | **ON**（D） | NL 多视角 / lexicon / token 加权 |
-| `CODE_ANALYSIS_NL_REWRITE_ENABLED` | **OFF**（D） | LLM 改写；难例可开 |
-| `CODE_ANALYSIS_NL_REWRITE_MODE` | weak | `weak` \| `always`（勿默认 always） |
+| `CODE_ANALYSIS_SYMBOL_SUMMARY_ENABLED` | **ON**（A） | 符号摘要 / related 主力 |
+| `CODE_ANALYSIS_NL_TO_CODE_ENABLED` | **OFF**（A） | NL 多视角 / lexicon；开则为 D |
+| `CODE_ANALYSIS_NL_REWRITE_ENABLED` | **OFF**（A） | LLM 改写；难例可开 F |
+| `CODE_ANALYSIS_NL_REWRITE_MODE` | weak | `weak` \| `always`（勿默认 always=E） |
 | `CODE_ANALYSIS_RELATED_INCLUDE_GRAPH` | OFF | related 是否融 CodeGraph |
 | `CODE_GRAPH_ENABLED` / `PROVIDER` | ON / codegraph | 图谱 |
 | `ENABLE_INCREMENTAL_SCAN` | 可配 | 后台增量扫描 |

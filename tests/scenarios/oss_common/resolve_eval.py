@@ -41,7 +41,7 @@ class CaseRow:
     elapsed_ms: float = 0.0
 
 
-# 与 Pando §5.12 对齐：A=符号 B=NL C=NL+always D=符号+NL E=符号+NL+always F=符号+NL+weak
+# 与 Pando §5.12 对齐：A=符号（产品默认）B=NL C=NL+always D=符号+NL E=符号+NL+always F=符号+NL+weak
 ALL_CONFIGS: List[AblationConfig] = [
     AblationConfig("A", symbol_on=True, nl2code=False, nl_rewrite=False),
     AblationConfig("B", symbol_on=False, nl2code=True, nl_rewrite=False),
@@ -54,7 +54,7 @@ ALL_CONFIGS: List[AblationConfig] = [
 # 评测顺序：先有符号通道档，再关符号档（均不重建索引）
 EVAL_ORDER = ("A", "D", "E", "F", "B", "C")
 
-DEFAULT_D = next(c for c in ALL_CONFIGS if c.label == "D")
+DEFAULT_A = next(c for c in ALL_CONFIGS if c.label == "A")
 
 
 def paths(items: List[Dict[str, Any]]) -> List[str]:
