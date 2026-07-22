@@ -1,0 +1,2339 @@
+{
+  "tag": "KB",
+  "rows": [
+    {
+      "config": "A",
+      "case_id": "kb.resolve.related.KBService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8928.727299993625
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.related.DocParserService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/domains/services/doc_parser_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 12433.470199990552
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.related.SessionManager",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 3554.0854000137188
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.related.Dealer",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7454.595599992899
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.nl.cn_kb",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 13,
+      "top": "app/domains/api/kb_qa.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 11700.987199990777
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.nl.cn_parse",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 2,
+      "n_also": 12,
+      "top": "app/rag_core/rag/app/manual.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 10083.990199986147
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.nl.cn_session",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 15,
+      "top": "app/agent_frame/session/api.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 30757.144499977585
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.nl.cn_retrieval",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 13,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 32285.558300005505
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.nl.semantic_retrieval",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.0625,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 13,
+      "top": "app/domains/models/document.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 36930.87009998271
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.similar.kb_service_create",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 22229.67480000807
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.similar.session_manager",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 24882.936000009067
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.similar.dealer_get_vector",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 16914.010100008454
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.related.KBService_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 26115.085199999157
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.related.Dealer_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 59435.923899989575
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.nl.cn_doc_chunk",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 15,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 20015.785100025823
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.hard.short_cn_kb",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 12,
+      "top": "app/domains/api/kb_qa.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 59444.623599993065
+    },
+    {
+      "config": "A",
+      "case_id": "kb.resolve.hard.short_cn_session",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 13,
+      "top": "app/agent_frame/session/api.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 62819.830299995374
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.related.KBService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 25517.44399999734
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.related.DocParserService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/domains/services/doc_parser_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 67909.07100000186
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.related.SessionManager",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 4,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 17309.37519998406
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.related.Dealer",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 14651.950700004818
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.nl.cn_kb",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 13,
+      "top": "app/domains/api/kb_qa.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 21407.225100003416
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.nl.cn_parse",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 12,
+      "top": "app/rag_core/rag/app/manual.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 25784.338199999183
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.nl.cn_session",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 15,
+      "top": "app/agent_frame/session/api.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 20797.40059998585
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.nl.cn_retrieval",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 13,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 49652.17020001728
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.nl.semantic_retrieval",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 14,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 37063.36359999841
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.similar.kb_service_create",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6781.805200007511
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.similar.session_manager",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7007.117399974959
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.similar.dealer_get_vector",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 28374.060500005726
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.related.KBService_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 37096.045100013725
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.related.Dealer_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 30641.87810002477
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.nl.cn_doc_chunk",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 15,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 47484.13589998381
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.hard.short_cn_kb",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 12,
+      "top": "app/domains/api/kb_qa.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 57351.538499991875
+    },
+    {
+      "config": "D",
+      "case_id": "kb.resolve.hard.short_cn_session",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 13,
+      "top": "app/agent_frame/session/api.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 57443.97610001033
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.related.KBService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 28092.800500016892
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.related.DocParserService",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Implementation of the DocParserService class or interface",
+        "identifiers": [
+          "DocParserService",
+          "doc_parser_service",
+          "DocParserServiceImpl",
+          "class DocParserService",
+          "doc_parser",
+          "DocParser",
+          "parse_document",
+          "DocumentParserService"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 352586.3568999921
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.related.SessionManager",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 4,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 22510.523899982218
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.related.Dealer",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 10305.00709998887
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.nl.cn_kb",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.0625,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 13,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "knowledge base service location or definition",
+        "identifiers": [
+          "knowledge_base_service",
+          "KnowledgeBaseService",
+          "kb_service",
+          "knowledge_service",
+          "knowledgebase_service",
+          "KnowledgeService",
+          "kb_repository",
+          "knowledge_base"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 250504.11770000937
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.nl.cn_parse",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "document parsing logic - where documents are parsed",
+        "identifiers": [
+          "document_parser",
+          "parse_document",
+          "DocumentParser",
+          "doc_parser",
+          "parseDoc",
+          "document_parsing",
+          "docParse",
+          "parse_doc"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 343146.5697999811
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.nl.cn_session",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "session management implementation",
+        "identifiers": [
+          "session_manager",
+          "SessionManager",
+          "manage_session",
+          "session_store",
+          "create_session",
+          "destroy_session",
+          "session_handler",
+          "session_service"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 362320.2716000087
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.nl.cn_retrieval",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/domains/services/common/doc_vector_store_service.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "vector retrieval re-ranking location or implementation",
+        "identifiers": [
+          "vector_retrieval_rerank",
+          "rerank",
+          "vector_search_rerank",
+          "reranking",
+          "re_rank",
+          "hybrid_rerank",
+          "retrieval_rerank",
+          "rerankSearch"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 241392.28299999377
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.nl.semantic_retrieval",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 14,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Document retrieval pipeline using vector search with a reranking step, possibly applied to dealer-related documents",
+        "identifiers": [
+          "rerank_documents",
+          "vector_search_retrieve",
+          "document_retrieval",
+          "rerank_results",
+          "dealer_search",
+          "semantic_search_rerank",
+          "retrieve_and_rerank",
+          "search_documents"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 343821.1263999983
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.similar.kb_service_create",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8271.390799985966
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.similar.session_manager",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 14686.408300010953
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.similar.dealer_get_vector",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5198.358099994948
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.related.KBService_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Knowledge base service definition and implementation",
+        "identifiers": [
+          "KBService",
+          "kb_service",
+          "KnowledgeBaseService",
+          "knowledge_base_service",
+          "KBServiceBase",
+          "DefaultKBService",
+          "kb_service_impl",
+          "KnowledgeService"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 233145.01470001414
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.related.Dealer_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Where is the Dealer vector retrieval reranking implemented",
+        "identifiers": [
+          "dealer_vector_rerank",
+          "dealerVectorRerank",
+          "dealer_rerank",
+          "vector_retrieval_rerank",
+          "dealer_vector_search",
+          "dealerRerank",
+          "dealer_retrieval_rerank",
+          "vectorRerank"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 205512.69870001124
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.nl.cn_doc_chunk",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Parse documents and ingest them into a database or vector store",
+        "identifiers": [
+          "parse_document",
+          "ingest_document",
+          "document_loader",
+          "index_document",
+          "document_to_chunks",
+          "insert_documents",
+          "embed_and_store",
+          "doc_ingestion"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 151326.93079998717
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.hard.short_cn_kb",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/infrastructure/storage/base.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "knowledge base management, storage, and retrieval functionality",
+        "identifiers": [
+          "knowledge_base",
+          "KnowledgeBase",
+          "kb_search",
+          "kb_query",
+          "knowledge_repo",
+          "knowledgeBase",
+          "kb_manager",
+          "knowledge_entry"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 201249.55340000452
+    },
+    {
+      "config": "E",
+      "case_id": "kb.resolve.hard.short_cn_session",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "session management or session handling",
+        "identifiers": [
+          "session",
+          "Session",
+          "create_session",
+          "session_id",
+          "SessionManager",
+          "start_session",
+          "session_store",
+          "getSession"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 367570.75659997645
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.related.KBService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 44705.40920001804
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.related.DocParserService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/domains/services/doc_parser_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 27908.839399984572
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.related.SessionManager",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 4,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 30718.753300025128
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.related.Dealer",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 32420.802700013155
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.nl.cn_kb",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "knowledge base service definition and implementation",
+        "identifiers": [
+          "knowledge_base_service",
+          "KnowledgeBaseService",
+          "knowledge_base",
+          "kb_service",
+          "KbService",
+          "knowledge_service",
+          "KnowledgeService",
+          "knowledge_repo_service"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 205360.69380000117
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.nl.cn_parse",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find where document parsing is implemented or located in the codebase",
+        "identifiers": [
+          "parse_document",
+          "document_parser",
+          "docParser",
+          "parse_doc",
+          "document_parsing",
+          "extract_document",
+          "load_document",
+          "DocumentParser"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 458966.5194999834
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.nl.cn_session",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "session management logic, including session creation, storage, and lifecycle handling",
+        "identifiers": [
+          "session_manager",
+          "SessionManager",
+          "session_handler",
+          "SessionHandler",
+          "session_service",
+          "SessionService",
+          "session_store",
+          "SessionStore"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 307206.59539999906
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.nl.cn_retrieval",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/domains/services/common/doc_vector_store_service.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Vector retrieval reranking logic location",
+        "identifiers": [
+          "vector_rerank",
+          "rerank_vector_results",
+          "vector_retrieval_rerank",
+          "rerank_candidates",
+          "vector_search_reranker",
+          "apply_rerank",
+          "rerank_scores",
+          "retrieval_rerank"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 272864.9443000031
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.nl.semantic_retrieval",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 14,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 48164.61320000235
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.similar.kb_service_create",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 13918.591099994956
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.similar.session_manager",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9047.020600002725
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.similar.dealer_get_vector",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 23328.57340000919
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.related.KBService_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 82405.71110000019
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.related.Dealer_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/rag_core/rag/nlp/synonym.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 44346.46749999956
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.nl.cn_doc_chunk",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Document parsing and ingestion into a database or storage system",
+        "identifiers": [
+          "parse_document",
+          "document_ingestion",
+          "ingest_document",
+          "document_to_db",
+          "extract_text",
+          "insert_document",
+          "document_store",
+          "index_document"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 327320.2557999757
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.hard.short_cn_kb",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0625,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 13,
+      "top": "app/infrastructure/storage/base.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "knowledge base implementation, storage and retrieval of structured knowledge entries",
+        "identifiers": [
+          "knowledge_base",
+          "KnowledgeBase",
+          "knowledge_base_repository",
+          "knowledge_entry",
+          "kb_search",
+          "knowledge_base_service",
+          "kb_index",
+          "knowledge_store"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 269586.9441999821
+    },
+    {
+      "config": "F",
+      "case_id": "kb.resolve.hard.short_cn_session",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agent_frame/session/session.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "session management, handling user or client sessions",
+        "identifiers": [
+          "session",
+          "create_session",
+          "session_id",
+          "getSession",
+          "session_store",
+          "destroy_session",
+          "session_manager",
+          "sessionTimeout"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 339744.0640999994
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.related.KBService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 3188.6093000066467
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.related.DocParserService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/doc_parser_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 18834.196000010706
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.related.SessionManager",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 4,
+      "top": "app/agent_frame/session/api.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5198.989500000607
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.related.Dealer",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/rag_core/graphrag/search.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5179.697399988072
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.nl.cn_kb",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 9,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6713.608999998542
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.nl.cn_parse",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 9,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 19540.980599995237
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.nl.cn_session",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.16666666666666666,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7811.261299997568
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.nl.cn_retrieval",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 6,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7263.15060001798
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.nl.semantic_retrieval",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/constants/common.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 14062.53719999222
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.similar.kb_service_create",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 11596.387199999299
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.similar.session_manager",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 15022.417900006985
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.similar.dealer_get_vector",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2151.3369000167586
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.related.KBService_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4850.294600008056
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.related.Dealer_nl",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/rag_core/graphrag/search.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8434.247400000459
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.nl.cn_doc_chunk",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 9,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2300.9395000117365
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.hard.short_cn_kb",
+      "items_p": 0.5,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 7,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2141.923700022744
+    },
+    {
+      "config": "B",
+      "case_id": "kb.resolve.hard.short_cn_session",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2261.889500019606
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.related.KBService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4107.1815000032075
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.related.DocParserService",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Implementation of DocParserService",
+        "identifiers": [
+          "DocParserService",
+          "doc_parser_service",
+          "DocParserServiceImpl",
+          "doc_parser_service_impl",
+          "parse_document",
+          "parseDocument",
+          "DocumentParserService",
+          "document_parser_service"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 83008.72020001407
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.related.SessionManager",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 4,
+      "top": "app/agent_frame/session/api.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 3780.6518000143114
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.related.Dealer",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/rag_core/graphrag/search.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2774.1219000017736
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.nl.cn_kb",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/rag_core/graphrag/light/graph_prompt.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "knowledge base service implementation or definition location",
+        "identifiers": [
+          "knowledge_base_service",
+          "KnowledgeBaseService",
+          "kb_service",
+          "KBService",
+          "knowledge_service",
+          "KnowledgeService",
+          "knowledge_base",
+          "knowledgeBase"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 143789.70990001108
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.nl.cn_parse",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/api/document.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "find where document parsing logic is located",
+        "identifiers": [
+          "document_parser",
+          "parse_document",
+          "doc_parser",
+          "DocumentParser",
+          "parse_doc",
+          "document_parsing",
+          "load_document",
+          "read_document"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 212597.97929998604
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.nl.cn_session",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agent_frame/session/api.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "session management logic and where it is located",
+        "identifiers": [
+          "session_manager",
+          "SessionManager",
+          "session_handler",
+          "session_service",
+          "SessionService",
+          "session_store",
+          "session_controller",
+          "manage_session"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 156841.5549999918
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.nl.cn_retrieval",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/services/common/doc_vector_store_service.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "vector retrieval reranking logic location",
+        "identifiers": [
+          "rerank",
+          "vector_search_rerank",
+          "rerankDocs",
+          "rerank_results",
+          "vector_reranker",
+          "rerank_candidates",
+          "retrievalRerank",
+          "rerank_top_k"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 249353.98580000037
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.nl.semantic_retrieval",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Document retrieval system that performs vector search and reranks results, possibly scoped to a dealer entity",
+        "identifiers": [
+          "rerank_documents",
+          "vector_search",
+          "retrieve_documents",
+          "rerank_results",
+          "dealer_search",
+          "document_retrieval",
+          "rerank_search_results",
+          "search_and_rerank"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 278369.7279999906
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.similar.kb_service_create",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7280.266500019934
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.similar.session_manager",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 4,
+      "top": "app/agent_frame/session/manager.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9641.060399997514
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.similar.dealer_get_vector",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/rag_core/rag/retrieval/search.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 16872.49559999327
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.related.KBService_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/domains/services/kb_service.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find the location or definition of the knowledge base service (KBService)",
+        "identifiers": [
+          "KBService",
+          "kb_service",
+          "KnowledgeBaseService",
+          "knowledge_base_service",
+          "KbService",
+          "kbService",
+          "knowledge_service",
+          "KnowledgeService"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 194130.19009999698
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.related.Dealer_nl",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0625,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 13,
+      "top": "app/domains/services/common/doc_vector_store_service.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Location of vector retrieval reranking logic in the Dealer module",
+        "identifiers": [
+          "dealer_vector_rerank",
+          "vector_retrieval_rerank",
+          "dealer_rerank",
+          "vector_search_rerank",
+          "rerank_vector",
+          "dealer_vector_retrieval",
+          "VectorRetrievalRerank",
+          "dealer_reranking"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 271820.12770001893
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.nl.cn_doc_chunk",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/domains/api/document.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Parse documents and ingest them into storage or database",
+        "identifiers": [
+          "parse_document",
+          "document_ingestion",
+          "ingest_documents",
+          "parse_and_store",
+          "document_loader",
+          "index_documents",
+          "import_documents",
+          "document_pipeline"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 335761.57810000586
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.hard.short_cn_kb",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/infrastructure/storage/factory.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Knowledge base storage, retrieval, and management functionality",
+        "identifiers": [
+          "knowledge_base",
+          "knowledgeBase",
+          "knowledge_repo",
+          "knowledge_store",
+          "KnowledgeBase",
+          "kb_repository",
+          "knowledge_data",
+          "knowledgeIndex"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 197402.8656000155
+    },
+    {
+      "config": "C",
+      "case_id": "kb.resolve.hard.short_cn_session",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agent_frame/session/api.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Session management, creation, storage, and retrieval of user sessions",
+        "identifiers": [
+          "session",
+          "session_id",
+          "createSession",
+          "getSession",
+          "sessionManager",
+          "session_store",
+          "SessionTimeout",
+          "user_session"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 283771.9466999988
+    }
+  ],
+  "summary": [
+    {
+      "cfg": "A",
+      "avg_iR": 0.7058823529411765,
+      "avg_uR": 0.9411764705882353,
+      "pass": "12/17",
+      "avg_ms": 26234.546929409535,
+      "p50_ms": 22229.67480000807,
+      "p95_ms": 59444.623599993065,
+      "symbol": true
+    },
+    {
+      "cfg": "D",
+      "avg_iR": 0.7058823529411765,
+      "avg_uR": 1.0,
+      "pass": "12/17",
+      "avg_ms": 32486.640905882643,
+      "p50_ms": 28374.060500005726,
+      "p95_ms": 57443.97610001033,
+      "symbol": true
+    },
+    {
+      "cfg": "E",
+      "avg_iR": 0.7647058823529411,
+      "avg_uR": 0.9411764705882353,
+      "pass": "13/17",
+      "avg_ms": 184802.36284117395,
+      "p50_ms": 205512.69870001124,
+      "p95_ms": 362320.2716000087,
+      "symbol": true
+    },
+    {
+      "cfg": "F",
+      "avg_iR": 0.8235294117647058,
+      "avg_uR": 1.0,
+      "pass": "14/17",
+      "avg_ms": 149294.98815294082,
+      "p50_ms": 48164.61320000235,
+      "p95_ms": 339744.0640999994,
+      "symbol": true
+    },
+    {
+      "cfg": "B",
+      "avg_iR": 0.8235294117647058,
+      "avg_uR": 0.9411764705882353,
+      "pass": "14/17",
+      "avg_ms": 8032.498094123131,
+      "p50_ms": 6713.608999998542,
+      "p95_ms": 18834.196000010706,
+      "symbol": false
+    },
+    {
+      "cfg": "C",
+      "avg_iR": 0.6470588235294118,
+      "avg_uR": 0.8235294117647058,
+      "pass": "11/17",
+      "avg_ms": 144194.36259412116,
+      "p50_ms": 156841.5549999918,
+      "p95_ms": 283771.9466999988,
+      "symbol": false
+    }
+  ]
+}

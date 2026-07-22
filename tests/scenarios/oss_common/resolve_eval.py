@@ -5,8 +5,11 @@
 **不必**为 B/C 清库重建无符号索引；复用已有（含符号）索引即可。
 """
 from __future__ import annotations
+import json
 import os
-from dataclasses import dataclass, field
+import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Type
 from tests.scenarios.framework.accuracy import AccuracyMetrics
 from tests.scenarios.framework.case_spec import PathSetCase
@@ -35,6 +38,7 @@ class CaseRow:
     passed: bool
     channels: List[str] = field(default_factory=list)
     nl_rewrite_meta: Optional[Dict[str, object]] = None
+    elapsed_ms: float = 0.0
 
 
 # 与 Pando §5.12 对齐：A=符号 B=NL C=NL+always D=符号+NL E=符号+NL+always F=符号+NL+weak
@@ -87,12 +91,14 @@ async def eval_resolve(
     repo_id = await session_cls.ensure_repo()
     rows: List[CaseRow] = []
     for case in cases:
+        t0 = time.perf_counter()
         result = await SearchResolveService.resolve(
             repo_id,
             case.extra["query"],
             top_k=case.top_k,
             intent="auto",
         )
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
         items = result.get("items") or []
         also = result.get("also_consider") or []
         hits = paths(items)
@@ -117,6 +123,7 @@ async def eval_resolve(
             passed=score.recall >= case.min_recall,
             channels=list(result.get("channels_used") or []),
             nl_rewrite_meta=result.get("nl_rewrite"),
+            elapsed_ms=elapsed_ms,
         )
         rows.append(row)
         rw = "N"
@@ -130,7 +137,7 @@ async def eval_resolve(
         print(
             f"[{tag}/{cfg.label}] {case.case_id} "
             f"iR={row.items_r:.0%} uR={row.union_r:.0%} rw={rw} "
-            f"top={row.top} pass={row.passed}",
+            f"ms={row.elapsed_ms:.0f} top={row.top} pass={row.passed}",
             flush=True,
         )
     return rows
@@ -140,11 +147,123 @@ def avg(rows: List[CaseRow], attr: str) -> float:
     return sum(getattr(r, attr) for r in rows) / max(len(rows), 1)
 
 
+def _percentile(values: List[float], p: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    idx = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * p))))
+    return ordered[idx]
+
+
+def print_latency_table(tag: str, all_rows: List[CaseRow]) -> None:
+    present = [lbl for lbl in EVAL_ORDER if any(r.config == lbl for r in all_rows)]
+    case_ids = list(dict.fromkeys(r.case_id for r in all_rows))
+    print(f"\n===== {tag} CASE LATENCY (ms) =====", flush=True)
+    print(
+        f"{'case':<52}" + "".join(f" {lbl:>8}" for lbl in present) + f" {'avg':>8}",
+        flush=True,
+    )
+    for cid in case_ids:
+        vals: List[str] = []
+        nums: List[float] = []
+        for label in present:
+            hit = next((r for r in all_rows if r.config == label and r.case_id == cid), None)
+            if hit is None:
+                vals.append("-")
+            else:
+                vals.append(f"{hit.elapsed_ms:.0f}")
+                nums.append(hit.elapsed_ms)
+        avg_ms = sum(nums) / len(nums) if nums else 0.0
+        print(f"{cid:<52}" + "".join(f" {v:>8}" for v in vals) + f" {avg_ms:>8.0f}", flush=True)
+
+
+def dump_eval_artifact(tag: str, all_rows: List[CaseRow], configs: Sequence[AblationConfig]) -> Path:
+    """写出 JSON + Markdown，便于人工检视准确率与耗时。"""
+    out_dir = Path(".")
+    json_path = out_dir / f".tmp_{tag.lower()}_ablation_newgt.json"
+    md_path = out_dir / f".tmp_{tag.lower()}_ablation_newgt.md"
+    payload = {
+        "tag": tag,
+        "rows": [asdict(r) for r in all_rows],
+        "summary": [],
+    }
+    cfg_map = {c.label: c for c in configs}
+    lines = [f"# {tag} resolve 消融（新 GT）", ""]
+    lines.append("## 档位汇总")
+    lines.append("")
+    lines.append("| cfg | avg_iR | avg_uR | pass | avg_ms | p50_ms | p95_ms |")
+    lines.append("|-----|--------|--------|------|--------|--------|--------|")
+    for label in EVAL_ORDER:
+        rows = [r for r in all_rows if r.config == label]
+        if not rows:
+            continue
+        ms = [r.elapsed_ms for r in rows]
+        summary = {
+            "cfg": label,
+            "avg_iR": avg(rows, "items_r"),
+            "avg_uR": avg(rows, "union_r"),
+            "pass": f"{sum(1 for r in rows if r.passed)}/{len(rows)}",
+            "avg_ms": avg(rows, "elapsed_ms"),
+            "p50_ms": _percentile(ms, 0.50),
+            "p95_ms": _percentile(ms, 0.95),
+            "symbol": cfg_map[label].symbol_on if label in cfg_map else None,
+        }
+        payload["summary"].append(summary)
+        lines.append(
+            f"| {label} | {summary['avg_iR']:.0%} | {summary['avg_uR']:.0%} | "
+            f"{summary['pass']} | {summary['avg_ms']:.0f} | "
+            f"{summary['p50_ms']:.0f} | {summary['p95_ms']:.0f} |"
+        )
+    lines.append("")
+    lines.append("## 每用例耗时 (ms)")
+    lines.append("")
+    present = [lbl for lbl in EVAL_ORDER if any(r.config == lbl for r in all_rows)]
+    case_ids = list(dict.fromkeys(r.case_id for r in all_rows))
+    lines.append("| case | " + " | ".join(present) + " | avg |")
+    lines.append("|------|" + "|".join(["------"] * len(present)) + "|-----|")
+    for cid in case_ids:
+        cells: List[str] = []
+        nums: List[float] = []
+        for label in present:
+            hit = next((r for r in all_rows if r.config == label and r.case_id == cid), None)
+            if hit is None:
+                cells.append("-")
+            else:
+                cells.append(f"{hit.elapsed_ms:.0f}")
+                nums.append(hit.elapsed_ms)
+        avg_ms = sum(nums) / len(nums) if nums else 0.0
+        short = cid.split(".")[-1] if cid.count(".") >= 2 else cid
+        lines.append(f"| `{short}` | " + " | ".join(cells) + f" | {avg_ms:.0f} |")
+    lines.append("")
+    lines.append("## 每用例准确率 (iR/pass)")
+    lines.append("")
+    lines.append("| case | " + " | ".join(f"{lbl} iR" for lbl in present) + " |")
+    lines.append("|------|" + "|".join(["------"] * len(present)) + "|")
+    for cid in case_ids:
+        cells = []
+        for label in present:
+            hit = next((r for r in all_rows if r.config == label and r.case_id == cid), None)
+            if hit is None:
+                cells.append("-")
+            else:
+                mark = "✓" if hit.passed else "✗"
+                cells.append(f"{hit.items_r:.0%}{mark}")
+        short = cid.split(".")[-1] if cid.count(".") >= 2 else cid
+        lines.append(f"| `{short}` | " + " | ".join(cells) + " |")
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"[{tag}] artifact json={json_path.resolve()}", flush=True)
+    print(f"[{tag}] artifact md={md_path.resolve()}", flush=True)
+    return md_path
+
+
 def print_summary(tag: str, all_rows: List[CaseRow], configs: Sequence[AblationConfig]) -> None:
     print(f"\n===== {tag} RESOLVE SUMMARY =====", flush=True)
     print(
-        f"{'cfg':<4} {'avg_iR':>7} {'avg_uR':>7} {'pass':>8} {'symbol':>7} "
-        f"{'nl2c':>5} {'rewr':>5} {'mode':>6}",
+        f"{'cfg':<4} {'avg_iR':>7} {'avg_uR':>7} {'pass':>8} {'avg_ms':>8} "
+        f"{'p50':>7} {'p95':>7} {'symbol':>7} {'nl2c':>5} {'rewr':>5} {'mode':>6}",
         flush=True,
     )
     cfg_map = {c.label: c for c in configs}
@@ -154,28 +273,32 @@ def print_summary(tag: str, all_rows: List[CaseRow], configs: Sequence[AblationC
             continue
         cfg = cfg_map[label]
         mode = cfg.rewrite_mode if cfg.nl_rewrite else "-"
+        ms = [r.elapsed_ms for r in rows]
         print(
             f"{label:<4} {avg(rows, 'items_r'):>6.0%} {avg(rows, 'union_r'):>6.0%} "
             f"{sum(1 for r in rows if r.passed)}/{len(rows):<4} "
+            f"{avg(rows, 'elapsed_ms'):>7.0f} "
+            f"{_percentile(ms, 0.50):>6.0f} {_percentile(ms, 0.95):>6.0f} "
             f"{'ON' if cfg.symbol_on else 'OFF':>7} "
             f"{'ON' if cfg.nl2code else 'OFF':>5} "
             f"{'ON' if cfg.nl_rewrite else 'OFF':>5} "
             f"{mode:>6}",
             flush=True,
         )
-    focus = [r.case_id for r in all_rows if ".nl.cn_" in r.case_id]
+    print_latency_table(tag, all_rows)
+    focus = [r.case_id for r in all_rows if ".nl.cn_" in r.case_id or ".hard." in r.case_id]
     focus = list(dict.fromkeys(focus))
-    if not focus:
-        return
     present = [lbl for lbl in EVAL_ORDER if any(r.config == lbl for r in all_rows)]
-    print(f"\n===== {tag} FOCUS Chinese NL (unionR) =====", flush=True)
-    print(f"{'case':<48}" + "".join(f" {lbl:>6}" for lbl in present), flush=True)
-    for cid in focus:
-        vals = []
-        for label in present:
-            hit = next((r for r in all_rows if r.config == label and r.case_id == cid), None)
-            vals.append(f"{hit.union_r:.0%}" if hit else "-")
-        print(f"{cid:<48}" + "".join(f" {v:>6}" for v in vals), flush=True)
+    if focus:
+        print(f"\n===== {tag} FOCUS NL/hard (unionR) =====", flush=True)
+        print(f"{'case':<52}" + "".join(f" {lbl:>6}" for lbl in present), flush=True)
+        for cid in focus:
+            vals = []
+            for label in present:
+                hit = next((r for r in all_rows if r.config == label and r.case_id == cid), None)
+                vals.append(f"{hit.union_r:.0%}" if hit else "-")
+            print(f"{cid:<52}" + "".join(f" {v:>6}" for v in vals), flush=True)
+    dump_eval_artifact(tag, all_rows, configs)
 
 
 def env_truthy(name: str) -> bool:

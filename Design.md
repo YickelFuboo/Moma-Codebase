@@ -663,7 +663,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | 套件 | 结果 |
 |------|------|
 | `tests/unit/search/nl2code_enhance/` 等 | **84 passed**（完备性收口时） |
-| 真仓六档消融 | 见 **§5.12**（四仓：Pando 17 / KB 12 / Go 29 / Django 30；产品默认 D） |
+| 真仓六档消融 | 见 **§5.12**（新 GT：Pando 22 / KB 17 / Go 32 / Django 33；产品默认 D；含每用例耗时） |
 
 ---
 
@@ -683,9 +683,9 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 
 ---
 
-### 5.12 整体配置开关对比测试（四仓）
+### 5.12 整体配置开关对比测试（四仓 + 本仓 related）
 
-日期：Pando 2026-07-19～20；KB / Go / Django 2026-07-20～21  
+日期：新 GT 消融 **2026-07-22**（Agent 向配比；全程约 10h；日志 `.tmp_four_repo_ablation_newgt.log`）。
 
 四仓 resolve 消融共用六档 **A–F**（短标签）：
 
@@ -698,145 +698,103 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | **E** | ON | ON | ON（`always`） | 符号+NL+always |
 | **F** | ON | ON | ON（`weak`） | 符号+NL+weak |
 
-口径：**avg iR** = items Recall；**avg uR** = items∪also_consider Recall；**pass** = items recall ≥ 用例门槛。  
+口径：**avg iR** = items Recall；**avg uR** = items∪also_consider Recall；**pass** = items recall ≥ 用例门槛；**avg_ms** = 单次 resolve 墙钟均值。  
 产品默认 **D**：符号 ON + NL2Code ON + rewrite OFF。
 
-| 仓 | 角色 | 分析范围 | resolve 案数 | 档位覆盖 | 脚本 |
-|----|------|----------|--------------|----------|------|
-| **Pando-Agent** | 业务 Agent 真仓 | `app/` | **17** | A–F | `tests.scenarios.pando_agent.run_nl2code_ablation` |
-| **KnowledegBase-Service** | 第二业务真仓 | 全仓 `app/` 等 | **12** | D / F（专项） | `tests.scenarios.knowledge_base.run_resolve_eval` |
-| **Go（开源）** | 大仓多包 | `src` 下 **net + encoding + context** | **29** | A–F（查询时切开关，不重建） | `tests.scenarios.go_oss.run_resolve_eval` |
-| **Django（开源）** | 大仓整包 | `django/`（db/http/contrib/forms/…） | **30** | A–F（同上） | `tests.scenarios.django_oss.run_resolve_eval` |
+#### Agent 向用例配比（目标）
 
-GT 源文件：各目录 `ground_truth.py`（`PANDO_RESOLVE_CASES` / `KB_RESOLVE_CASES` / `GO_RESOLVE_CASES` / `DJANGO_RESOLVE_CASES`）。
+| 类型 | 目标占比 | 说明 |
+|------|----------|------|
+| 纯符号 `sym` | 25–30% | 栈迹 / 标识符 |
+| 符号+NL `sym_nl` | 15–20% | Agent 混合问法 |
+| 纯 NL `nl` | 30–35% | 中/英文意图 |
+| 代码片段 `similar` | 15–20% | 贴代码找同类 |
+| 难例 `hard` | 10–15% | 同名歧义 / 短中文 |
 
-#### 四仓结果总表（resolve）
+| 仓 | 角色 | 分析范围 | resolve/related 案数 | 档位覆盖 | 脚本 |
+|----|------|----------|----------------------|----------|------|
+| **Pando-Agent** | 业务 Agent 真仓 | `app/` | **22** resolve | A–F | `tests.scenarios.pando_agent.run_nl2code_ablation` |
+| **KnowledegBase-Service** | 第二业务真仓 | 全仓 `app/` 等 | **17** resolve | A–F | `tests.scenarios.knowledge_base.run_resolve_eval` |
+| **Go（开源）** | 大仓多包 | `src` 下 net+encoding+context | **32** resolve | A–F | `tests.scenarios.go_oss.run_resolve_eval` |
+| **Django（开源）** | 大仓整包 | `django/` | **33** resolve | A–F | `tests.scenarios.django_oss.run_resolve_eval` |
+| **本仓 Moma-CodeBase** | 框架回归 | 本仓 `app/` | **11** related（+ similar/graph 另计） | related 场景 | `tests.scenarios.vector_related` 等 |
 
-| 档 | 短标签 | Pando 17 | KB 12 | Go 29 | Django 30 |
-|----|--------|----------|-------|-------|-----------|
-| **A** | 符号 | 88%/97% · **15/17** | — | **66%/97% · 21/29** | **83%/98% · 25/30** |
-| **B** | NL | 68%/88% · 12/17 | — | 36%/59% · 11/29 | 31%/69% · 10/30 |
-| **C** | NL+always | 76%/94% · 13/17 | — | 43%/64% · 13/29 | 37%/71% · 11/30 |
-| **D** ★ | 符号+NL | **94%/97% · 16/17** | 75%/100% · **9/12** | 62%/86% · 19/29 | 80%/96% · 24/30 |
-| **E** | 符号+NL+always | 91%/94% · 16/17 | — | **69%/90% · 20/29** | **94%/99% · 29/30** |
-| **F** | 符号+NL+weak | **94%/97% · 16/17** | **92%/100% · 11/12** | 62%/86% · 19/29 | 81%/97% · 25/30 |
+GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`。
 
-（「—」= 该仓未跑该档。KB 仅对比 D/F。）
+#### 四仓结果总表（resolve，新 GT：Pando22 / KB17 / Go32 / Django33）
 
-#### 四仓交叉结论
+仓内效果序（同仓 A–F）：主序 **pass**，同 pass 比 **avg iR**，再比 **avg uR**；并列则按档位字母。单元格末尾 **①最好 → ⑥最弱**。
 
-1. **必须开符号**：四仓里无符号的 B/C 都明显弱于有符号档。  
-2. **产品默认仍 = D（符号+NL）**：Pando 上 D 优于 A（16/17 vs 15/17）；Go/Django 上 A 略优于 D（NL 偶发噪声），D 仍是「符号为主 + NL 保险」的折中。  
-3. **F（符号+NL+weak）**：Pando≈D；KB 短中文 items 抬分最明显（9→11/12）；Go≈D；Django 略好于 D（如 `cn_auth`）。  
-4. **E（符号+NL+always）**：大仓抬分猛（Django 29/30），但 Pando 伤过 `cn_memory`，**不宜默认**。  
-5. **NL 收益依赖问法分布**：符号题占主导的大仓，A 可更干净；中文/语义题多的业务仓，D/F 更有价值。
+| 档 | 短标签 | Pando 22 | KB 17 | Go 32† | Django 33 |
+|----|--------|----------|-------|--------|-----------|
+| **A** | 符号 | 86%/91% · 19/22 ④ | 71%/94% · 12/17 ⑤ | 58%/89% · 20/32 ② | 82%/98% · 27/33 ① |
+| **B** | NL | 70%/95% · 16/22 ⑥ | 82%/94% · 14/17 ② | 31%/58% · 11/32 ⑥ | 40%/78% · 14/33 ⑤ |
+| **C** | NL+always | 80%/91% · 18/22 ⑤ | 65%/82% · 11/17 ⑥ | 39%/66% · 14/32 ⑤ | 36%/68% · 12/33 ⑥ |
+| **D** ★ | 符号+NL | 91%/95% · 20/22 ② | 71%/100% · 12/17 ④ | 58%/78% · 20/32 ③ | 76%/96% · 25/33 ③ |
+| **E** | 符号+NL+always | 93%/95% · 21/22 ① | 76%/94% · 13/17 ③ | 62%/83% · 21/32 ① | 80%/97% · 27/33 ② |
+| **F** | 符号+NL+weak | 89%/95% · 20/22 ③ | 82%/100% · 14/17 ① | 58%/78% · 20/32 ④ | 74%/94% · 25/33 ④ |
 
-#### Pando 焦点中文 NL（unionR）
+仓内效果序一览：
 
-| case | A | B | C | D | E | F |
-|------|---|---|---|---|---|---|
-| `cn_auth` | 50% | **100%** | **100%** | 50% | **100%** | 50% |
-| `cn_memory` | **100%** | **100%** | **100%** | **100%** | **0%** | **100%** |
-| `cn_ws` | 100% | 100% | 100% | 100% | 100% | 100% |
+| 仓 | ① | ② | ③ | ④ | ⑤ | ⑥ |
+|----|---|---|---|---|---|---|
+| Pando | E | D | F | A | C | B |
+| KB | F | B | E | D | A | C |
+| Go | E | A | D | F | C | B |
+| Django | A | E | D | F | B | C |
 
-#### KB 中文 NL（items；union 均为 100%）
+（口径：avg iR / avg uR · pass。明细 `.tmp_{pando,kb,go,django}_ablation_newgt.md`。）  
+† Go：**net/encoding/context** 三包子集。
 
-| case | D items | F items |
-|------|---------|---------|
-| `cn_kb` / `cn_parse` / `cn_session` | fail（落 also） | **pass** |
-| `cn_retrieval` | pass | fail（weak 偶发带偏） |
+#### 四仓档位平均耗时（ms / 次 resolve）
 
-#### Go / Django 焦点中文 NL（unionR）
+仓内速度序：**①最快 → ⑥最慢**（数字越小越好）。
 
-| case（Go） | A | D | E | F | B | C |
-|------------|---|---|---|---|---|---|
-| `cn_http_server` / `cn_listen` | 100% | 0% | 100% | 0% | 0% | 0% |
-| `cn_router` | 100% | 0% | 100% | 0% | 0% | 100% |
-| json / context 等 | 多 100% | 多 100% | 多 100% | 同 D | 弱 | 中 |
+| 档 | Pando | KB | Go | Django |
+|----|-------|----|----|--------|
+| **A** | ① 9.1k | ② 26k | ② 24k | ② 15k |
+| **B** | ② 13k | ① 8k | ① 14k | ① 11k |
+| **C** | ④ 68k | ④ 144k | ⑤ 95k | ⑤ 58k |
+| **D** ★ | ③ 17k | ③ 32k | ③ 34k | ③ 20k |
+| **E** | ⑥ 116k | ⑥ 185k | ⑥ 176k | ⑥ 82k |
+| **F** | ⑤ 70k | ⑤ 149k | ④ 38k | ④ 39k |
 
-| case（Django） | A | D | E | F | B | C |
-|----------------|---|---|---|---|---|---|
-| `cn_url_resolve` | 100% | 0% | 100% | 0% | 0% | 0% |
-| `cn_auth` | 33% | 67% | 67% | **100%** | 67% | 33% |
-| 其余多数中文 | 100% | 100% | 100% | 100% | 参差 | 参差 |
+仓内速度序一览：
 
-Pando 另有通道对照（旧 resolve 6 + related 13，非本次四仓主表）：A/D related 均为 96%/100%·13/13；无符号 B related 仅 8/13。
+| 仓 | ①最快 | ② | ③ | ④ | ⑤ | ⑥最慢 |
+|----|--------|---|---|---|---|--------|
+| Pando | A | B | D | C | F | E |
+| KB | B | A | D | C | F | E |
+| Go | B | A | D | F | C | E |
+| Django | B | A | D | F | C | E |
+
+每用例 × 档位耗时见各仓 artifact（含 p50/p95）：`.tmp_pando_ablation_newgt.md` / `.tmp_kb_ablation_newgt.md` / `.tmp_go_ablation_newgt.md` / `.tmp_django_ablation_newgt.md`。
+
+#### 四仓交叉结论（新 GT）
+
+1. **必须开符号**：Go/Django 上 B/C 仍明显弱于有符号档；Pando 无符号也掉分。  
+2. **产品默认仍 = D**：相对 A，Pando 提升（19→20/22）；KB/Go 持平；Django 略降（27→25/33）但 uR 仍高。相对 E 准确率接近，**延迟低一个数量级**。  
+3. **F**：KB 最优（14/17）；Pando/Go≈D；Django≈D。弱改写有收益但代价仍高。  
+4. **E**：四仓 pass 多为最高或并列最高，**avg_ms 常 >80k～180k**，不宜默认。  
+5. **新 GT 更贴近 Agent**：NL/hard 增多后，纯符号 A 在业务仓不再独大；开源大仓 A 仍偏稳，但 D 作为跨仓默认仍合理。
 
 ---
 
-#### 测试用例场景列表（resolve）
+#### 测试用例场景列表（resolve / related）
 
-##### 1) Pando-Agent（17）
+用例明细以各仓 `ground_truth.py` 为准；下表为 **新 GT 规模与类型占比**（`extra.case_kind`）。
 
-路径默认 `F:\Product_Dev\PANDO\Pando-Agent`（可用 `PANDO_AGENT_PATH`）。
+| 仓 | 总数 | sym | sym_nl | nl | similar | hard |
+|----|------|-----|--------|----|---------|------|
+| Pando resolve | **22** | 27% | 23% | 27% | 18% | 5% |
+| KB resolve | **17** | 18% | 18% | 35% | 18% | 12% |
+| Go resolve | **32** | 25% | 19% | 31% | 16% | 9% |
+| Django resolve | **33** | 24% | 18% | 30% | 15% | 12% |
+| 本仓 related | **11** | 36% | 27% | 27% | — | 9% |
 
-| # | case_id | 场景类型 | 查询 | 期望路径（主） |
-|---|---------|----------|------|----------------|
-| 1 | `related.ReActAgent` | 中文+符号 | 查找 ReActAgent 实现位置 | `app/agents/core/react.py` |
-| 2 | `related.BaseAgent` | 纯符号 | BaseAgent | `app/agents/core/base.py` |
-| 3 | `related.ContextBuilder` | 纯符号 | ContextBuilder | `app/agents/context/context.py` |
-| 4 | `related.PlanningAgent` | 中文+符号 | PlanningAgent 实现在哪 | `app/agents/plan/planning.py` |
-| 5 | `related.LangGraphExecutor` | 纯符号 | LangGraphExecutor | `app/agents/plan/langraph_excutor.py` |
-| 6 | `related.EmbeddingModelFactory` | 纯符号 | EmbeddingModelFactory | `app/infrastructure/llms/embedding_models/factory.py` |
-| 7 | `related.OpenAIModels` | 纯符号 | OpenAIModels | `app/infrastructure/llms/chat_models/openai_llm.py` |
-| 8 | `related.jwt_validator` | 路径/标识 | jwt_validator | `app/utils/auth/jwt_validator.py` |
-| 9 | `nl.semantic.memory` | 弱英文 NL | default memory extract prompt… | `app/agents/memorys/default/memory.py` |
-| 10 | `nl.semantic.websocket` | 弱英文 NL | websocket channel connection manager… | `app/channel/websocket/websocket.py` 等 |
-| 11 | `nl.cn_auth` | 中文 NL | 鉴权在哪 | `app/utils/auth/jwt_validator.py` 等 |
-| 12 | `nl.cn_memory` | 中文 NL | 记忆在哪 | `app/agents/memorys/default/memory.py` |
-| 13 | `nl.cn_ws` | 中文 NL | websocket 通道在哪 | `app/channel/websocket/…` |
-| 14 | `similar.think_and_act` | 代码片段 | think_and_act… | `app/agents/core/react.py` |
-| 15 | `similar.agent_state` | 代码片段 | class AgentState… | `app/agents/core/base.py` |
-| 16 | `similar.jwt_validator` | 代码片段 | class JWTValidator… | `app/utils/auth/jwt_validator.py` |
-| 17 | `similar.websocket_endpoint` | 代码片段 | websocket_endpoint… | `app/channel/websocket/websocket.py` |
+相对旧版主要变化：Go/Django **砍冗余纯符号**、补 **符号+NL / 难例 / 英文 NL / similar**；Pando/KB **补混合问法与短中文难例**；本仓 related **补中文 NL 与 MR 经验定位**。
 
-##### 2) KnowledegBase-Service（12）
-
-路径可用 `KB_SERVICE_PATH`。
-
-| # | case_id | 场景类型 | 查询 | 期望路径（主） |
-|---|---------|----------|------|----------------|
-| 1 | `related.KBService` | 纯符号 | KBService | `app/domains/services/kb_service.py` |
-| 2 | `related.DocParserService` | 中文+符号 | DocParserService 实现在哪 | `app/domains/services/doc_parser_service.py` |
-| 3 | `related.SessionManager` | 纯符号 | SessionManager | `app/agent_frame/session/manager.py` |
-| 4 | `related.Dealer` | 纯符号 | Dealer | `app/rag_core/rag/retrieval/search.py` |
-| 5 | `nl.cn_kb` | 中文 NL | 知识库服务在哪 | `…/kb_service.py` |
-| 6 | `nl.cn_parse` | 中文 NL | 文档解析在哪 | `…/doc_parser_service.py` |
-| 7 | `nl.cn_session` | 中文 NL | 会话管理在哪 | `…/session/manager.py` |
-| 8 | `nl.cn_retrieval` | 中文 NL | 向量检索重排在哪 | `…/retrieval/search.py` |
-| 9 | `nl.semantic_retrieval` | 弱英文 NL | document retrieval rerank… | `…/retrieval/search.py` |
-| 10 | `similar.kb_service_create` | 代码片段 | create_kb… | `…/kb_service.py` |
-| 11 | `similar.session_manager` | 代码片段 | create_session… | `…/session/manager.py` |
-| 12 | `similar.dealer_get_vector` | 代码片段 | Dealer._get_vector… | `…/retrieval/search.py` |
-
-##### 3) Go 开源（29）— `net` / `encoding` / `context`
-
-路径默认 `F:\开源项目\go`（`GO_OSS_PATH`）。
-
-| # | case_id | 场景类型 | 查询 | 期望路径（主） |
-|---|---------|----------|------|----------------|
-| 1–8 | `related.Server`…`Cookie` | 纯符号 | Server / ListenAndServe / Client / ServeMux / Handler / Request / Response / Cookie | `src/net/http/{server,client,request,response,cookie}.go` |
-| 9 | `related.NewServeMux` | 中文+符号 | NewServeMux 路由在哪 | `src/net/http/server.go` |
-| 10–13 | `related.Marshal`…`NewDecoder` | 符号 / 中文+符号 | Marshal / Unmarshal / NewEncoder… / NewDecoder | `src/encoding/json/{encode,decode,stream}.go`（含 v2 变体） |
-| 14–17 | `related.Context`…`Background` | 符号 / 中文+符号 | Context / WithCancel / WithTimeout… / Background | `src/context/context.go` |
-| 18–21 | `nl.cn_http_*` / `cn_listen` / `cn_router` | 中文 NL | HTTP 服务端/监听/客户端/路由… | `src/net/http/{server,client}.go` |
-| 22–25 | `nl.cn_json_*` / `cn_context_*` | 中文 NL | JSON 序列化/反序列化；可取消/超时 context | `encoding/json/*`；`context.go` |
-| 26–29 | `similar.*` | 代码片段 | ListenAndServe / Client struct / Marshal / WithCancel | 对应实现文件 |
-
-##### 4) Django 开源（30）— 整包 `django/`
-
-路径默认 `F:\开源项目\django`（`DJANGO_OSS_PATH`）。
-
-| # | case_id | 场景类型 | 查询 | 期望路径（主） |
-|---|---------|----------|------|----------------|
-| 1–4 | `related.Model`…`Field` | 纯符号 | Model / QuerySet / Manager / Field | `django/db/models/{base,query,manager,fields}` |
-| 5–7 | `related.Http*` / `JsonResponse` | 纯符号 | HttpRequest / HttpResponse / JsonResponse | `django/http/{request,response}.py` |
-| 8–13 | auth / admin / session | 符号或中文+符号 | User… / AuthenticationMiddleware / authenticate / login… / AdminSite / SessionMiddleware | `django/contrib/{auth,admin,sessions}/…` |
-| 14–18 | forms / urls / views / mw / core | 纯符号 | Form / URLResolver / View / CommonMiddleware / BaseHandler | `forms` / `urls` / `views` / `middleware` / `core/handlers` |
-| 19–27 | `nl.cn_*` | 中文 NL | ORM / 认证 / QuerySet / 中间件 / 表单 / URL / Admin / Session / 请求 | 对应定义文件 |
-| 28–30 | `similar.*` | 代码片段 | Model / authenticate / Form | `base.py` / `auth/__init__.py` / `forms.py` |
-
-场景类型覆盖约定（四仓共用）：**纯符号**、**中文+符号**、**中文 NL**、**弱英文 NL**（Pando/KB）、**代码 similar**。
+路径默认：Pando `PANDO_AGENT_PATH`；KB `KB_SERVICE_PATH`；Go `GO_OSS_PATH`（三包子集）；Django `DJANGO_OSS_PATH`。
 
 ---
 

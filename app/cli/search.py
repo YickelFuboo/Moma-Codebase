@@ -188,13 +188,13 @@ def search_similar(
         targets = await _expand_target_paths(paths, kind=RepoKind.CODE)
 
         async def _one(path: str):
-            repo = await get_repo_by_path(path)
+        repo = await get_repo_by_path(path)
             _assert_kind_code(repo)
-            result = await SearchService.search_similar_code(
-                repo_id=repo.id,
-                code_text=code,
-                top_k=top_k,
-            )
+        result = await SearchService.search_similar_code(
+            repo_id=repo.id,
+            code_text=code,
+            top_k=top_k,
+        )
             result["path"] = path
             result["kind"] = RepoKind.CODE
             result["repo_id"] = repo.id
@@ -233,11 +233,11 @@ def search_related(
         async def _one(path: str):
             repo = await get_repo_by_path(path)
             _assert_kind_code(repo)
-            result = await SearchService.search_related_files(
-                repo_id=repo.id,
-                keywords=keyword_list,
-                top_k=top_k,
-            )
+        result = await SearchService.search_related_files(
+            repo_id=repo.id,
+            keywords=keyword_list,
+            top_k=top_k,
+        )
             result["path"] = path
             result["kind"] = RepoKind.CODE
             result["repo_id"] = repo.id

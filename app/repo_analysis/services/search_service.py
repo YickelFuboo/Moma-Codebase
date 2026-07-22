@@ -726,17 +726,17 @@ class SearchService:
             "total": len(docs),
             "index": index,
             "items": [
-                {
-                    "file_path": doc.get("file_path"),
+            {
+                "file_path": doc.get("file_path"),
                     "symbol_kind": doc.get("symbol_kind"),
                     "symbol_name": doc.get("symbol_name"),
-                    "start_line": doc.get("start_line"),
-                    "end_line": doc.get("end_line"),
+                "start_line": doc.get("start_line"),
+                "end_line": doc.get("end_line"),
                     "summary": doc.get("summary"),
                     "score": doc.get("_score"),
                     "match_source": "symbol_summary",
-                }
-                for doc in docs
+            }
+            for doc in docs
             ],
         }
 

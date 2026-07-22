@@ -1,6 +1,6 @@
 """开源大仓 Go：scenario 会话。
 
-分析范围：src 下至少三个包 — net / encoding / context（其余顶层包排除）。
+分析范围：src 下 net / encoding / context 三包（全量 src ~5900 文件 + 符号摘要约需数日，已停用）。
 """
 from __future__ import annotations
 import asyncio
@@ -12,7 +12,6 @@ from tests.scenarios.base import CodebaseScenarioBase
 
 DEFAULT_GO_PATH = Path(r"F:\开源项目\go")
 
-# 至少三个子目录；覆盖 HTTP / JSON / context
 _GO_SRC_ALLOW = {"net", "encoding", "context"}
 _GO_SRC_ALL = {
     "archive", "arena", "bufio", "builtin", "bytes", "cmd", "cmp", "compress",
@@ -26,7 +25,7 @@ _GO_SRC_ALL = {
 
 
 class GoOssScenarioSession(CodebaseScenarioBase):
-    """登记并分析 Go 标准库多包子集（默认 D：符号摘要 ON）。"""
+    """登记并分析 Go 标准库三包子集（默认 D：符号摘要 ON）。"""
 
     ENABLE_SYMBOL_SUMMARY = True
     ENABLE_CODE_GRAPH = False

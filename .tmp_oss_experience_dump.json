@@ -1,0 +1,2481 @@
+{
+  "go": {
+    "path": "F:\\开源项目\\go",
+    "repo_id": "99b77fa8-c711-4f43-b566-d49da6a4da38",
+    "ready_mrs": 31,
+    "pattern_count": 56,
+    "items": [
+      {
+        "commit_sha": "060245832fdda78cb2f6113ed4c5fc6339808e47",
+        "commit_message": "all: REVERSE MERGE dev.simd (c29765a) into master",
+        "committed_at": "2026-07-16T00:13:54",
+        "is_merge": true,
+        "title": "多目标代码生成器的分层 IR 架构与协同变更约定",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "多目标代码生成器的分层 IR 架构与协同变更约定",
+            "scenario": "需要为多种目标架构（如 arm64、wasm、x86 等）生成等语义但不同指令的代码时，如何组织代码生成流水线使得新增目标架构或修改中间表达时变更可控",
+            "patterns": [
+              "设置共享统一层（unify）抽象目标无关的语义 IR（env/value），各目标后端（arm64、wasm）仅消费统一层产出，不直接互相依赖",
+              "在统一层与目标后端之间引入 midway 中间 pass 层，处理跨目标的全局变换（如求各架构指令集交集），避免将跨目标逻辑散落到各后端",
+              "当修改统一层 IR 定义时，所有目标后端与 midway pass 需协同同步更新——可将统一层作为变更的辐射源，用编译期类型或生成规则确保不遗漏"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "060245832fdda78cb2f6113ed4c5fc6339808e47"
+            ],
+            "anchors": [
+              "src/simd/archsimd/_gen/unify/",
+              "src/simd/archsimd/_gen/midway/",
+              "src/simd/archsimd/_gen/simdgen/",
+              "src/simd/archsimd/_gen/wasmgen/"
+            ],
+            "relevant_files": [
+              "src/simd/archsimd/_gen/unify/env.go",
+              "src/simd/archsimd/_gen/unify/value.go",
+              "src/simd/archsimd/_gen/midway/intersect_simd_ops.go",
+              "src/simd/archsimd/_gen/simdgen/arm64/instruction.go",
+              "src/simd/archsimd/_gen/wasmgen/main.go"
+            ],
+            "plan": [
+              "定义 unify 层的核心 IR 类型（如 Env、Value），确保目标无关",
+              "为每个目标架构实现独立 generator 目录，仅依赖 unify 层接口",
+              "将跨架构公共逻辑（如交集计算、规则合并）放入 midway 层，而非各后端重复实现",
+              "建立统一层变更时的检查清单：unify → midway → 各 backend 依次验证"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "b996c7a19ab82311ef19e64d5ad9d07b52642dd2",
+        "commit_message": "[dev.simd] all: merge master (9e5cf80) into dev.simd",
+        "committed_at": "2026-07-01T22:47:24",
+        "is_merge": true,
+        "title": "巨型测试文件按正交架构维度拆分",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "巨型测试文件按正交架构维度拆分",
+            "scenario": "跨架构计算库（SIMD/DSP/GPU intrinsic）中，单文件测试随架构和操作类型增长到数千行，维护和定位困难，需要拆分以降低认知负担并支持按维度选择性执行",
+            "patterns": [
+              "按正交维度拆分测试文件，而非按单一维度：目标架构（amd64/arm64）、向量位宽（128/wider）、操作元数（unary/binary/ternary/convert/shift）三轴独立，组合成文件名如 convert_helpers_wider_test.go、unary_amd64_test.go",
+              "拆分时保持每个文件自包含——自带 import 和 helper 调用，而非依赖原 monolithic 文件中的共享上下文，使 CI 可按架构/位宽维度选择性运行子集",
+              "通用 helper（不绑定特定架构或位宽的纯逻辑验证）留在不带维度后缀的基线文件中，避免维度特定文件重复承载共享逻辑"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "b996c7a19ab82311ef19e64d5ad9d07b52642dd2"
+            ],
+            "anchors": [
+              "src/simd/archsimd/internal/simd_test/"
+            ],
+            "relevant_files": [
+              "src/simd/archsimd/internal/simd_test/convert_helpers_test.go",
+              "src/simd/archsimd/internal/simd_test/convert_helpers_wider_test.go",
+              "src/simd/archsimd/internal/simd_test/convert_helpers_128_test.go",
+              "src/simd/archsimd/internal/simd_test/simd_amd64_test.go",
+              "src/simd/archsimd/internal/simd_test/unary_amd64_test.go"
+            ],
+            "plan": [
+              "枚举当前测试文件中的所有 test case，按「架构 × 位宽 × 操作元数」三轴打标签",
+              "将标签结果聚类，每簇生成独立测试文件，文件名编码维度组合（如 {op}_{arch}_test.go）",
+              "剩余无法归入特定维度的通用 case 保留在基线文件中",
+              "验证拆分后 test coverage 不降，且按架构 GOARCH 选择性执行时各子文件可独立通过"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "0061fdb4b9533e20f8f798b12376ab19bf07b647",
+        "commit_message": "[dev.simd] all: merge master (cabdf7f) into dev.simd",
+        "committed_at": "2026-06-18T23:49:40",
+        "is_merge": true,
+        "title": "平台优化代码与可移植桩代码的构建标签隔离 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "平台优化代码与可移植桩代码的构建标签隔离",
+            "scenario": "当一个模块同时包含平台特定优化实现（SIMD/汇编/CPU特性）和可移植回退实现时，需要让构建系统按目标平台自动选择正确实现，避免在不支持优化的平台上编译失败或运行时崩溃",
+            "patterns": [
+              "将平台特定代码与可移植桩代码拆分到不同文件，用 //go:build 标签互斥选择（如 simd.go 带 !nosimd 标签，simd_stubs.go 带 nosimd 标签），而非在同一文件中用 runtime 检测分支",
+              "桩文件必须暴露与优化版本完全一致的 API 签名，调用方无需感知底层是优化路径还是回退路径",
+              "迁移时先提取桩代码到独立文件并验证 API 对等，再从主实现文件中删除已迁移逻辑，降低一次性 diff 风险"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "0061fdb4b9533e20f8f798b12376ab19bf07b647"
+            ],
+            "anchors": [
+              "src/simd/"
+            ],
+            "relevant_files": [
+              "src/simd/simd.go",
+              "src/simd/simd_stubs.go",
+              "src/simd/ip_test.go"
+            ],
+            "plan": [
+              "识别当前文件中哪些函数/常量属于平台无关的可移植回退",
+              "创建 _stubs.go 文件，添加排他构建标签，迁入回退实现",
+              "从主实现文件删除已迁出的回退代码，为主文件添加正向构建标签",
+              "补充针对桩路径的独立测试，确保回退行为与优化路径语义一致"
+            ]
+          },
+          {
+            "title": "标准化密码学测试向量框架的按算法扩展",
+            "scenario": "当项目已有一套共享的密码学测试向量解析基础设施（如 Wycheproof schema），需要为新引入的密码学算法添加一致性测试时",
+            "patterns": [
+              "维护统一的测试向量 schema 解析层，新增算法时只需编写 per-algorithm 测试消费者，而非为每个算法重建解析基础设施",
+              "测试向量文件与算法实现同目录放置，共享 schema 解析器从公共路径引用，避免跨算法复制解析逻辑",
+              "扩展 schema 时保持向后兼容，已有算法的测试不应因 schema 字段新增而失败"
+            ],
+            "quality_score": 0.65,
+            "source_commits": [
+              "0061fdb4b9533e20f8f798b12376ab19bf07b647"
+            ],
+            "anchors": [
+              "src/crypto/internal/cryptotest/wycheproof/"
+            ],
+            "relevant_files": [
+              "src/crypto/internal/cryptotest/wycheproof/schema.go",
+              "src/crypto/mldsa/mldsa_wycheproof_test.go"
+            ],
+            "plan": [
+              "在共享 schema 模块中确认是否需要新增字段以支持新算法的向量格式",
+              "创建 per-algorithm 测试文件，引用共享 schema 解析器加载向量",
+              "确保测试覆盖所有向量级别（valid/invalid/acceptable）的分类断言"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "fbe166e065672070ee45023f2b33736c9c98abe8",
+        "commit_message": "[dev.simd] all: merge master (d2b991c) into dev.simd",
+        "committed_at": "2026-06-06T00:02:22",
+        "is_merge": true,
+        "title": "硬件加速能力的 Bridge + Emulation 分层架构 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "硬件加速能力的 Bridge + Emulation 分层架构",
+            "scenario": "当系统需要支持跨架构的硬件加速指令（SIMD、crypto accelerator、压缩指令等），且必须在不具备硬件支持时回退到软件实现时",
+            "patterns": [
+              "公共 API 层不感知底层架构细节，仅声明操作语义",
+              "设立 internal/bridge 中间层，将公共 API 映射到架构特定实现；bridge 层负责选择硬件路径或模拟路径，调用方无感知",
+              "架构特定实现隔离在 archsimd/{arch}/ 目录下，按平台分文件，互不依赖",
+              "emulated 回退实现作为独立一等公民存在（simd_emulated.go），而非散落在各架构分支的 else 中，确保无硬件支持时行为可预测",
+              "bridge 层的声明（decls）与实现分离：decls_{arch}.go 声明该架构可用操作，bridge 根据声明动态选择路径"
+            ],
+            "quality_score": 0.75,
+            "source_commits": [
+              "fbe166e065672070ee45023f2b33736c9c98abe8"
+            ],
+            "anchors": [
+              "src/simd/internal/bridge/",
+              "src/simd/archsimd/",
+              "src/simd/simd_emulated.go"
+            ],
+            "relevant_files": [
+              "src/simd/internal/bridge/decls_amd64.go",
+              "src/simd/internal/bridge/simd_emulated.go",
+              "src/simd/simd_emulated.go",
+              "src/simd/archsimd/ops_arm64.go"
+            ],
+            "plan": [
+              "定义公共 API 层，仅包含操作语义（如 Add、Load、MaskMerge），不包含任何架构分支",
+              "在 internal/bridge/ 下创建 per-arch 声明文件（decls_{arch}.go），列出该架构支持的硬件操作",
+              "在 archsimd/{arch}/ 下实现硬件加速版本，在 simd_emulated.go 中实现纯软件回退版本",
+              "bridge 层根据编译目标 + 运行时能力检测，选择硬件路径或模拟路径",
+              "为新架构扩展时，只需新增 decls_{newarch}.go + archsimd/{newarch}/ 实现，不修改公共 API 和 bridge 选择逻辑"
+            ]
+          },
+          {
+            "title": "声明式规则驱动的多平台代码生成管线",
+            "scenario": "当同一组操作需要为多个目标平台生成各自的优化实现和编译器 rewrite 规则，手写每个平台版本容易不一致且维护成本高时",
+            "patterns": [
+              "操作定义和 rewrite 规则用声明式规则文件（*.rules）描述，而非手写 switch/case 或模板字符串",
+              "规则文件按维度分离：generic ops 规则与平台特定 rewrite 规则分文件维护，避免交叉耦合",
+              "通过 code generator 从规则文件生成目标源码（opGen.go / *_gen_*.go），生成物与手写物目录或文件名区分（_gen_ 后缀）",
+              "规则文件是 single source of truth：修改操作语义只需改规则文件再重新生成，不需要手动同步多个平台实现"
+            ],
+            "quality_score": 0.68,
+            "source_commits": [
+              "fbe166e065672070ee45023f2b33736c9c98abe8"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/",
+              "src/cmd/compile/internal/ssa/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/_gen/simdARM64.rules",
+              "src/cmd/compile/internal/ssa/_gen/simdgenericOps.go",
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewriteARM64.go"
+            ],
+            "plan": [
+              "将操作定义和平台 rewrite 规则提取为声明式 .rules 文件，按 generic / per-arch 分离",
+              "编写 code generator 读取规则文件，输出 per-arch 的 Go 源码和 SSA rewrite 函数",
+              "生成文件统一用 _gen_ 命名约定，与手写文件物理分离，便于 CI 校验「生成物是否与规则一致」",
+              "新增操作时：在规则文件中追加声明 → 运行 generator → review 生成差异，不手写平台实现"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "33001a6225296f26b46c5e64a1df20e307790111",
+        "commit_message": "all: REVERSE MERGE dev.simd (0e5948d) into master",
+        "committed_at": "2026-06-02T05:32:08",
+        "is_merge": true,
+        "title": "硬件能力差异通过 Bridge 层桥接原生与模拟实现 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "硬件能力差异通过 Bridge 层桥接原生与模拟实现",
+            "scenario": "当系统依赖平台特定硬件指令（SIMD/加密指令/原子操作等），需在不支持该指令的目标平台上提供软件模拟回退时",
+            "patterns": [
+              "将原生实现与模拟实现之间的数据/类型转换逻辑收敛到独立 bridge 层（如 internal/bridge/），而非散落在各 arch 文件中",
+              "bridge 层只负责 to/from 转换和调度，不承载业务语义；上层调用方不感知当前走的是原生还是模拟路径",
+              "模拟实现按功能域拆分文件（如 simd_emulated.go / clmul_emulated.go），保持与原生接口签名一致，降低调用方心智负担"
+            ],
+            "quality_score": 0.78,
+            "source_commits": [
+              "33001a6225296f26b46c5e64a1df20e307790111"
+            ],
+            "anchors": [
+              "src/simd/internal/bridge/"
+            ],
+            "relevant_files": [
+              "src/simd/internal/bridge/simd_emulated.go",
+              "src/simd/internal/bridge/tofrom_emulated.go",
+              "src/simd/simd_emulated.go"
+            ],
+            "plan": [
+              "定义统一的操作接口（op signature），原生与模拟实现分别提供该接口的具体实现",
+              "在 internal/bridge/ 下新建 to/from 转换函数，负责原生向量类型与模拟表示之间的双向转换",
+              "运行时根据 CPU feature detection 自动选择原生或模拟路径，bridge 层透明完成数据转换"
+            ]
+          },
+          {
+            "title": "跨架构指令扩展的编译器 SSA 集成范式",
+            "scenario": "当需要为编译器/虚拟机新增一组平台特定指令（新 intrinsic、新向量操作等），并使其在编译优化阶段被正确识别和重写时",
+            "patterns": [
+              "新指令支持需同步修改三处：SSA opcode 定义（opGen.go）注册新操作码、架构相关 rewrite 规则（rewriteARM64.go 等）定义匹配与重写模式、arch 层提供实际 codegen",
+              "opcode 注册与 rewrite 规则分离：opGen 只声明操作码的属性（参数类型、副作用标记），rewrite 规则独立维护，便于按架构裁剪",
+              "新增指令族（如 clmul）时，同时提供原生 arch 实现（clmul_arm64.go）和模拟实现（clmul_emulated.go），由 bridge 层统一调度"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "33001a6225296f26b46c5e64a1df20e307790111"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/",
+              "src/simd/archsimd/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewriteARM64.go",
+              "src/simd/archsimd/_gen/simdgen/arm64/instruction.go",
+              "src/simd/archsimd/clmul_arm64.go",
+              "src/simd/archsimd/clmul_emulated.go"
+            ],
+            "plan": [
+              "在 SSA opcode 生成器中注册新操作码，声明参数/结果类型与副作用",
+              "为目标架构编写 rewrite 规则，将高级 IR pattern 匹配到新 opcode",
+              "在 archsimd/ 下按架构实现原生 codegen，同时提供 emulated 回退",
+              "通过 code generator（_gen/simdgen/）管理指令元数据，避免手动维护大量重复声明"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "0d75fdfd4fae506ec620023ce9102dd8cbb067f0",
+        "commit_message": "all: REVERSE MERGE dev.simd (b566743) into master",
+        "committed_at": "2026-05-30T05:27:14",
+        "is_merge": true,
+        "title": "多架构指令集抽象：per-arch 声明文件 + Bridge 层隔离 等3条经验",
+        "kept_after_quality_filter": 3,
+        "total_extracted": 3,
+        "patterns": [
+          {
+            "title": "多架构指令集抽象：per-arch 声明文件 + Bridge 层隔离",
+            "scenario": "需要为同一组 API 提供 amd64/arm64/wasm 等多架构后端实现时，如何组织代码使上层不感知平台差异、新架构可独立追加",
+            "patterns": [
+              "在 internal/bridge/ 下按架构拆分声明文件（decls_{arch}.go），每个文件只包含该架构的 intrinsic 映射，不混杂跨平台逻辑",
+              "Bridge 层作为唯一出口，上层包只依赖 bridge 暴露的统一接口签名，arch 差异在编译期通过 build tag 选择具体文件",
+              "新增架构只需新增一个 decls_{newarch}.go 并实现相同接口契约，不修改已有架构文件——开闭原则在多 arch 场景的具体落地"
+            ],
+            "quality_score": 0.75,
+            "source_commits": [
+              "0d75fdfd4fae506ec620023ce9102dd8cbb067f0"
+            ],
+            "anchors": [
+              "src/simd/internal/bridge/",
+              "decls_{arch}.go 命名约定"
+            ],
+            "relevant_files": [
+              "src/simd/internal/bridge/decls_amd64.go",
+              "src/simd/internal/bridge/decls_arm64.go",
+              "src/simd/internal/bridge/decls_wasm.go",
+              "src/simd/simd.go"
+            ],
+            "plan": [
+              "定义 arch-agnostic 的操作集合接口（如 Op 类型、函数签名）",
+              "为每个目标架构创建独立声明文件，用 build constraint 隔离",
+              "在 bridge 包中通过类型别名或 re-export 对外暴露统一入口",
+              "新架构接入时复制模板文件、填充 intrinsic 映射，验证接口完整性"
+            ]
+          },
+          {
+            "title": "编译器优化规则用声明式 DSL + 代码生成，而非手写 pass",
+            "scenario": "编译器或中间表示层需要对大量操作做架构相关 rewrite/peephole 优化时，如何让规则可审计、可 diff、可跨架构复用",
+            "patterns": [
+              "将优化规则写在 .rules 文件中（声明式 DSL），而非直接手写 rewrite Go 代码；规则文件是 single source of truth",
+              "通过 _gen/ 下的代码生成器将 .rules 编译为 opGen.go / rewrite{Arch}.go，生成代码不手动编辑",
+              "架构间共享的规则逻辑提取到 midway 层做通用变换，架构独有规则留在各自的 simd{Arch}.rules 中——避免跨架构 copy-paste",
+              "规则变更只需改 .rules 文件并重新生成，review 时聚焦 DSL 声明而非上千行生成代码"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "0d75fdfd4fae506ec620023ce9102dd8cbb067f0"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/",
+              "_gen/midway/",
+              ".rules 文件命名约定"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64.rules",
+              "src/cmd/compile/internal/ssa/_gen/simdARM64.rules",
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewriteAMD64.go",
+              "src/simd/archsimd/_gen/midway/intersect_simd_ops.go"
+            ],
+            "plan": [
+              "设计或复用一套规则 DSL 语法（pattern => result 形式）",
+              "为每类架构创建独立 .rules 文件，公共规则放 midway 共享层",
+              "编写 codegen 将 .rules 转译为目标语言代码，CI 中校验生成产物与 .rules 一致",
+              "review 流程中仅 review .rules 和 codegen 模板，生成代码标记为 do-not-edit"
+            ]
+          },
+          {
+            "title": "硬件特性 API 的软件仿真降级层",
+            "scenario": "对外暴露的 API 依赖硬件特性（如 SIMD 指令），但需要在不支持该特性的平台上仍能编译运行时，如何设计降级策略",
+            "patterns": [
+              "提供 *_emulated.go 作为纯软件实现路径，接口签名与硬件加速版完全一致",
+              "运行时或编译期根据平台能力选择 native 实现或 emulated 实现，调用方无感知",
+              "emulated 实现独立于架构声明文件，不属于任何 arch 的 decls——它是「无 arch」的兜底",
+              "性能敏感路径可在 native 可用时做 fast-path 跳转，emulated 作为 correctness-first 的 fallback"
+            ],
+            "quality_score": 0.68,
+            "source_commits": [
+              "0d75fdfd4fae506ec620023ce9102dd8cbb067f0"
+            ],
+            "anchors": [
+              "src/simd/simd_emulated.go",
+              "src/simd/simd.go"
+            ],
+            "relevant_files": [
+              "src/simd/simd_emulated.go",
+              "src/simd/simd.go"
+            ],
+            "plan": [
+              "定义统一接口（方法签名/操作类型）",
+              "为支持的架构编写 native 实现，通过 build tag 激活",
+              "编写 emulated.go 作为 default fallback，确保所有接口方法都有纯 Go 实现",
+              "在入口层做 dispatch：有 native 用 native，否则走 emulated"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "b56674396e06fe553acebfa7e229efd4f9b905f9",
+        "commit_message": "[dev.simd] all: merge master (388e94d) into dev.simd",
+        "committed_at": "2026-05-30T05:20:57",
+        "is_merge": true,
+        "title": "Library v2 重设计：将配置选项抽离为独立 options 层 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "Library v2 重设计：将配置选项抽离为独立 options 层",
+            "scenario": "当核心库（如序列化/编码/网络协议）需要推出 v2 API，且行为需要高度可配置（如自定义编解码策略、字段忽略规则、错误处理模式）而又不想膨胀函数签名时",
+            "patterns": [
+              "将 options/configuration 抽离到独立 internal 包（如 jsonopts/），而非作为参数逐层传递，核心引擎只依赖 options 接口而非具体字段",
+              "默认行为与核心引擎分离：arshal.go 只含通用 (de)serialize 流程，arshal_default.go 提供 default impl，便于在不改核心逻辑的前提下替换默认行为",
+              "options 层独立演进：新增 option 只改 options 包 + default impl，不触碰核心 arshal 逻辑，实现配置扩展与引擎解耦"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "b56674396e06fe553acebfa7e229efd4f9b905f9"
+            ],
+            "anchors": [
+              "src/encoding/json/v2/",
+              "src/encoding/json/internal/jsonopts/"
+            ],
+            "relevant_files": [
+              "src/encoding/json/v2/arshal.go",
+              "src/encoding/json/v2/arshal_default.go",
+              "src/encoding/json/internal/jsonopts/options.go"
+            ],
+            "plan": [
+              "识别 v2 API 中所有可配置行为点，将其归集为 options struct",
+              "创建独立的 internal options 包，定义 options 类型与校验逻辑",
+              "核心引擎仅通过 options 接口读取配置，不直接引用具体 option 字段",
+              "将原有硬编码默认值迁移到 arshal_default 或 equivalent，确保核心引擎无状态依赖"
+            ]
+          },
+          {
+            "title": "二进制格式解析器应补充 fuzz 测试覆盖",
+            "scenario": "项目中有解析二进制文件格式（ELF、symbol table、protobuf wire format 等）的代码，这些解析器面对不可信输入时可能因畸形数据触发 panic 或 OOM",
+            "patterns": [
+              "对二进制格式解析入口添加 Go 原生 fuzz 测试（fuzz_test.go），而非仅靠手写 edge-case 单测",
+              "fuzz target 聚焦在「接受外部字节流」的 parse 入口函数，而非内部辅助函数，以最大化路径覆盖"
+            ],
+            "quality_score": 0.6,
+            "source_commits": [
+              "b56674396e06fe553acebfa7e229efd4f9b905f9"
+            ],
+            "anchors": [
+              "src/debug/elf/",
+              "src/debug/gosym/"
+            ],
+            "relevant_files": [
+              "src/debug/elf/fuzz_test.go",
+              "src/debug/gosym/symtab.go"
+            ],
+            "plan": [
+              "识别项目中所有接受 []byte 或 io.Reader 的二进制解析入口",
+              "为每个入口创建 FuzzXxx 函数，seed corpus 覆盖合法 + 常见畸形样本",
+              "在 CI 中将 fuzz 测试纳入常规跑批，设置超时和内存上限"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "a004b4b1b06aa99af9a4c8d24d13d7e043f34844",
+        "commit_message": "all: REVERSE MERGE dev.simd (0ac6a67) into master",
+        "committed_at": "2026-05-27T03:08:55",
+        "is_merge": true,
+        "title": "多目标 ISA 特性引入：用代码生成层管理 operation×architecture 组合爆炸 等3条经验",
+        "kept_after_quality_filter": 3,
+        "total_extracted": 3,
+        "patterns": [
+          {
+            "title": "多目标 ISA 特性引入：用代码生成层管理 operation×architecture 组合爆炸",
+            "scenario": "编译器/运行时需要将一类新硬件能力（如 SIMD、crypto 指令、向量化数学库）同时接入多个目标架构（AMD64/ARM64/Wasm 等），如果逐架构手写 SSA rewrite rules 和 op 定义，维护成本随 operation×arch 组合爆炸",
+            "patterns": [
+              "在新特性引入时，先定义与架构无关的 generic operation spec（放在 _gen/ 目录下），再由 code generator 为每个 target arch 自动生成对应的 SSA op 定义、rewrite rules 和 intrinsics 映射，而非逐架构手写",
+              "code generator 与生成产物分层：_gen/ 下放生成逻辑和 spec，生成产物（opGen.go、rewrite*.go、ops_*.go）提交到版本库以便审查和 bisect，但开发者只编辑 spec 不直接改生成产物",
+              "新增 target arch 时只需在 generator 中添加该 arch 的 lowering 规则，不需要触碰已有的其他 arch 生成产物"
+            ],
+            "quality_score": 0.78,
+            "source_commits": [
+              "a004b4b1b06aa99af9a4c8d24d13d7e043f34844"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/",
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewrite*.go"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64ops.go",
+              "src/cmd/compile/internal/ssa/_gen/simdgenericOps.go",
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewriteAMD64.go",
+              "src/cmd/compile/internal/ssa/rewriteARM64.go",
+              "src/cmd/compile/internal/ssa/rewriteWasm.go"
+            ],
+            "plan": [
+              "梳理新特性涉及的全部 operation 语义，抽象为 generic spec（如 simdgenericOps.go）",
+              "为每个目标 arch 编写 generator rule，定义 generic op → arch-specific SSA op 的 lowering 策略",
+              "运行 generator 产出 rewrite rules / op 定义 / intrinsics 映射，将生成产物纳入 CI 校验（确保 spec 与产物一致）",
+              "后续新增 arch 或 op 时只修改 spec 和对应 generator，不手改生成产物"
+            ]
+          },
+          {
+            "title": "硬件能力暴露层：Intrinsics-to-SSA 桥接映射保持 API 与内部表示解耦",
+            "scenario": "当编译器需要将硬件特性（如 SIMD intrinsics）暴露给上层语言使用时，如果 intrinsics 直接调用底层 SSA op，会导致 API 表面与编译器内部表示强耦合，后续 SSA 重构会波及所有 intrinsics 调用点",
+            "patterns": [
+              "设立独立的 intrinsics-to-SSA 映射层（如 simdAMD64intrinsics.go），将上层 intrinsic 函数签名映射到 SSA op + type 信息，使上层 API 不直接依赖 SSA 内部 op 编号或参数布局",
+              "映射层按 target arch 分文件维护（simdAMD64intrinsics.go、未来可扩展 simdARM64intrinsics.go），共享同一映射接口约定",
+              "arch-specific ops（ops_amd64.go / ops_arm64.go）只定义该架构的底层语义，intrinsic 映射层负责高层 API → 底层 op 的适配，职责分离"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "a004b4b1b06aa99af9a4c8d24d13d7e043f34844"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssagen/",
+              "src/simd/archsimd/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssagen/simdAMD64intrinsics.go",
+              "src/simd/archsimd/ops_amd64.go",
+              "src/simd/archsimd/ops_arm64.go"
+            ],
+            "plan": [
+              "定义 intrinsic function 的命名规范和类型签名集合",
+              "为每个 target arch 编写映射文件，将 intrinsic 签名绑定到对应的 SSA op 和类型约束",
+              "确保映射层是 intrinsics 调用链中唯一直接引用 SSA op 内部细节的位置，其余代码只通过 intrinsic API 间接使用"
+            ]
+          },
+          {
+            "title": "跨架构语义等价测试：抽取共享 test helper 避免逐架构重复断言",
+            "scenario": "当同一语义操作在多个目标架构上有不同实现（如 SIMD unary/convert 操作在 AMD64/ARM64/Wasm 上各自 lowering），需要验证它们产出相同语义结果时，逐架构独立写测试会导致大量重复且难以保证覆盖一致",
+            "patterns": [
+              "抽取按操作类别组织的共享 test helper（如 unary_helpers_test.go、convert_helpers_test.go），封装输入构造、期望值计算和断言逻辑，供各 arch test suite 复用",
+              "helper 按 operation 语义分类而非按 arch 分类，确保新增 arch 时自动继承已有测试覆盖",
+              "test helper 放在跨 arch 共享的 test 包内，而非某个 arch 的私有目录"
+            ],
+            "quality_score": 0.63,
+            "source_commits": [
+              "a004b4b1b06aa99af9a4c8d24d13d7e043f34844"
+            ],
+            "anchors": [
+              "src/simd/archsimd/internal/simd_test/"
+            ],
+            "relevant_files": [
+              "src/simd/archsimd/internal/simd_test/unary_helpers_test.go",
+              "src/simd/archsimd/internal/simd_test/convert_helpers_test.go"
+            ],
+            "plan": [
+              "识别需要跨 arch 验证的 operation 语义类别（unary、convert、binary 等）",
+              "为每类抽取通用 test helper：输入向量生成、期望值计算、结果比对",
+              "各 arch test suite 引用共享 helper，只提供 arch-specific 的 operation 调用入口，断言逻辑由 helper 统一完成"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "0ac6a67fbb8b45f81c10c82b0a71ae77738de5bf",
+        "commit_message": "[dev.simd] all: merge master (39c00b1) into dev.simd",
+        "committed_at": "2026-05-27T02:46:36",
+        "is_merge": true,
+        "title": "编译器 SSA 多架构指令定义的代码生成管线约定",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "编译器 SSA 多架构指令定义的代码生成管线约定",
+            "scenario": "在编译器 SSA 中间层需要新增/修改跨架构指令操作（op）定义，或调整 op 元数据结构时，需要判断哪些文件是人工编辑源、哪些是生成产物，以及如何正确驱动再生成",
+            "patterns": [
+              "架构特定的 SSA op 定义以 _gen/*Ops.go 为唯一人工编辑源，opGen.go 为自动生成产物——禁止直接编辑生成文件，所有变更必须落在 _gen/ 下的源文件中再 regenerate",
+              "当 op 定义的结构/格式/字段发生变更时，需对所有架构的 *Ops.go 做同构修改而非只改单架构，保持跨架构文件结构对齐（字段顺序、命名约定一致），以便生成器和下游 pass 统一处理",
+              "代码生成管线是 single source of truth 模式：_gen/*Ops.go → 生成器 → opGen.go，下游 SSA pass 只依赖生成产物中统一的 op 接口，不直接引用 _gen 源文件"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "0ac6a67fbb8b45f81c10c82b0a71ae77738de5bf"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/",
+              "src/cmd/compile/internal/ssa/opGen.go"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/_gen/AMD64Ops.go",
+              "src/cmd/compile/internal/ssa/_gen/ARM64Ops.go",
+              "src/cmd/compile/internal/ssa/opGen.go"
+            ],
+            "plan": [
+              "判断变更属于 op 定义层还是生成器逻辑层：新增 op / 修改 op 元数据 → 编辑 _gen/*Ops.go；修改生成规则 → 编辑生成器本身",
+              "对每个受影响架构的 *Ops.go 做结构一致的同构修改，确保字段命名、顺序、类型跨架构对齐",
+              "运行 go generate 重新生成 opGen.go，检查生成产物 diff 是否符合预期而非出现意外漂移"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "fdbd2e871adf91f0db5f03516a3d8de051fafaa0",
+        "commit_message": "[dev.simd] all: merge master (f6664a0) into dev.simd",
+        "committed_at": "2026-05-05T02:56:12",
+        "is_merge": true,
+        "title": "架构特定代码从单体 asm 文件迁移至领域包内按需拆分",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "架构特定代码从单体 asm 文件迁移至领域包内按需拆分",
+            "scenario": "项目中存在按架构维度组织的单体汇编/底层文件（如 asm_amd64.s），随着功能增长，单个文件承载多个不相关子系统的实现，导致维护困难、职责模糊。需要将领域相关的底层代码迁移到对应领域包中，同时保持各架构变体的一致性。",
+            "patterns": [
+              "将领域专属的架构相关代码（汇编、intrinsic、SIMD 等）从单体 runtime/asm_*.s 拆分到领域包内部，按 {domain}_{arch}.s 命名，使代码归属与领域包对齐",
+              "迁移时保持所有受影响架构变体同步迁移（amd64、386、arm64 等），避免部分架构遗漏导致跨平台行为不一致",
+              "单体 asm 文件仅保留真正属于该层级（如 runtime 调度、栈管理）的代码，领域逻辑（如 memhash）归入 internal/runtime/maps/ 等领域包",
+              "迁移后通过编译验证 + 已有测试覆盖确认行为等价，不需要额外编写迁移专用测试"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "fdbd2e871adf91f0db5f03516a3d8de051fafaa0"
+            ],
+            "anchors": [
+              "src/runtime/asm_*.s",
+              "src/internal/runtime/maps/"
+            ],
+            "relevant_files": [
+              "src/runtime/asm_amd64.s",
+              "src/runtime/asm_386.s",
+              "src/internal/runtime/maps/memhash_amd64.s",
+              "src/internal/runtime/maps/memhash_386.s"
+            ],
+            "plan": [
+              "审计单体 asm 文件中各函数的领域归属，标记属于特定子系统的函数块",
+              "在目标领域包下新建按架构命名的文件（如 memhash_{arch}.s），将对应函数原样搬移",
+              "从单体 asm 文件中删除已迁移代码，确认剩余内容仍属于该层职责",
+              "全架构（amd64/386/arm64…）同步执行迁移，编译并运行全量测试验证等价性"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "c9fae72dbd9f830202101d3b9653c968067db3f0",
+        "commit_message": "[dev.simd] all: merge master (8678b2d) into dev.simd",
+        "committed_at": "2026-04-22T03:52:08",
+        "is_merge": true,
+        "title": "声明式 Schema 驱动的架构特定代码生成 等3条经验",
+        "kept_after_quality_filter": 3,
+        "total_extracted": 3,
+        "patterns": [
+          {
+            "title": "声明式 Schema 驱动的架构特定代码生成",
+            "scenario": "需要为多种 CPU 架构（SIMD/NEON/SSE/AVX 等）实现统一操作接口、且手写每平台汇编成本高昂时",
+            "patterns": [
+              "用声明式 YAML 定义操作的语义（操作类型、数据类型、寄存器约束等），由代码生成器自动产出各架构的具体实现，而非逐平台手写",
+              "操作定义与平台实现解耦：新增一条操作只需修改 YAML schema 并触发生成，无需触碰每个平台的汇编/内置函数代码",
+              "生成器产出物应纳入版本控制以便 diff review，但源 of truth 始终是声明式 schema"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "c9fae72dbd9f830202101d3b9653c968067db3f0"
+            ],
+            "anchors": [
+              "src/simd/archsimd/_gen/simdgen/",
+              "src/cmd/internal/obj/arm64/"
+            ],
+            "relevant_files": [
+              "src/simd/archsimd/_gen/simdgen/ops/Moves/go.yaml",
+              "src/cmd/internal/obj/arm64/inst_gen.go",
+              "src/cmd/internal/obj/arm64/encoding_gen.go"
+            ],
+            "plan": [
+              "定义操作描述 schema（字段含操作名、输入输出类型、目标架构列表）",
+              "编写 codegen 工具读取 schema 并按架构模板生成目标代码",
+              "将生成代码纳入 CI 校验：若生成产物与提交代码不一致则失败"
+            ]
+          },
+          {
+            "title": "渐进式迁移中的双实现同步维护",
+            "scenario": "系统存在新旧两套并行实现（如旧 types / 新 types2），迁移过渡期内两者都需接受相同修复和功能变更",
+            "patterns": [
+              "当新旧实现并行时，同一逻辑修复必须同步应用到两份代码，保持行为等价",
+              "建立共享测试套件或等价性测试，验证两份实现在相同输入下产出一致结果",
+              "在迁移完成前，代码审查流程应强制检查：涉及被迁移模块的 MR 是否同时修改了新旧两份实现"
+            ],
+            "quality_score": 0.66,
+            "source_commits": [
+              "c9fae72dbd9f830202101d3b9653c968067db3f0"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/types2/",
+              "src/go/types/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/types2/subst.go",
+              "src/go/types/subst.go"
+            ],
+            "plan": [
+              "识别所有存在双实现的模块对，建立映射表",
+              "为每对双实现添加等价性测试用例",
+              "在 CI 中加入 lint 规则：修改其中一份时提醒检查另一份"
+            ]
+          },
+          {
+            "title": "协议实现的重复代码归并",
+            "scenario": "同一协议实现散落在多个包或目录（如 vendored 版与 internal 版），导致 bug 修复需多处同步、维护成本高时",
+            "patterns": [
+              "将分散的协议逻辑归并到单一源位置，消除跨包/跨目录的重复实现",
+              "归并方向：保留功能更完整的版本作为 source of truth，删除冗余 wrapper 和转发层",
+              "归并后保留薄适配层对外暴露稳定 API，内部实现统一调用单一源"
+            ],
+            "quality_score": 0.63,
+            "source_commits": [
+              "c9fae72dbd9f830202101d3b9653c968067db3f0"
+            ],
+            "anchors": [
+              "src/net/http/http2.go",
+              "src/net/http/internal/http2/"
+            ],
+            "relevant_files": [
+              "src/net/http/http2.go",
+              "src/net/http/internal/http2/transport.go",
+              "src/net/http/internal/http2/server.go",
+              "src/net/http/server.go"
+            ],
+            "plan": [
+              "审计协议实现的所有副本位置，对比功能完整度",
+              "选择最完整版本作为唯一源，将其余位置的调用方迁移过来",
+              "删除冗余副本及其中间转发逻辑，补充迁移后的回归测试"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "8fad825fe1a4ad412c8abb1f7d55e2e7b31833b1",
+        "commit_message": "[dev.simd] all: merge master (f3bb0f4) into dev.simd",
+        "committed_at": "2026-04-16T23:28:02",
+        "is_merge": true,
+        "title": "编译器后端新增指令集扩展的分层约定 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "编译器后端新增指令集扩展的分层约定",
+            "scenario": "当需要为编译器/汇编器后端引入新的 SIMD/向量指令集扩展（如 ARM SVE、x86 AVX-512、RISC-V V 扩展）时，需要决定代码组织结构和测试策略",
+            "patterns": [
+              "将指令定义（inst.go）、指令生成逻辑（inst_gen.go）、二进制编码规则（encoding_gen.go）分为独立层，新增指令集时只需在对应层扩展，不交叉修改",
+              "SSA rewrite rules 是连接高层 IR 与目标指令的桥梁，新增指令集扩展时必须同步更新 rewritegeneric.go 中的匹配规则，否则编译器无法自动选用新指令",
+              "汇编测试数据同时维护正向用例（合法编码）和负向用例（错误编码），二者缺一不可——正向验证编码正确性，负向验证错误诊断能力"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "8fad825fe1a4ad412c8abb1f7d55e2e7b31833b1"
+            ],
+            "anchors": [
+              "src/cmd/internal/obj/{arch}/",
+              "src/cmd/compile/internal/ssa/",
+              "src/cmd/asm/internal/asm/testdata/"
+            ],
+            "relevant_files": [
+              "src/cmd/internal/obj/arm64/inst.go",
+              "src/cmd/internal/obj/arm64/inst_gen.go",
+              "src/cmd/internal/obj/arm64/encoding_gen.go",
+              "src/cmd/compile/internal/ssa/rewritegeneric.go",
+              "src/cmd/asm/internal/asm/testdata/arm64sveenc.s",
+              "src/cmd/asm/internal/asm/testdata/arm64sveerror.s"
+            ],
+            "plan": [
+              "在目标架构 obj 目录下定义新指令的语义和操作数格式",
+              "在 inst_gen 层实现指令的汇编/反汇编生成逻辑",
+              "在 encoding_gen 层实现二进制编码/解码规则",
+              "在 SSA rewrite 规则中添加匹配模式，使编译器能在自动向量化场景选用新指令",
+              "编写正向编码测试（sveenc.s）和负向编码测试（sveerror.s），覆盖边界情况"
+            ]
+          },
+          {
+            "title": "移除平台支持时需同步清理自动生成的绑定文件",
+            "scenario": "当项目决定废弃某个 GOOS/GOARCH 组合（如 openbsd/mips64）时，需要系统性清理该平台的所有相关代码",
+            "patterns": [
+              "平台废弃不只是删源码——自动生成的 syscall 绑定文件（zsyscall_*、zerrors_*）体量巨大且易遗漏，必须作为清理的首要目标",
+              "移除顺序应为：先生成工具层面去除目标平台 → 再删除已生成的绑定文件 → 最后清理构建系统和 CI 中的平台引用，避免中间状态编译失败"
+            ],
+            "quality_score": 0.63,
+            "source_commits": [
+              "8fad825fe1a4ad412c8abb1f7d55e2e7b31833b1"
+            ],
+            "anchors": [
+              "src/syscall/",
+              "src/cmd/internal/obj/{arch}/"
+            ],
+            "relevant_files": [
+              "src/syscall/zerrors_openbsd_mips64.go",
+              "src/syscall/zsyscall_openbsd_mips64.go",
+              "src/cmd/internal/obj/loong64/a.out.go",
+              "src/cmd/internal/obj/loong64/inst.go"
+            ],
+            "plan": [
+              "识别所有以目标 GOOS_GOARCH 命名的自动生成文件（zsyscall、zerrors、ztypes 等）",
+              "在代码生成工具中移除该平台的入口，防止后续重新生成",
+              "删除已生成的平台绑定文件",
+              "全局搜索构建标签（//go:build openbsd && mips64）并清理残留引用",
+              "更新 CI 矩阵和文档，移除该平台的构建任务"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "9abe2e1903a70f626a88f868bdf13cfa8268b13a",
+        "commit_message": "[dev.simd] all: merge master (918644a) into dev.simd",
+        "committed_at": "2026-03-24T14:48:16",
+        "is_merge": true,
+        "title": "Vendor bundle 单文件拆解为标准包目录结构 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "Vendor bundle 单文件拆解为标准包目录结构",
+            "scenario": "项目将外部依赖以单文件 bundle 形式 vendor 进代码库（如 h2_bundle.go），随着维护成本上升需要拆回标准多文件包结构",
+            "patterns": [
+              "按上游包原始文件粒度拆分，而非自行设计新的文件划分——transport.go/server.go/frame.go 各自独立，保持与上游 1:1 对应，降低后续同步上游 diff 的认知成本",
+              "测试文件随源文件迁移到同目录，命名保持 _test.go 后缀与源文件配对（transport_test.go ↔ transport.go），使测试可就近维护",
+              "拆分完成后直接删除 bundle 文件，避免双份代码共存导致行为歧义和维护分叉",
+              "拆分期间如需保持外部 import 兼容，可在原 bundle 位置保留 thin re-export shim，全部调用方迁移完成后再移除"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "9abe2e1903a70f626a88f868bdf13cfa8268b13a"
+            ],
+            "anchors": [
+              "src/net/http/internal/http2/",
+              "src/net/http/h2_bundle.go"
+            ],
+            "relevant_files": [
+              "src/net/http/h2_bundle.go",
+              "src/net/http/internal/http2/transport.go",
+              "src/net/http/internal/http2/server.go",
+              "src/net/http/internal/http2/frame.go",
+              "src/net/http/internal/http2/transport_test.go",
+              "src/net/http/internal/http2/server_test.go",
+              "src/net/http/internal/http2/frame_test.go"
+            ],
+            "plan": [
+              "识别 bundle 文件中各逻辑模块的边界（transport/server/frame 等），参照上游包的文件划分",
+              "在目标目录下按上游结构创建文件，逐模块迁移代码并保持 package 声明一致",
+              "迁移对应测试文件到新位置，确保测试覆盖不丢失",
+              "全量编译和测试通过后删除原 bundle 文件，更新所有 import 路径"
+            ]
+          },
+          {
+            "title": "多 ISA 指令表与汇编逻辑分离",
+            "scenario": "工具链/编译器后端需同时维护多个指令集架构（ARM64/Loong64/RISCV64），某架构的指令定义表与汇编处理逻辑混在同一大文件中，导致单文件膨胀、跨架构对照困难",
+            "patterns": [
+              "将指令操作码定义（instOp）与汇编生成逻辑（asm）分离到独立文件，降低单文件复杂度并使数据表可独立审阅",
+              "各 ISA 目录遵循统一的文件命名约定（instOp.go / inst_gen.go / encoding_gen.go），便于跨架构对照和批量维护",
+              "生成代码（_gen.go 后缀）与手写代码分文件存放，生成代码变更可独立 review 且不干扰手写逻辑的 diff 审查"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "9abe2e1903a70f626a88f868bdf13cfa8268b13a"
+            ],
+            "anchors": [
+              "src/cmd/internal/obj/loong64/",
+              "src/cmd/internal/obj/arm64/"
+            ],
+            "relevant_files": [
+              "src/cmd/internal/obj/loong64/asm.go",
+              "src/cmd/internal/obj/loong64/instOp.go",
+              "src/cmd/internal/obj/arm64/inst_gen.go",
+              "src/cmd/internal/obj/arm64/encoding_gen.go"
+            ],
+            "plan": [
+              "审计目标 ISA 目录下各文件职责，识别数据表与逻辑混用的大文件",
+              "将指令操作码/编码表抽取到独立文件（如 instOp.go），原文件仅保留处理逻辑",
+              "对其他 ISA 目录应用相同拆分约定，保持命名一致性",
+              "验证各 ISA 编译和测试通过，确认无回归"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "31321792091fbe5b89053a77f9c993073ecf720d",
+        "commit_message": "[dev.simd] all: merge master (cfc024d) into dev.simd",
+        "committed_at": "2025-12-19T01:06:59",
+        "is_merge": true,
+        "title": "长生命周期特性分支合入上游时，生成文件应按源规则重生成而非手动合并 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "长生命周期特性分支合入上游时，生成文件应按源规则重生成而非手动合并",
+            "scenario": "维护一个携带自定义代码生成扩展的长生命周期分支（如自定义编译器 SSA 规则、架构特定指令生成），需要定期从上游 master 合入变更。生成产物与源规则文件之间会产生冲突。",
+            "patterns": [
+              "生成文件（如 rewriteAMD64.go、malloc_generated.go）不是手动合并的对象，而是从源规则文件（如 _gen/*.rules）重新生成的派生产物；合入时应先合并源规则、解决源冲突，再全量重新生成",
+              "生成文件在 merge diff 中呈现对称增删（additions ≈ deletions）是正常信号，说明是整体重生成而非逐行手改；如果生成文件出现不对称 churn，说明可能有人手动编辑了生成产物，应视为代码异味",
+              "架构扩展分支应将自定义规则与上游规则隔离存放（如独立 simdAMD64.rules），避免与上游同名文件直接冲突，降低合入成本"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "31321792091fbe5b89053a77f9c993073ecf720d"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/",
+              "src/simd/archsimd/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/rewriteAMD64.go",
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64.rules",
+              "src/runtime/malloc_generated.go"
+            ],
+            "plan": [
+              "合入前先识别哪些文件是生成产物、哪些是源规则，建立映射关系",
+              "合并时仅手动解决源规则文件的冲突，生成文件全部丢弃后用代码生成器重新产出",
+              "在 CI 中加校验：生成文件必须与源规则重新生成的结果一致，防止手动修改生成产物"
+            ]
+          },
+          {
+            "title": "密码学合规测试应独立分层并使用标准化测试向量协议",
+            "scenario": "为加密模块引入 FIPS 140 或其他合规认证时，需要组织大量标准化测试向量，并确保合规测试不与功能测试耦合。",
+            "patterns": [
+              "合规验证测试应放在独立测试包中（如 fips140test/），与模块内部功能测试隔离，便于单独运行和认证审计",
+              "使用行业标准化测试向量协议（如 ACVP）驱动合规测试，而非手写断言数据，确保测试覆盖可被认证机构认可",
+              "合规测试文件的命名应包含认证版本号（如 acvp_fips140v1），使多版本合规标准可共存"
+            ],
+            "quality_score": 0.66,
+            "source_commits": [
+              "31321792091fbe5b89053a77f9c993073ecf720d"
+            ],
+            "anchors": [
+              "src/crypto/internal/fips140test/",
+              "src/crypto/internal/fips140only/"
+            ],
+            "relevant_files": [
+              "src/crypto/internal/fips140only/fips140only_test.go",
+              "src/crypto/internal/fips140test/acvp_fips140v1.26_test.go",
+              "src/crypto/tls/handshake_test.go",
+              "src/crypto/hpke/hpke_test.go"
+            ],
+            "plan": [
+              "创建独立测试目录用于合规验证，与功能测试目录分开",
+              "引入或适配标准化测试向量格式（ACVP / NIST CAVP），编写向量解析与执行框架",
+              "在 CI 中为合规测试设置独立 job，标记为 required 或 nightly 取决于认证需求"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "9e0981230803265f3245193e1d61cc3599c9ca54",
+        "commit_message": "all: REVERSE MERGE dev.simd (c456ab7) into master",
+        "committed_at": "2025-12-09T06:53:31",
+        "is_merge": true,
+        "title": "架构相关代码隔离到独立子目录",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "架构相关代码隔离到独立子目录",
+            "scenario": "项目中存在多种 CPU 架构特定的实现（如 amd64/arm64 的 SIMD、汇编加速路径），需要与可移植代码分离管理，避免 arch 文件散落在包根目录导致职责模糊、构建标签混乱、新增架构时改动面过大。",
+            "patterns": [
+              "将所有 arch-specific 文件（如 *_amd64.go）统一收拢到独立的 arch 子目录（如 archsimd/），而非与可移植代码混放在包根目录；包根仅保留跨架构通用的接口定义与 fallback 实现",
+              "arch 子目录内部可按目标架构进一步细分或通过 build tag 约束，使新增一种架构支持时只需在 arch 目录下新增对应文件集，不触碰上层通用逻辑",
+              "测试代码随实现同步迁移：arch-specific 的 test helpers 和 test cases 与实现文件保持在同一 arch 目录树下，而非集中在顶层 test 包中，保证 arch 代码的自包含性与可独立验证性"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "9e0981230803265f3245193e1d61cc3599c9ca54"
+            ],
+            "anchors": [
+              "src/simd/archsimd/",
+              "src/simd/"
+            ],
+            "relevant_files": [
+              "src/simd/archsimd/ops_amd64.go",
+              "src/simd/archsimd/types_amd64.go",
+              "src/simd/archsimd/shuffles_amd64.go",
+              "src/simd/archsimd/slice_gen_amd64.go",
+              "src/simd/archsimd/internal/simd_test/unary_helpers_test.go",
+              "src/simd/archsimd/internal/simd_test/simd_test.go"
+            ],
+            "plan": [
+              "识别当前包中所有带架构后缀（如 _amd64.go、_arm64.go）或依赖 arch build tag 的文件",
+              "在包内创建 arch 子目录，将 arch-specific 的实现文件及其配套测试文件整体迁入",
+              "确保包根仅保留接口定义、通用 fallback 实现、以及跨架构共享的类型声明",
+              "验证构建标签和 import 路径在迁移后仍然正确，运行全架构测试矩阵确认无回归"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "c456ab7a308fa42c601aa07c04207e29f1993e93",
+        "commit_message": "[dev.simd] all: merge master (a33bbf1) into dev.simd",
+        "committed_at": "2025-12-09T06:41:05",
+        "is_merge": true,
+        "title": "测试数据按归属包就近存放，而非集中在顶层入口目录",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "测试数据按归属包就近存放，而非集中在顶层入口目录",
+            "scenario": "当一个 internal 包拥有独立的测试逻辑和测试脚本（如 fuzz、e2e 脚本），但测试数据仍堆放在上层入口模块的 testdata 目录中时，会导致归属不清、维护时需要跨目录查找、且无法被包级别测试自包含运行。",
+            "patterns": [
+              "测试 fixture（脚本、seed corpus、crash 样本等）应跟随其归属的 internal 包，放在该包自身的 testdata/ 目录下，使包测试自包含",
+              "迁移测试数据时，同步在新位置补充 README 或目录说明，记录 fixture 命名规范和用途，降低后续新人理解成本",
+              "对于 Go 项目，cmd/go/ 之类的入口模块只保留与入口行为直接相关的 testdata；fuzz 等内部包专属测试数据下沉到 cmd/internal/fuzztest/testdata/"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "c456ab7a308fa42c601aa07c04207e29f1993e93"
+            ],
+            "anchors": [
+              "src/cmd/internal/fuzztest/testdata/",
+              "src/cmd/go/testdata/"
+            ],
+            "relevant_files": [
+              "src/cmd/internal/fuzztest/testdata/script/README",
+              "src/cmd/internal/fuzztest/testdata/script/test_fuzz.txt",
+              "src/cmd/go/testdata/script/test_fuzz.txt"
+            ],
+            "plan": [
+              "识别当前 testdata 目录中哪些 fixture 实际由哪个 internal 包消费",
+              "在目标 internal 包下创建 testdata/ 子目录（遵循 Go 工具链对 testdata 的自动识别约定）",
+              "逐批迁移 fixture 文件，保持文件名不变以最小化 diff 审查成本",
+              "在新 testdata 根目录补充 README，说明各 fixture 的触发条件和预期行为",
+              "验证迁移后包级别 `go test ./cmd/internal/fuzztest/...` 能独立通过，不依赖原路径"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "2b62144069a130cc469f33009c0c392cc6de8810",
+        "commit_message": "all: REVERSE MERGE dev.simd (9ac524a) into master",
+        "committed_at": "2025-12-04T05:24:48",
+        "is_merge": true,
+        "title": "编译器 ISA 扩展的声明式代码生成管线 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "编译器 ISA 扩展的声明式代码生成管线",
+            "scenario": "需要为编译器添加新一类硬件指令支持（如 SIMD、向量化、新寻址模式等），涉及 SSA opcode 定义、rewrite 规则、平台 lowering 多个阶段需要保持一致",
+            "patterns": [
+              "用 YAML 声明操作语义作为唯一真相源，驱动多阶段代码生成：YAML 定义 → 通用 SSA opcode 生成 → 平台 rewrite 规则生成 → 平台 lowering 代码生成",
+              "生成的代码与手写规则分离：_gen 目录放声明式输入和生成器，生成产物输出到编译器正式目录，避免手写与生成代码混杂",
+              "操作按 category 组织声明文件（如 Converts/categories.yaml、Compares/categories.yaml），而非按平台或指令平铺，便于跨平台复用同一操作定义"
+            ],
+            "quality_score": 0.73,
+            "source_commits": [
+              "2b62144069a130cc469f33009c0c392cc6de8810"
+            ],
+            "anchors": [
+              "src/simd/_gen/",
+              "src/cmd/compile/internal/ssa/_gen/"
+            ],
+            "relevant_files": [
+              "src/simd/_gen/simdgen/ops/Converts/go.yaml",
+              "src/simd/_gen/simdgen/ops/Converts/categories.yaml",
+              "src/cmd/compile/internal/ssa/_gen/simdgenericOps.go",
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64ops.go",
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64.rules"
+            ],
+            "plan": [
+              "在声明层定义新操作 category 的 YAML（操作名、类型签名、语义描述）",
+              "在通用 opcode 生成器中注册新 category，确保生成 platform-agnostic SSA opcode",
+              "在各目标平台的 rules 文件中添加 lowering rewrite 规则，将通用 opcode 重写为平台指令",
+              "运行代码生成器，产出各阶段的 .go 文件，验证生成产物的编译正确性"
+            ]
+          },
+          {
+            "title": "通用 opcode → 平台 lowering 的分层降级模式",
+            "scenario": "新增的 IR 操作需要在多个目标架构上支持，但各架构指令集差异大；需要决定操作在 IR 层以什么粒度定义、在什么阶段降级为平台指令",
+            "patterns": [
+              "先定义 platform-agnostic 的通用 opcode（如 simdgenericOps.go），使 IR 层不绑定具体架构指令",
+              "通过 SSA rewrite rules 文件做平台降级（generic → AMD64/ARM64），而非在 IR 生成阶段就硬编码平台选择",
+              "平台特有的 intrinsic 注入放在独立入口（如 ssagen/simdintrinsics.go），与通用编译流程解耦"
+            ],
+            "quality_score": 0.7,
+            "source_commits": [
+              "2b62144069a130cc469f33009c0c392cc6de8810"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/simdgenericOps.go",
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64.rules",
+              "src/cmd/compile/internal/ssagen/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/_gen/simdgenericOps.go",
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64.rules",
+              "src/cmd/compile/internal/ssagen/simdintrinsics.go",
+              "src/cmd/compile/internal/amd64/simdssa.go"
+            ],
+            "plan": [
+              "评估新操作是否可跨架构通用：若是，定义 generic opcode 并为每个目标架构编写独立 rewrite rules",
+              "若某架构有原生指令对应，在 rewrite rules 中匹配 generic opcode → 平台 intrinsic",
+              "若某架构无原生支持，在 rewrite rules 中 fallback 到标量展开或函数调用",
+              "将平台 intrinsic 的注入逻辑收拢到独立的 ssagen 入口文件，不侵入主编译流程"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "d4f5650cc5cdc5fa559491991208f8563bd6f3b8",
+        "commit_message": "all: REVERSE MERGE dev.simd (7d65463) into master",
+        "committed_at": "2025-11-25T05:02:08",
+        "is_merge": true,
+        "title": "声明式规则驱动的大规模代码生成：将规则定义与生成产物分层隔离 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "声明式规则驱动的大规模代码生成：将规则定义与生成产物分层隔离",
+            "scenario": "当需要在编译器/运行时中引入一大类新操作（如 SIMD、GPU intrinsic、新 ISA 扩展），手写实现不现实、需要批量生成大量 opcode 和 rewrite 规则时",
+            "patterns": [
+              "将人类可读的声明式规则（.rules / Ops.go）放在 _gen/ 子目录作为 codegen 源输入，生成产物（opGen.go、rewrite*.go）放在上层包目录，两者物理隔离",
+              "生成产物体积可达数万行，review 和维护只针对 _gen/ 下的声明式源文件，绝不通篇审阅或手改生成代码",
+              "generic 规则与 arch-specific 规则分文件存放（simdgenericOps.go vs simdAMD64ops.go），使新增架构时只需追加 arch-specific 文件而不动 generic 定义"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "d4f5650cc5cdc5fa559491991208f8563bd6f3b8"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/_gen/",
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewriteAMD64.go"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64.rules",
+              "src/cmd/compile/internal/ssa/_gen/simdAMD64ops.go",
+              "src/cmd/compile/internal/ssa/_gen/simdgenericOps.go",
+              "src/cmd/compile/internal/ssa/opGen.go",
+              "src/cmd/compile/internal/ssa/rewriteAMD64.go"
+            ],
+            "plan": [
+              "在设计阶段确定哪些内容是声明式可生成的（opcode 定义、rewrite 规则、类型映射），哪些需要手写（intrinsic 桥接、arch-specific lowering）",
+              "创建 _gen/ 目录，编写 .rules 和 ops 定义文件作为唯一真相源",
+              "实现 codegen 工具读取 _gen/ 产物，生成到上层包目录",
+              "在 CI 中校验生成产物与 _gen/ 源一致，防止手动修改漂移"
+            ]
+          },
+          {
+            "title": "跨编译器层级引入新能力域的四层分层架构",
+            "scenario": "当需要向编译器+运行时引入一个横切新能力域（如 SIMD、自动向量化、异构计算 offload），该能力同时涉及类型定义、操作实现、SSA lowering 和 intrinsic 桥接时",
+            "patterns": [
+              "第一层（库层）：在 src/{capability}/ 下定义公开类型和 arch-specific 操作实现（types_*.go、ops_*.go），作为用户可见 API",
+              "第二层（声明层）：在编译器 ssa/_gen/ 下用声明式规则描述该能力的 opcode 和 rewrite 规则",
+              "第三层（lowering 层）：在 cmd/compile/internal/{arch}/ 下实现从高层 SSA 到机器指令的 arch-specific lowering",
+              "第四层（桥接层）：在 cmd/compile/internal/ssagen/ 下实现 intrinsic 到 SSA 的入口桥接，使编译器前端不感知 arch 细节",
+              "测试基础设施（helpers + parametric tests）与能力定义同步引入，而非事后补齐"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "d4f5650cc5cdc5fa559491991208f8563bd6f3b8"
+            ],
+            "anchors": [
+              "src/simd/",
+              "src/cmd/compile/internal/ssa/_gen/",
+              "src/cmd/compile/internal/amd64/",
+              "src/cmd/compile/internal/ssagen/"
+            ],
+            "relevant_files": [
+              "src/simd/types_amd64.go",
+              "src/simd/ops_amd64.go",
+              "src/simd/shuffles_amd64.go",
+              "src/cmd/compile/internal/amd64/simdssa.go",
+              "src/cmd/compile/internal/ssagen/simdintrinsics.go",
+              "src/simd/internal/simd_test/simd_test.go",
+              "src/simd/internal/simd_test/unary_helpers_test.go"
+            ],
+            "plan": [
+              "先定义库层类型和操作语义（types_*.go），确立 API 契约",
+              "再编写 _gen/ 声明式规则，描述 opcode 和通用 rewrite",
+              "实现 arch-specific lowering 和 intrinsic 桥接，打通从前端到后端的完整路径",
+              "同步引入结构化测试（unary/binary helpers + parametric test harness），覆盖每个操作类别"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "afd1721fc5a158928f11d81916be1ca41f67e514",
+        "commit_message": "[dev.simd] all: merge master (02d1f3a) into dev.simd",
+        "committed_at": "2025-11-25T04:29:37",
+        "is_merge": true,
+        "title": "Register-based ABI 迁移需 runtime / compiler / reflect 三层联动",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "Register-based ABI 迁移需 runtime / compiler / reflect 三层联动",
+            "scenario": "当某个架构（新架构引入或旧架构升级）需要从栈式调用约定迁移到寄存器调用约定时；或当开发分支（如 SIMD 特性）需要合入上游已完成 ABI 迁移的改动时，需要识别所有受影响的子系统并协调联动修改。",
+            "patterns": [
+              "ABI 变更是跨层契约变更，不能只改单层：runtime 汇编桩（函数入口/出口栈帧布局）、reflect 汇编桩（call/cgo 调用）、bytealg 汇编（字符串/字节比较的参数传递）、compiler SSA 后端（寄存器分配与函数生成）、obj 指令编码层必须同步",
+              "浮点寄存器处理需独立 stub（如 float32reg），因为各架构浮点寄存器集与整数寄存器集的布局、数量差异大，不能复用整数路径",
+              "ABI 规范文档（如 abi-internal.md）是各层之间的单一事实来源，实现变更必须与文档同步，文档先行定义寄存器映射表",
+              "在特性分支上做架构增强（如 SIMD）时，若上游同时推进 ABI 迁移，应尽早合入上游 ABI 改动再叠加特性，避免两者汇编桩冲突"
+            ],
+            "quality_score": 0.78,
+            "source_commits": [
+              "afd1721fc5a158928f11d81916be1ca41f67e514"
+            ],
+            "anchors": [
+              "src/cmd/compile/abi-internal.md",
+              "src/runtime/asm_<arch>.s",
+              "src/reflect/asm_<arch>.s",
+              "src/internal/bytealg/*_<arch>.s",
+              "src/cmd/compile/internal/<arch>/ssa.go",
+              "src/cmd/internal/obj/<arch>/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/abi-internal.md",
+              "src/runtime/asm_s390x.s",
+              "src/reflect/asm_s390x.s",
+              "src/reflect/float32reg_s390x.s",
+              "src/internal/bytealg/indexbyte_s390x.s",
+              "src/internal/bytealg/equal_s390x.s",
+              "src/internal/bytealg/compare_s390x.s",
+              "src/cmd/compile/internal/s390x/ssa.go",
+              "src/cmd/internal/obj/s390x/objz.go"
+            ],
+            "plan": [
+              "1. 先更新 abi-internal.md 中目标架构的寄存器映射表，明确参数/返回值寄存器分配",
+              "2. 更新 compiler SSA 后端与 obj 指令编码层，使函数生成遵循新 ABI",
+              "3. 逐子系统更新汇编桩：runtime → reflect（含浮点独立 stub）→ bytealg → race",
+              "4. 确认 cgo 测试覆盖跨 ABI 边界调用场景",
+              "5. 若存在并行特性分支，在其之上 rebase 或 merge 已完成的 ABI 迁移，逐一解决汇编冲突"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "220d73cc44a0c580dc8ee10df6395c8e517e118f",
+        "commit_message": "[dev.simd] all: merge master (8dd5b13) into dev.simd",
+        "committed_at": "2025-11-25T00:03:06",
+        "is_merge": true,
+        "title": "格密码实现中域运算与算法逻辑分层隔离",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "格密码实现中域运算与算法逻辑分层隔离",
+            "scenario": "当实现基于格的后量子签名/加密算法（ML-DSA、ML-KEM 等）时，需要管理大素数域上的多项式运算与上层签名/验证逻辑的复杂度",
+            "patterns": [
+              "将底层域运算（模乘、模约减、NTT 等）独立为 field.go，与算法主逻辑（签名/验证流程）物理分离，使域运算可被同族算法复用",
+              "域运算层和算法层各自拥有独立测试文件（field_test.go vs mldsa_test.go），验证粒度分层：域运算做边界值/随机测试，算法层做已知答案测试",
+              "FIPS 140 合规实现放在独立模块路径（fips140/）下，与非合规版本隔离，合规边界由目录结构显式表达"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "220d73cc44a0c580dc8ee10df6395c8e517e118f"
+            ],
+            "anchors": [
+              "src/crypto/internal/fips140/mldsa/"
+            ],
+            "relevant_files": [
+              "src/crypto/internal/fips140/mldsa/field.go",
+              "src/crypto/internal/fips140/mldsa/mldsa.go",
+              "src/crypto/internal/fips140/mldsa/field_test.go",
+              "src/crypto/internal/fips140/mldsa/mldsa_test.go"
+            ],
+            "plan": [
+              "先实现并充分测试底层域运算模块（field.go + field_test.go），确保数值正确性",
+              "在域运算层之上构建算法主逻辑，通过组合而非继承引用域运算",
+              "将合规版本置于 fips140/ 路径下，明确合规边界",
+              "算法层测试以标准测试向量（KAT）驱动，域运算层测试以边界/随机输入驱动"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "a693ae1e9aebac896f6634583dbdd1cd319f3983",
+        "commit_message": "[dev.simd] all: merge master (d70ad4e) into dev.simd",
+        "committed_at": "2025-09-26T01:33:59",
+        "is_merge": true,
+        "title": "热路径查找表用构建期代码生成替代运行时计算 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "热路径查找表用构建期代码生成替代运行时计算",
+            "scenario": "当运行时需要大量常量查找表（如内存分配 size-class 映射、编解码系数表）且这些表数据量大、推导逻辑复杂时",
+            "patterns": [
+              "将表的生成逻辑放在独立 generator 工具中，而非手写或运行时推导",
+              "generator 源码与生成产物同目录共置，generator 目录用下划线前缀（如 _mk）标记为构建工具而非运行时代码",
+              "生成文件统一用 _generated 后缀，便于 .gitignore / lint 规则区分人工维护与自动生成",
+              "generator 修改后必须在 CI 中重新生成并提交产物，避免生成器与产物漂移"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "a693ae1e9aebac896f6634583dbdd1cd319f3983"
+            ],
+            "anchors": [
+              "src/runtime/_mkmalloc/",
+              "src/runtime/malloc_generated.go",
+              "src/runtime/malloc_tables_generated.go"
+            ],
+            "relevant_files": [
+              "src/runtime/_mkmalloc/mkmalloc.go",
+              "src/runtime/malloc_generated.go",
+              "src/runtime/malloc_tables_generated.go",
+              "src/runtime/malloc_stubs.go"
+            ],
+            "plan": [
+              "识别运行时频繁查表且数据量大的常量表，将其推导逻辑抽离为独立 generator",
+              "在产物目录旁创建 _mk{module}/ 子目录放置 generator 源码",
+              "生成文件以 _generated.go 命名，头部注释标注 generator 命令",
+              "在构建脚本或 CI 中增加 make generate 目标，确保 generator 与产物同步"
+            ]
+          },
+          {
+            "title": "计算密集型算法提供 SIMD 实现与纯 Go 回退的双路径",
+            "scenario": "当项目需要在特定 CPU 指令集上加速计算密集型算法（如 DCT/iDCT、哈希、加解密），同时保证不支持 SIMD 的平台仍有正确实现时",
+            "patterns": [
+              "算法接口层与实现层分离：公共 API 不感知底层是否走 SIMD，由 init 阶段根据 CPU 能力选择实现",
+              "SIMD 实现与纯 Go 实现共享同一测试套件，用表驱动方式对两组实现跑相同输入断言相同输出",
+              "纯 Go 实现不因引入 SIMD 而删除——它是回退路径和可读性参考，应保留为基准实现",
+              "SIMD 路径的引入以分支合并方式集成（如 dev.simd → main），而非在主干上直接改写原始实现"
+            ],
+            "quality_score": 0.7,
+            "source_commits": [
+              "a693ae1e9aebac896f6634583dbdd1cd319f3983"
+            ],
+            "anchors": [
+              "src/image/jpeg/"
+            ],
+            "relevant_files": [
+              "src/image/jpeg/dct.go",
+              "src/image/jpeg/idct.go",
+              "src/image/jpeg/dct_test.go"
+            ],
+            "plan": [
+              "定义算法的纯函数接口，纯 Go 实现作为基准",
+              "在独立分支开发 SIMD 实现，保持接口签名一致",
+              "编写共享测试套件，对两种实现运行相同 test cases",
+              "在 init() 中通过 CPU feature detection 选择实现，无 SIMD 支持时自动回退"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "9a349f8e729038857c27be2b11ba23d21e86a6c0",
+        "commit_message": "[dev.simd] all: merge master (cf5e993) into dev.simd",
+        "committed_at": "2025-09-12T03:09:34",
+        "is_merge": true,
+        "title": "跨架构编译器后端优化规则的分层归并 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "跨架构编译器后端优化规则的分层归并",
+            "scenario": "多 ISA 目标的编译器/JIT 后端中，各架构各自维护一份 rewrite/optimization 规则文件，随着规则增长出现大量重复且难以同步，需要将共性规则上提到通用层",
+            "patterns": [
+              "将多架构共享的 rewrite 规则从 per-arch 文件迁移到 generic 规则集，arch-specific 文件仅保留 ISA 独有指令模式（如寄存器约束、特殊寻址）",
+              "使用代码生成器（opGen）从规则模板自动派生各架构变体，而非手写每份规则文件，避免人工同步漂移",
+              "迁移时先在 generic 层补全规则，再逐架构删除 per-arch 中的重复规则，保证可回退验证"
+            ],
+            "quality_score": 0.73,
+            "source_commits": [
+              "9a349f8e729038857c27be2b11ba23d21e86a6c0"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/rewritegeneric.go",
+              "src/cmd/compile/internal/ssa/opGen.go"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/rewritegeneric.go",
+              "src/cmd/compile/internal/ssa/rewriteRISCV64.go",
+              "src/cmd/compile/internal/ssa/rewriteLOONG64.go",
+              "src/cmd/compile/internal/ssa/rewriteMIPS64.go",
+              "src/cmd/compile/internal/ssa/opGen.go"
+            ],
+            "plan": [
+              "审计各架构 rewrite 文件，标记规则交集与架构独有集",
+              "将交集规则迁移至 generic 规则文件并补齐匹配条件",
+              "逐架构删除已上提的重复规则，跑全架构回归测试确认行为不变",
+              "后续新架构只需实现 ISA-specific 规则，自动继承 generic 层"
+            ]
+          },
+          {
+            "title": "用编译器生成的代码路径替代手写汇编优化例程",
+            "scenario": "运行时中存在手写汇编优化例程（如 Duff's device、手写 memmove 等），当编译器 SSA 后端的 lowering 能力足够生成等价代码时，可移除手写汇编以降低跨架构维护成本",
+            "patterns": [
+              "优先让编译器 SSA lowering 生成等效代码路径，手写汇编仅作为编译器能力不足时的临时补丁",
+              "移除手写汇编时需确认 SSA 生成的代码在目标架构上性能不退化，用 benchmark 对比而非仅功能测试",
+              "每移除一个架构的手写例程就关闭对应汇编文件，减少「半迁移」状态下的认知负担",
+              "新架构接入时默认走 SSA 生成路径，不再新增手写 Duff device 等历史模式"
+            ],
+            "quality_score": 0.7,
+            "source_commits": [
+              "9a349f8e729038857c27be2b11ba23d21e86a6c0"
+            ],
+            "anchors": [
+              "src/runtime/duff_*.s",
+              "src/cmd/compile/internal/*/ssa.go"
+            ],
+            "relevant_files": [
+              "src/runtime/duff_loong64.s",
+              "src/runtime/duff_riscv64.s",
+              "src/cmd/compile/internal/riscv64/ssa.go"
+            ],
+            "plan": [
+              "确认 SSA lowering 已支持生成等价的内存拷贝/赋值序列",
+              "对目标架构跑 benchmark 对比手写汇编 vs 生成代码的性能差异",
+              "性能达标后删除手写汇编文件，保留 git 历史供回退",
+              "在架构接入文档中标注「不再需要手写此例程」"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "103b6e39caf2e0b44e9b8f1f173bc97a22637109",
+        "commit_message": "[dev.simd] all: merge master (9de69f6) into dev.simd",
+        "committed_at": "2025-08-21T04:07:37",
+        "is_merge": true,
+        "title": "手写汇编优化例程的跨架构退役决策",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "手写汇编优化例程的跨架构退役决策",
+            "scenario": "项目中存在跨多架构（amd64/arm64 等）手写汇编的性能关键路径（如内存拷贝、零值初始化、Duff's device），随编译器/运行时优化能力提升，需决定是否保留这些手写例程",
+            "patterns": [
+              "当编译器生成代码或标准库等价实现的性能与手写汇编持平时，优先移除手写汇编以降低多架构维护成本",
+              "手写汇编的退役应跨所有架构同步进行，避免不同架构间实现不一致导致行为分歧",
+              "退役同时应清理编译器后端中为该手写例程服务的架构特殊路径（如 SSA rewrite 规则、obj 层特殊处理），否则残留的死代码会长期增加认知负担",
+              "退役前需有性能基准测试确认无回归；退役后保留或增强对应测试覆盖以锁定预期行为"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "103b6e39caf2e0b44e9b8f1f173bc97a22637109"
+            ],
+            "anchors": [
+              "src/runtime/",
+              "src/cmd/compile/internal/",
+              "src/cmd/internal/obj/"
+            ],
+            "relevant_files": [
+              "src/runtime/duff_amd64.s",
+              "src/runtime/duff_arm64.s",
+              "src/cmd/compile/internal/arm64/ssa.go",
+              "src/cmd/internal/obj/arm64/obj7.go",
+              "src/cmd/compile/internal/ssa/rewriteARM64.go"
+            ],
+            "plan": [
+              "梳理所有架构下手写例程的定义文件及调用链（运行时调用点 + 编译器后端特殊规则）",
+              "为每个例程建立跨架构性能基准",
+              "验证编译器生成 / 标准库等价实现在各架构下性能达标",
+              "统一移除所有架构的手写例程及其关联的编译器后端特殊路径",
+              "运行全量基准与回归测试确认无性能退化"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "a4ad41708d8303a561ed072596222aae990f8dbd",
+        "commit_message": "[dev.simd] all: merge master (924fe98) into dev.simd",
+        "committed_at": "2025-08-14T23:43:16",
+        "is_merge": true,
+        "title": "多架构 SIMD 优化例程的代码生成管线设计 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "多架构 SIMD 优化例程的代码生成管线设计",
+            "scenario": "当运行时/底层库需要为同一算法（如 GC 扫描、序列化、校验）在 x86、ARM、RISCV、LOONG64 等多架构上提供 SIMD 加速实现时，手写每架构汇编难以维护且易出错",
+            "patterns": [
+              "将架构无关的算法逻辑描述与架构相关的指令选择/寄存器分配分离，用 Go 代码生成器统一产出各架构汇编",
+              "管线分层：simd.go 描述 SIMD 操作语义 → regalloc.go 做架构相关寄存器分配 → mkasm.go/gen.go 发射目标汇编",
+              "生成产物（expand_*.s）由生成器输出而非手写，删除大型手写汇编文件（如 zcallback_windows_arm.s）以消除维护负担",
+              "新增架构支持时只需扩展生成器的 arch 描述表，而非从头编写完整汇编"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "a4ad41708d8303a561ed072596222aae990f8dbd"
+            ],
+            "anchors": [
+              "src/internal/runtime/gc/internal/gen/",
+              "src/internal/runtime/gc/scan/"
+            ],
+            "relevant_files": [
+              "src/internal/runtime/gc/internal/gen/gen.go",
+              "src/internal/runtime/gc/internal/gen/simd.go",
+              "src/internal/runtime/gc/internal/gen/regalloc.go",
+              "src/internal/runtime/gc/scan/mkasm.go",
+              "src/internal/runtime/gc/scan/expand_amd64.s"
+            ],
+            "plan": [
+              "识别需要 SIMD 加速的热点例程，确认其跨架构共性逻辑",
+              "设计架构无关的中间描述（如扫描步长、向量宽度、循环展开因子）",
+              "为每种目标架构实现寄存器分配与指令映射规则",
+              "编写代码生成器，从中间描述+架构规则自动产出 .s 文件",
+              "将生成产物纳入构建系统，并在 CI 中验证生成器输出与提交产物一致"
+            ]
+          },
+          {
+            "title": "编译器架构特定优化规则的按 ISA 模块化组织",
+            "scenario": "当编译器/工具链需要为多种 ISA（AMD64、RISCV64、LOONG64 等）维护 SSA 中间表示的 rewrite 规则时，规则散落或耦合会导致新增架构成本高、回归风险大",
+            "patterns": [
+              "每个 ISA 拥有独立的 rewrite{ARCH}.go 文件，规则按架构边界隔离，新增架构时只需新增文件而非侵入共享逻辑",
+              "rewrite 规则文件之间保持一致的接口契约（输入 AST 模式 → 输出重写后的指令序列），便于跨架构对比与规则迁移",
+              "当某架构的 rewrite 规则需要调整时，修改范围限定在单文件内，不影响其他架构的稳定性"
+            ],
+            "quality_score": 0.63,
+            "source_commits": [
+              "a4ad41708d8303a561ed072596222aae990f8dbd"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/ssa/"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/ssa/rewriteAMD64.go",
+              "src/cmd/compile/internal/ssa/rewriteRISCV64.go",
+              "src/cmd/compile/internal/ssa/rewriteLOONG64.go"
+            ],
+            "plan": [
+              "定义 rewrite 规则的统一接口与匹配模式 DSL",
+              "为已有架构抽取独立的 rewrite{ARCH}.go，确保迁移后行为不变",
+              "新增 ISA 支持时，参照已有架构文件结构创建新 rewrite 文件",
+              "在回归测试中按架构分别验证 rewrite 结果"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "775fb527458e09258d07a3c92eada92167b3e7d3",
+        "commit_message": "[dev.simd] all: merge master (7a1679d) into dev.simd",
+        "committed_at": "2025-08-05T03:07:05",
+        "is_merge": true,
+        "title": "内部包按唯一消费方收窄可见域 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "内部包按唯一消费方收窄可见域",
+            "scenario": "项目存在一个 internal 共享包，但实际上只被单一子工具/子系统消费，其他模块从不引用。随着代码库增长，宽泛可见域会导致误用和耦合扩散。",
+            "patterns": [
+              "当 internal 包仅被一个消费方使用时，将其从公共 internal 层下沉到该消费方自己的目录树下（如 cmd/internal/X → cmd/<tool>/internal/X），利用语言级可见性规则收窄可访问范围",
+              "迁移时保持包内容不变、仅调整导入路径，降低行为风险；同步删除原路径入口文件（如 main.go 占位）避免残留幽灵包",
+              "测试文件随包一并迁移，保证覆盖关系不变"
+            ],
+            "quality_score": 0.66,
+            "source_commits": [
+              "775fb527458e09258d07a3c92eada92167b3e7d3"
+            ],
+            "anchors": [
+              "cmd/internal/doc/",
+              "cmd/go/internal/doc/"
+            ],
+            "relevant_files": [
+              "src/cmd/go/internal/doc/pkg.go",
+              "src/cmd/internal/doc/pkg.go",
+              "src/cmd/go/internal/doc/doc_test.go",
+              "src/cmd/internal/doc/doc_test.go",
+              "src/cmd/internal/doc/main.go"
+            ],
+            "plan": [
+              "通过全量导入分析确认该 internal 包的真实消费方集合",
+              "若消费方唯一，在目标消费方目录下新建 internal 子路径并整体搬运源文件与测试文件",
+              "全局替换导入路径，删除原路径残留文件",
+              "验证编译与测试通过"
+            ]
+          },
+          {
+            "title": "特性分支与上游趋同时消除并行实现变体",
+            "scenario": "特性分支在开发期间维护了新旧两套并行实现（通过命名后缀区分，如 _swiss / _noswiss），用于渐进式实验或回退安全。当上游 trunk 已正式采纳相同特性、不再需要回退路径时，合并即触发变体清理。",
+            "patterns": [
+              "合并上游时若 trunk 已内置特性分支的实验能力，应删除分支独有的兼容/回退变体文件（带 _noswiss 等后缀），只保留无后缀的规范实现",
+              "以无后缀文件名作为唯一权威实现，避免长期维护双份代码导致行为分叉和测试负担",
+              "变体文件删除后需确认上游版本已覆盖等价逻辑，不可简单删除后留空"
+            ],
+            "quality_score": 0.62,
+            "source_commits": [
+              "775fb527458e09258d07a3c92eada92167b3e7d3"
+            ],
+            "anchors": [
+              "src/runtime/",
+              "src/internal/runtime/maps/"
+            ],
+            "relevant_files": [
+              "src/runtime/map_noswiss.go",
+              "src/internal/runtime/maps/runtime_fast64_swiss.go",
+              "src/internal/runtime/maps/runtime_fast64.go",
+              "src/runtime/map_faststr_noswiss.go"
+            ],
+            "plan": [
+              "枚举分支中所有带实验性后缀的变体文件及其无后缀对应文件",
+              "逐对确认上游 trunk 是否已提供等价或更优的实现",
+              "删除变体文件，保留无后缀版本作为唯一实现",
+              "运行全量测试确认无回归"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "f4a7c124ccd96667948539bd1132bca3ea6ba843",
+        "commit_message": "[dev.simd] all: merge master (f8ccda2) into dev.simd",
+        "committed_at": "2025-06-26T03:00:04",
+        "is_merge": true,
+        "title": "使用合成时间（synctest）隔离时间依赖型逻辑的测试 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "使用合成时间（synctest）隔离时间依赖型逻辑的测试",
+            "scenario": "代码中包含超时控制、定时调度、速率限制、重试退避等强时间依赖逻辑，传统测试要么 sleep 拖慢 CI，要么无法覆盖边界时序。",
+            "patterns": [
+              "在运行时层提供 synthetic clock API，测试中可冻结/快进虚拟时间，使被测代码感知到的时间完全可控",
+              "时间依赖型业务代码应依赖可注入的时间源接口，而非直接调用 time.Now / time.After，以便在 synctest 环境下被透明替换",
+              "synctest 框架作为 internal package 提供，业务测试通过公共入口调用，避免直接依赖运行时内部实现"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "f4a7c124ccd96667948539bd1132bca3ea6ba843"
+            ],
+            "anchors": [
+              "src/runtime/synctest.go",
+              "src/internal/synctest/"
+            ],
+            "relevant_files": [
+              "src/runtime/synctest.go",
+              "src/internal/synctest/synctest_test.go"
+            ],
+            "plan": [
+              "识别业务中所有直接调用 time.Now/time.After/time.Sleep 的代码路径",
+              "抽象出 Clock / Timer 接口，生产环境使用真实实现，测试环境使用 synctest 实现",
+              "编写 synctest 集成测试，验证超时边界、并发时序、重试间隔等场景"
+            ]
+          },
+          {
+            "title": "序列化框架中将复杂类型编解码逻辑按类型隔离到独立模块",
+            "scenario": "设计或维护一个通用编解码框架（JSON/Proto/自定义协议）时，time、duration、big.Int 等语义复杂类型需要特殊处理，如果全部堆在核心 marshal/unmarshal 代码中会导致核心逻辑膨胀且难以独立演进。",
+            "patterns": [
+              "核心 codec 只保留类型分派与通用序列化循环，将 time 等复杂类型的 marshal/unmarshal 逻辑抽取到独立文件（如 arshal_time.go）",
+              "复杂类型的编解码函数通过统一的注册或 fncase 机制挂载到核心 codec 上，核心不感知具体类型的格式细节",
+              "复杂类型的测试也应独立维护（如 arshal_time_test.go），与通用 codec 测试解耦，便于单独演进时间格式支持"
+            ],
+            "quality_score": 0.66,
+            "source_commits": [
+              "f4a7c124ccd96667948539bd1132bca3ea6ba843"
+            ],
+            "anchors": [
+              "src/encoding/json/v2/arshal.go",
+              "src/encoding/json/v2/arshal_time.go"
+            ],
+            "relevant_files": [
+              "src/encoding/json/v2/arshal.go",
+              "src/encoding/json/v2/arshal_time.go",
+              "src/encoding/json/v2/arshal_time_test.go"
+            ],
+            "plan": [
+              "审计 codec 核心文件中内联的特殊类型处理分支",
+              "按类型域拆分：每个语义复杂类型域一个 arshal_{type}.go + arshal_{type}_test.go",
+              "在核心 codec 中仅保留分派入口，具体格式逻辑委托给类型模块"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "b2e8ddba3ca4dd7ba8241cf6716b06e042185f71",
+        "commit_message": "[dev.simd] all: merge master (773701a) into dev.simd",
+        "committed_at": "2025-06-11T02:57:15",
+        "is_merge": true,
+        "title": "CLI 命令实现代码移入 internal 包以收窄可见性",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "CLI 命令实现代码移入 internal 包以收窄可见性",
+            "scenario": "Go 项目中，命令行工具（cmd）的实现代码仅被本模块内部使用，但放在公开路径下导致外部模块可意外导入，造成 API 暴露面膨胀和潜在的循环依赖风险",
+            "patterns": [
+              "将仅供模块内部使用的命令实现代码从 src/cmd/{tool}/ 迁移到 src/cmd/internal/{tool}/，利用 Go 编译器强制 internal 可见性约束，防止外部模块依赖实现细节",
+              "迁移时保持子目录结构（含 testdata）不变，仅改变父路径前缀，降低 diff 噪声和 review 成本",
+              "main.go 中的入口逻辑也一并迁入 internal，仅在外部保留最薄的 bootstrap 或直接由 internal/main 暴露二进制入口"
+            ],
+            "quality_score": 0.62,
+            "source_commits": [
+              "b2e8ddba3ca4dd7ba8241cf6716b06e042185f71"
+            ],
+            "anchors": [
+              "src/cmd/internal/doc/"
+            ],
+            "relevant_files": [
+              "src/cmd/internal/doc/pkg.go",
+              "src/cmd/internal/doc/main.go",
+              "src/cmd/internal/doc/dirs.go",
+              "src/cmd/internal/doc/doc_test.go"
+            ],
+            "plan": [
+              "审计 src/cmd/ 下各子目录，识别哪些工具的代码仅被本模块引用、不打算作为公开 API 暴露",
+              "将目标子目录整体移动到 src/cmd/internal/ 下，保持内部文件结构不变",
+              "更新所有内部引用路径（import statements），运行全量测试确认无断裂",
+              "在 CI 或 lint 中增加规则，阻止未来新增的非 internal cmd 包被外部模块引用"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "baa72c25f19c5b515e9f92ce7f54041127c80f69",
+        "commit_message": "[dev.simd] all: merge master (711ff94) into dev.simd",
+        "committed_at": "2025-06-03T02:42:05",
+        "is_merge": true,
+        "title": "多锁并发系统中锁序声明须与调度器改动同步维护 等3条经验",
+        "kept_after_quality_filter": 3,
+        "total_extracted": 3,
+        "patterns": [
+          {
+            "title": "多锁并发系统中锁序声明须与调度器改动同步维护",
+            "scenario": "任何涉及多锁排序的并发核心系统（内核调度器、数据库事务引擎、游戏引擎任务系统等）中，修改锁获取顺序或新增锁时",
+            "patterns": [
+              "锁排序（lock ranking）是全局不变量而非局部约定——任何在核心调度路径中新增/修改锁获取顺序的改动，必须同步更新锁序声明文件，否则会引入潜在死锁",
+              "锁序声明文件是死锁预防的唯一真相源，应视为承载逻辑的代码而非纯文档；它应与被约束的代码在同一变更中提交",
+              "当新增测试原语需要操作调度器内部锁时，锁序图必须反映新增的锁依赖关系"
+            ],
+            "quality_score": 0.68,
+            "source_commits": [
+              "baa72c25f19c5b515e9f92ce7f54041127c80f69"
+            ],
+            "anchors": [
+              "src/runtime/lockrank.go",
+              "src/runtime/proc.go"
+            ],
+            "relevant_files": [
+              "src/runtime/lockrank.go",
+              "src/runtime/proc.go",
+              "src/runtime/synctest.go"
+            ],
+            "plan": [
+              "识别本次改动涉及的锁及其获取顺序",
+              "在锁序声明（如 lockrank.go 或等价文件）中新增/调整对应的锁节点与边",
+              "验证锁序图中不存在环——可通过静态分析工具或编译期检查"
+            ]
+          },
+          {
+            "title": "版本化 API 清单作为兼容性治理的契约层",
+            "scenario": "在持续演进的 SDK / 标准库 / 公共 API 平台中，需要精确追踪每个版本新增了哪些公开符号、并据此做兼容性校验时",
+            "patterns": [
+              "维护一份版本化 API 清单文件（如 api/goNN.txt），声明该版本暴露的全部公开符号；清单是兼容性契约，源码不是",
+              "新增公开 API 时，实现与清单声明必须在同一变更中提交——脱离清单的 API 等于未注册，无法被兼容性工具检测",
+              "清单文件按版本号组织，而非单一累积文件；这样每个版本的增量一目了然，便于自动化差异比对和 semver 校验"
+            ],
+            "quality_score": 0.66,
+            "source_commits": [
+              "baa72c25f19c5b515e9f92ce7f54041127c80f69"
+            ],
+            "anchors": [
+              "api/",
+              "api/go1.25.txt"
+            ],
+            "relevant_files": [
+              "api/go1.25.txt",
+              "src/runtime/synctest.go",
+              "src/internal/synctest/synctest_test.go"
+            ],
+            "plan": [
+              "在版本化 API 清单文件中追加新增的公开符号声明",
+              "确保实现代码的导出名称与清单声明严格一致",
+              "运行兼容性校验工具确认清单与实际导出符号匹配"
+            ]
+          },
+          {
+            "title": "确定性时间测试原语需调度器级集成而非纯用户态 mock",
+            "scenario": "构建需要对并发代码进行确定性时间控制/调度控制的测试框架时（如 fake clock、virtual time、deterministic scheduler）",
+            "patterns": [
+              "确定性时间测试无法仅靠用户态时间 mock 实现——goroutine/线程的调度顺序本身也需被控制，因此测试原语必须下沉到运行时/调度器层",
+              "测试原语修改调度器行为时，调度器内部状态和锁序需同步调整，测试原语不是调度器的外部观察者而是内部参与者",
+              "测试原语的公开 API 应保持极简（如 Bubble/Wait 语义），复杂性封装在运行时内部，避免暴露调度器实现细节"
+            ],
+            "quality_score": 0.64,
+            "source_commits": [
+              "baa72c25f19c5b515e9f92ce7f54041127c80f69"
+            ],
+            "anchors": [
+              "src/runtime/synctest.go",
+              "src/internal/synctest/"
+            ],
+            "relevant_files": [
+              "src/runtime/synctest.go",
+              "src/internal/synctest/synctest_test.go",
+              "src/runtime/proc.go",
+              "api/go1.25.txt"
+            ],
+            "plan": [
+              "在运行时/调度器层为测试原语预留钩子（如时间推进、goroutine 暂停/恢复）",
+              "确保钩子与调度器现有锁机制兼容，更新锁序声明",
+              "在公开 API 清单中注册测试原语的新公开符号",
+              "编写覆盖确定性调度行为的集成测试"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "a10afb15e060386615dcc0ecf2bd60ca3abbc04c",
+        "commit_message": "all: REVERSE MERGE dev.unified (d558507) into master",
+        "committed_at": "2022-08-05T01:32:51",
+        "is_merge": true,
+        "title": "统一 IR 序列化层替代多阶段各自导出格式 等3条经验",
+        "kept_after_quality_filter": 3,
+        "total_extracted": 3,
+        "patterns": [
+          {
+            "title": "统一 IR 序列化层替代多阶段各自导出格式",
+            "scenario": "编译器/工具链有多个阶段（前端解析、包导入、链接）各自维护 IR 序列化格式，导致 N 种格式 × M 个消费者的兼容矩阵爆炸，修改一处 IR 结构需要同步多处序列化代码",
+            "patterns": [
+              "用单一 writer/reader 对覆盖全部 IR 序列化，而非每个阶段各自实现导出/导入",
+              "设立统一编排层（如 unified.go）协调写入流程，将 IR 图序列化为自描述的位流格式",
+              "linker 等下游消费者通过统一读取接口获取 IR，不感知序列化内部细节",
+              "序列化层与 IR 定义层解耦：IR 结构变更只需改 writer/reader，不波及所有消费方"
+            ],
+            "quality_score": 0.74,
+            "source_commits": [
+              "a10afb15e060386615dcc0ecf2bd60ca3abbc04c"
+            ],
+            "anchors": [
+              "src/cmd/compile/internal/noder/",
+              "src/cmd/compile/internal/noder/unified.go",
+              "src/cmd/compile/internal/noder/linker.go"
+            ],
+            "relevant_files": [
+              "src/cmd/compile/internal/noder/writer.go",
+              "src/cmd/compile/internal/noder/reader.go",
+              "src/cmd/compile/internal/noder/unified.go",
+              "src/cmd/compile/internal/noder/linker.go"
+            ],
+            "plan": [
+              "盘点当前所有需要序列化/反序列化 IR 的消费者，梳理它们的格式差异",
+              "设计统一的位流编码格式，定义 writer 和 reader 的对称接口",
+              "建立编排层统一协调写入流程，替代各阶段分散的导出入口",
+              "逐个消费者迁移到统一 reader，旧格式保留过渡期后移除"
+            ]
+          },
+          {
+            "title": "二进制序列化协议中嵌入同步标记检测 writer/reader 版本漂移",
+            "scenario": "二进制序列化格式随版本持续演进，writer 和 reader 可能运行在不同版本上，需要尽早检测不匹配而非产生静默数据损坏",
+            "patterns": [
+              "在序列化流的结构性边界（如元素起始、段落结束）嵌入 sync marker，reader 遇到不匹配立即报错",
+              "marker 枚举集中定义并自动生成字符串表示，便于调试和错误定位",
+              "sync marker 同时用于测试：通过 corpus 对拍验证 writer/reader 的版本一致性"
+            ],
+            "quality_score": 0.66,
+            "source_commits": [
+              "a10afb15e060386615dcc0ecf2bd60ca3abbc04c"
+            ],
+            "anchors": [
+              "src/internal/pkgbits/"
+            ],
+            "relevant_files": [
+              "src/internal/pkgbits/syncmarker_string.go"
+            ],
+            "plan": [
+              "在序列化协议的关键结构边界定义 sync marker 枚举",
+              "writer 在每个结构入口写入对应 marker，reader 在对应位置校验",
+              "为 marker 生成可读字符串映射，用于错误诊断",
+              "建立对拍测试：不同版本的 writer 输出由当前 reader 消费，验证兼容性"
+            ]
+          },
+          {
+            "title": "序列化格式迁移通过 reader 适配器渐进式替换旧消费者",
+            "scenario": "引入新的统一序列化格式后，现有消费者（如标准库包导入器、IDE 工具）仍依赖旧接口，无法一次性全量迁移",
+            "patterns": [
+              "为每个现有消费者提供适配 reader（如 ureader），将新格式转换为消费者期望的接口契约",
+              "适配器内部消费统一格式，对外暴露消费者原有的 API，消费者无需感知底层格式变更",
+              "迁移策略：先让适配器能读新格式 → 切换生产路径写入新格式 → 移除旧格式读取代码"
+            ],
+            "quality_score": 0.69,
+            "source_commits": [
+              "a10afb15e060386615dcc0ecf2bd60ca3abbc04c"
+            ],
+            "anchors": [
+              "src/go/internal/gcimporter/",
+              "src/cmd/compile/internal/noder/"
+            ],
+            "relevant_files": [
+              "src/go/internal/gcimporter/ureader.go",
+              "src/cmd/compile/internal/noder/reader.go"
+            ],
+            "plan": [
+              "识别所有依赖旧格式的消费者及其接口契约",
+              "为每个消费者实现适配 reader，封装新格式解析逻辑",
+              "在双写期同时支持新旧格式读取，验证适配器正确性",
+              "切换生产路径为只写新格式，确认无回归后移除旧格式代码"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "d558507db42d600e5ad82748bda0cb91df57b97d",
+        "commit_message": "[dev.unified] all: merge master (85d87b9) into dev.unified",
+        "committed_at": "2022-08-05T01:12:28",
+        "is_merge": true,
+        "title": "将依赖排序与环检测抽到独立 DAG 内部包 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "将依赖排序与环检测抽到独立 DAG 内部包",
+            "scenario": "系统中存在多种资源（锁、模块、任务调度）具有获取/依赖顺序约束，需要静态验证无环、并在顺序定义变更时自动检测冲突。适用于锁排序校验、构建依赖分析、任务拓扑调度等场景。",
+            "patterns": [
+              "将 DAG 解析（parse）与图算法（alg：拓扑排序/环检测）抽到 internal/dag 独立包，与具体业务域（如 lock ranking）解耦，使图逻辑可跨子系统复用",
+              "依赖关系用声明式描述输入，再通过统一算法层验证合法性，而非在各业务模块中散落手写校验逻辑",
+              "parse 与 alg 分文件/分测试：解析逻辑和纯图算法独立测试，降低耦合同时提高可组合性"
+            ],
+            "quality_score": 0.73,
+            "source_commits": [
+              "d558507db42d600e5ad82748bda0cb91df57b97d"
+            ],
+            "anchors": [
+              "src/internal/dag/"
+            ],
+            "relevant_files": [
+              "src/internal/dag/parse.go",
+              "src/internal/dag/alg.go",
+              "src/internal/dag/parse_test.go",
+              "src/internal/dag/alg_test.go"
+            ],
+            "plan": [
+              "定义依赖描述格式（如文本/结构体列表），实现 parse 层将其转为内部图表示",
+              "在 alg 层实现拓扑排序与环检测，返回有意义的错误路径信息",
+              "为 parse 和 alg 分别编写独立单测，确保图算法正确性不依赖具体业务输入",
+              "在业务模块中引用 internal/dag 包，将原有手写排序/校验逻辑替换为 DAG 驱动"
+            ]
+          },
+          {
+            "title": "用代码生成维护排序常量与源定义的一致性",
+            "scenario": "当存在一组有序常量（锁等级、优先级、枚举序号）需要与元数据定义保持同步，手工维护两份文件易产生不一致。适用于任何「从单一源定义派生有序常量/校验数据」的场景。",
+            "patterns": [
+              "用独立生成器脚本（如 mklockrank.go）从声明式元数据生成运行时常量文件，避免手写常量与定义脱节",
+              "生成产物提交到仓库并由 go:generate 驱动，使构建流程不依赖外部工具链即可再生",
+              "生成器与生成产物分离：生成器放在源码目录，生成产物明确标注为自动生成，禁止手工编辑"
+            ],
+            "quality_score": 0.68,
+            "source_commits": [
+              "d558507db42d600e5ad82748bda0cb91df57b97d"
+            ],
+            "anchors": [
+              "src/runtime/mklockrank.go",
+              "src/runtime/lockrank.go"
+            ],
+            "relevant_files": [
+              "src/runtime/mklockrank.go",
+              "src/runtime/lockrank.go",
+              "src/runtime/lockrank_test.go"
+            ],
+            "plan": [
+              "整理所有有序常量的元数据定义，确定唯一数据源",
+              "编写生成器读取元数据并输出常量文件（含排序、名称映射等）",
+              "在包头部添加 go:generate 指令，并在生成文件中标注 DO NOT EDIT",
+              "将原有手写常量替换为生成产物，验证编译和运行时行为一致"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "1b838e95562b20c1268a3c9145d46510e034e61f",
+        "commit_message": "[dev.unified] all: merge master (993c387) into dev.unified",
+        "committed_at": "2022-07-01T04:39:54",
+        "is_merge": true,
+        "title": "内部包膨胀时提取子包的迁移范式",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "内部包膨胀时提取子包的迁移范式",
+            "scenario": "当一个 internal 包随迭代积累了多个独立关注点（如缓存策略、协议适配、配置管理混在一处），需要拆分以提升封装性和可测试性",
+            "patterns": [
+              "识别包内高内聚的子模块，按关注点而非按类型拆分子包，子包名应直接反映其职责而非泛化命名",
+              "迁移时源文件与对应测试文件成对移动到新子包路径，保持包级测试一致性",
+              "子包迁移后，原包如有依赖可通过 import 新路径实现平滑过渡，避免破坏外部引用链"
+            ],
+            "quality_score": 0.62,
+            "source_commits": [
+              "1b838e95562b20c1268a3c9145d46510e034e61f"
+            ],
+            "anchors": [
+              "src/crypto/internal/boring/"
+            ],
+            "relevant_files": [
+              "src/crypto/internal/boring/bcache/cache.go",
+              "src/crypto/internal/boring/cache.go",
+              "src/crypto/internal/boring/bcache/cache_test.go",
+              "src/crypto/internal/boring/cache_test.go"
+            ],
+            "plan": [
+              "审计目标包内各文件的职责边界，标记可独立的子模块簇",
+              "创建子包目录，将源文件及测试文件成对迁移",
+              "更新原包中对迁移模块的 import 路径",
+              "运行全量测试验证迁移后包边界与依赖关系正确"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "django": {
+    "path": "F:\\开源项目\\django",
+    "repo_id": "f6a8d600-eb2e-4d0f-b877-dc2acf2caf61",
+    "ready_mrs": 11,
+    "pattern_count": 13,
+    "items": [
+      {
+        "commit_sha": "b1a29541e5d37c03becde6c84e793766ef23395c",
+        "commit_message": "Merge pull request #4761 from aaugustin/parallelize-tests-attempt-1",
+        "committed_at": "2015-09-10T22:12:36",
+        "is_merge": true,
+        "title": "并行测试场景下的数据库隔离策略 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "并行测试场景下的数据库隔离策略",
+            "scenario": "当测试套件需要从串行迁移到并行执行，且测试依赖共享数据库状态时，需要确保每个并行 worker 拥有独立的数据库实例以避免数据竞争",
+            "patterns": [
+              "为每个并行 worker 分配独立数据库，通过在原库名后追加 worker 序号后缀来命名，而非使用同一数据库加锁",
+              "在数据库 backend 基类中定义并行创建的抽象接口（如 clone/snapshot），各 backend（PostgreSQL/MySQL/SQLite）按自身能力实现具体策略——PG 用 template 克隆，SQLite 用文件复制，MySQL 用 CREATE DATABASE",
+              "基类提供默认的 fallback 行为（如串行创建多个库），backend 仅覆写性能优化路径，保证不支持并行的新 backend 仍可工作"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "b1a29541e5d37c03becde6c84e793766ef23395c"
+            ],
+            "anchors": [
+              "django/db/backends/base/creation.py",
+              "django/db/backends/postgresql/creation.py",
+              "django/db/backends/mysql/creation.py",
+              "django/db/backends/sqlite3/creation.py"
+            ],
+            "relevant_files": [
+              "django/db/backends/base/creation.py",
+              "django/db/backends/postgresql/creation.py",
+              "django/db/backends/mysql/creation.py",
+              "django/db/backends/sqlite3/creation.py",
+              "django/test/runner.py"
+            ],
+            "plan": [
+              "在 test runner 中确定 worker 数量 N，提前为每个 worker 编排数据库创建计划",
+              "在 base creation 类中新增按 worker index 创建/销毁测试库的方法，默认实现为循环创建 N 个独立库",
+              "在各 backend creation 子类中覆写为原生高效的克隆方式（如 PostgreSQL template0、SQLite 文件拷贝）",
+              "在 worker 进程启动时传入其对应的数据库连接配置（库名含 worker 序号）"
+            ]
+          },
+          {
+            "title": "引入并行测试时的不可并行用例标记与序列化",
+            "scenario": "当已有测试套件引入并行执行时，部分测试因依赖全局状态（如修改 settings、操作文件系统共享资源、使用信号）无法安全并行，需要一种机制将其隔离到串行通道",
+            "patterns": [
+              "提供类级别标记（如 __test__ 或 serialize 属性）声明该测试类不可并行，runner 自动将其从并行分发队列中排除并改为串行执行",
+              "同一测试类的方法默认绑定到同一 worker 执行，避免类级 fixture 在多 worker 间冲突",
+              "将不可并行用例的迁移视为渐进式过程：先标记全部可并行，再逐一排查标记例外，而非一开始就逐个审查"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "b1a29541e5d37c03becde6c84e793766ef23395c"
+            ],
+            "anchors": [
+              "django/test/runner.py",
+              "django/test/testcases.py"
+            ],
+            "relevant_files": [
+              "django/test/runner.py",
+              "django/test/testcases.py",
+              "tests/staticfiles_tests/test_management.py",
+              "tests/admin_scripts/tests.py",
+              "tests/timezones/tests.py"
+            ],
+            "plan": [
+              "在 test runner 中实现 test 分区逻辑：将可序列化的测试类打包分配给各 worker，不可序列化的集中到串行队列",
+              "在测试基类中提供可覆写的属性/装饰器，让开发者声明该类是否支持并行",
+              "对依赖共享资源的测试用例逐一审查并添加标记，通过 CI 验证并行结果与串行一致"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "74402a5b0db83371d9dac512379d61c4d74262dd",
+        "commit_message": "Merge pull request #4877 from shaib/oracle-maindb-connection",
+        "committed_at": "2015-06-21T05:48:05",
+        "is_merge": true,
+        "title": "数据库生命周期操作需分离管理连接与应用连接",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "数据库生命周期操作需分离管理连接与应用连接",
+            "scenario": "设计或维护数据库后端（尤其 Oracle/PostgreSQL 等需要预存实例的数据库）时，创建/销毁测试库、创建 schema/user 等 DDL 操作需要连接到已存在的管理实例或使用具有 DDL 权限的独立凭据，与应用层常规 DML 连接的目标和权限不同。",
+            "patterns": [
+              "数据库后端应区分两类连接：admin/creation connection（用于 DDL 和生命周期管理）与 application connection（用于常规查询），二者可能指向不同 database name、不同 user、不同权限级别",
+              "Oracle 等数据库不存在「创建新实例」概念，所谓建库实际是建 user/schema，必须先连接到主库（main database）才能执行，后端需显式维护这一主连接句柄",
+              "测试基础设施（test runner / creation module）不应复用应用的连接配置直接做 DDL，而应派生或独立配置管理连接参数，避免应用凭据权限不足或连接目标错误"
+            ],
+            "quality_score": 0.58,
+            "source_commits": [
+              "74402a5b0db83371d9dac512379d61c4d74262dd"
+            ],
+            "anchors": [
+              "db/backends/{vendor}/creation.py",
+              "db/backends/{vendor}/base.py"
+            ],
+            "relevant_files": [
+              "django/db/backends/oracle/creation.py"
+            ],
+            "plan": [
+              "审查数据库后端 creation 模块，确认建/删库流程使用的连接目标是否正确指向管理实例",
+              "如后端支持多种连接模式（SID / Service Name / TNS），确保管理连接能正确解析配置并 fallback 到主库",
+              "在连接创建/销毁路径上增加对管理连接参数缺失或不可达的明确报错，而非静默使用应用连接导致权限错误"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "d58816bd6bf93a878085d35d3ed4609efeb0acfa",
+        "commit_message": "Merge pull request #4818 from dracos/24937-ranging-to-victory",
+        "committed_at": "2015-06-06T20:41:00",
+        "is_merge": true,
+        "title": "复合数据库类型的 ORM 自定义字段：提取共享值对象工具层",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "复合数据库类型的 ORM 自定义字段：提取共享值对象工具层",
+            "scenario": "当项目需要为数据库原生复合类型（如 PostgreSQL 的 range/array/jsonb、或自定义复合类型）实现 ORM 自定义字段时，多个字段类型会面临相似的序列化、反序列化与值表示问题",
+            "patterns": [
+              "将复合 DB 值封装为专用 Python 值对象（而非裸 tuple/dict），以支持 __repr__、__eq__、校验和方法调用，同时保持字段公开 API 不变",
+              "当多个复合字段类型共享序列化/反序列化模式时，将公共逻辑提取到 fields/utils.py 共享模块，各字段委托调用，而非各自维护重复实现",
+              "重构现有字段实现以复用共享工具时，应保证字段对外的查询接口和数据迁移兼容性不受影响"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "d58816bd6bf93a878085d35d3ed4609efeb0acfa"
+            ],
+            "anchors": [
+              "django/contrib/postgres/fields/utils.py",
+              "django/contrib/postgres/fields/"
+            ],
+            "relevant_files": [
+              "django/contrib/postgres/fields/utils.py",
+              "django/contrib/postgres/fields/ranges.py",
+              "django/contrib/postgres/fields/array.py"
+            ],
+            "plan": [
+              "识别当前各复合字段中重复的值表示与转换逻辑",
+              "在 fields/utils.py 中定义共享值对象类及转换函数",
+              "将各字段（如 ranges.py、array.py）的内部实现改为委托 utils，删除冗余代码",
+              "补充测试覆盖值对象的构造、序列化往返、边界条件"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "6ae1e3ba9f3a5316504c7543ba4abc472990de95",
+        "commit_message": "Merge pull request #3563 from MarkusH/ticket23859",
+        "committed_at": "2014-11-18T02:52:50",
+        "is_merge": true,
+        "title": "顺序状态变更系统中操作的中间态感知设计",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "顺序状态变更系统中操作的中间态感知设计",
+            "scenario": "在迁移框架、配置演化引擎或任何按批次顺序执行状态变更操作的系统中，当同一批次内多个操作依次执行时，后续操作可能依赖前序操作产生的中间状态（而非批次开始前的初始状态）。若操作只感知初始状态或最终目标状态，会在中间态场景下失败或执行冗余动作。",
+            "patterns": [
+              "每个操作在做执行决策时应基于「前序操作执行后的累积中间状态」，而非批次初始状态——即操作链是状态折叠的，后一个操作看到的是前一个操作 forward 后的世界",
+              "当操作的目标对象由同批次前序操作刚创建时，应走快捷路径跳过不必要的变更步骤（如已由 AddField 创建的字段无需再 AlterField 重建），而非盲目执行完整变更流程",
+              "逻辑状态跟踪（state_forwards）与物理执行（database_forwards）应解耦——逻辑层始终累积推进，物理层可依据中间态选择不同执行策略"
+            ],
+            "quality_score": 0.63,
+            "source_commits": [
+              "6ae1e3ba9f3a5316504c7543ba4abc472990de95"
+            ],
+            "anchors": [
+              "db/migrations/operations/",
+              "operations/fields.py"
+            ],
+            "relevant_files": [
+              "django/db/migrations/operations/fields.py",
+              "tests/migrations/test_operations.py"
+            ],
+            "plan": [
+              "审计顺序操作系统中每个操作的依赖关系，识别哪些操作的执行前提可能由同批次前序操作建立",
+              "为受影响操作添加中间态前置检查：判断目标对象是否已被前序操作创建或修改",
+              "在物理执行层引入快捷路径：检测到目标由同批次操作刚创建时，使用更轻量的执行策略而非完整变更流程",
+              "补充测试用例覆盖「同批次内前序创建 + 后序变更」的顺序操作场景"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "6d2cad14f7cb01b83383e5faa18b5c845689298a",
+        "commit_message": "Merge pull request #3525 from vanschelven/master",
+        "committed_at": "2014-11-15T21:53:12",
+        "is_merge": true,
+        "title": "将嵌入在业务模块中的独立算法抽取为专用模块",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "将嵌入在业务模块中的独立算法抽取为专用模块",
+            "scenario": "当一个核心组件（如自动检测器）内部包含一段逻辑自洽、可独立测试的通用算法（如拓扑排序、图遍历、依赖解析）时，该算法往往被业务上下文耦合，难以被其他组件复用或单独测试",
+            "patterns": [
+              "识别业务模块中具有独立输入输出契约的算法段，将其抽取为同级或子级独立模块，原模块通过导入调用",
+              "算法模块只接受纯数据结构（如节点列表+边列表），不依赖业务对象，保证可被任意调用方复用",
+              "抽取后原有模块的职责收窄为'编排'（收集数据→调用算法→解释结果），而非'实现+编排'混合",
+              "测试相应拆分：算法正确性测试迁移到算法模块的测试文件，业务模块仅验证是否正确调用了算法"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "6d2cad14f7cb01b83383e5faa18b5c845689298a"
+            ],
+            "anchors": [
+              "django/db/migrations/topological_sort.py",
+              "django/db/migrations/autodetector.py"
+            ],
+            "relevant_files": [
+              "django/db/migrations/autodetector.py",
+              "django/db/migrations/topological_sort.py",
+              "tests/migrations/test_autodetector.py"
+            ],
+            "plan": [
+              "在业务模块中标记出算法边界——找到只依赖输入参数、不读写业务状态的代码段",
+              "创建独立模块，将算法迁入，定义清晰的函数签名（纯函数优先）",
+              "原模块替换为 import 调用，确保行为不变",
+              "将算法层面的单元测试迁移到新模块的测试文件，原模块测试仅保留集成验证"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "a305695f28cb15165a19c3871aec878a230a5105",
+        "commit_message": "Merge pull request #3481 from manfre/ticket-16358",
+        "committed_at": "2014-11-14T11:10:22",
+        "is_merge": true,
+        "title": "外部系统输入约束应在适配层透明处理",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "外部系统输入约束应在适配层透明处理",
+            "scenario": "当应用接入外部系统（缓存、消息队列、第三方 API）时，这些系统对 key / 标识符的长度、字符集等有硬性限制，而应用层生成的标识符可能违反这些约束",
+            "patterns": [
+              "在 backend/adapter 层对输入做校验与清洗转换，而非在每个业务调用点重复处理",
+              "对 key 格式约束采用静默转换（替换非法字符、超长截断+哈希兜底）而非直接抛错，保证调用方对底层限制无感知",
+              "外部系统的协议级约束（如 memcached key 不可含空格/控制字符、长度上限 250）应封装在具体 backend 实现内部，不泄漏到公共接口签名中",
+              "清洗逻辑变更属于行为变更，需在 release notes 中显式记录，避免存量 key 静默失效"
+            ],
+            "quality_score": 0.7,
+            "source_commits": [
+              "a305695f28cb15165a19c3871aec878a230a5105"
+            ],
+            "anchors": [
+              "django/core/cache/backends/"
+            ],
+            "relevant_files": [
+              "django/core/cache/backends/memcached.py",
+              "tests/cache/tests.py"
+            ],
+            "plan": [
+              "梳理目标外部系统的输入约束清单（长度、字符集、编码等）",
+              "在 adapter 层的入口方法（get/set/delete 等）统一增加 key 预处理",
+              "为预处理编写边界测试：超长 key、含空格/控制字符的 key、空 key 等",
+              "在版本 release notes 中记录清洗行为变更"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "aac594f65f613929f904f2ecb466edfb573e17b4",
+        "commit_message": "Merge pull request #3280 from Markush2010/ticket23556",
+        "committed_at": "2014-10-30T08:52:12",
+        "is_merge": true,
+        "title": "DAG 节点压缩与替换标记：在操作链中引入 squash 节点时保持图一致性 等2条经验",
+        "kept_after_quality_filter": 2,
+        "total_extracted": 2,
+        "patterns": [
+          {
+            "title": "DAG 节点压缩与替换标记：在操作链中引入 squash 节点时保持图一致性",
+            "scenario": "任何以 DAG 表示顺序操作（迁移、部署步骤、构建阶段）的系统，当需要将多个历史节点合并为一个 squash 节点以减少冗余时，需要处理「替换关系」的表示与遍历逻辑。",
+            "patterns": [
+              "squash 节点显式记录被替换的节点列表，而非隐式推断，便于图遍历时做 replaced 判定",
+              "被替换的原始节点不删除，保留在图中但标记为 replaced，兼容已执行过部分原始节点的环境",
+              "图遍历时区分三种状态：applied（已执行原始节点）、replaced（被 squash 替换）、pending（待执行 squash），三者迁移逻辑不同",
+              "squash 节点的依赖边应指向被替换范围的前驱和后继，而非内部节点，避免遍历进入已压缩区间"
+            ],
+            "quality_score": 0.65,
+            "source_commits": [
+              "aac594f65f613929f904f2ecb466edfb573e17b4"
+            ],
+            "anchors": [
+              "db/migrations/graph.py",
+              "db/migrations/loader.py"
+            ],
+            "relevant_files": [
+              "django/db/migrations/graph.py",
+              "django/db/migrations/loader.py"
+            ],
+            "plan": [
+              "在图数据结构中为每个节点增加 replaced_by / replaces 属性，建立双向引用",
+              "遍历逻辑中增加 replaced 过滤：若节点的 squash 替代者已 applied，则跳过该节点",
+              "为 squash 节点构建独立的依赖边集合，不继承被替换节点的内部依赖",
+              "编写覆盖 complex 和 erroneous 两种 squash 场景的测试，验证正常压缩与错误依赖检测"
+            ]
+          },
+          {
+            "title": "压缩态下的操作应用状态检测：当历史操作被 squash 后如何判断「已执行」",
+            "scenario": "操作链被压缩后，不同环境可能处于不同状态：有的已执行全部原始操作、有的执行了部分、有的尚未开始。系统需要在加载时正确检测当前状态并决定从哪个节点继续执行。",
+            "patterns": [
+              "加载阶段扫描已记录的应用历史，若被替换范围内的所有原始节点均已 applied，则自动将 squash 节点标记为 applied",
+              "对于部分应用的情况（被替换范围内仅部分 executed），不自动标记 squash 为 applied，而是提示用户先 squash 或手动对齐",
+              "检测逻辑放在 loader 层而非 graph 层——loader 负责「推断状态」，graph 负责「表示关系」，职责分离避免循环依赖"
+            ],
+            "quality_score": 0.62,
+            "source_commits": [
+              "aac594f65f613929f904f2ecb466edfb573e17b4"
+            ],
+            "anchors": [
+              "db/migrations/loader.py"
+            ],
+            "relevant_files": [
+              "django/db/migrations/loader.py",
+              "tests/migrations/test_loader.py"
+            ],
+            "plan": [
+              "在 loader 中增加 squash 状态推断逻辑：遍历 replaced 节点列表，检查应用记录覆盖率",
+              "定义三种推断结果：fully_applied（标记 squash 为 applied）、partially_applied（报错或降级处理）、not_applied（正常加载 squash）",
+              "为 erroneous 场景编写测试：squash 依赖缺失或冲突时应产生明确错误而非静默跳过"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "6f6e7d01dce94668e178b26da547c4643ed3a6cc",
+        "commit_message": "Merge pull request #3308 from aericson/ticket_22064",
+        "committed_at": "2014-10-07T04:06:33",
+        "is_merge": true,
+        "title": "框架级字段校验的三层落地约定：校验逻辑 + 逆例测试 + 检查项文档",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "框架级字段校验的三层落地约定：校验逻辑 + 逆例测试 + 检查项文档",
+            "scenario": "在 ORM 或任何带声明式字段定义的框架中，需要为字段类型新增一项合法性校验（如关联字段的反向引用冲突、必填项缺失等），使框架使用者在启动/迁移阶段就能收到明确告警而非运行时崩溃",
+            "patterns": [
+              "校验逻辑写在字段定义层（如 fields/related.py）而非在 model.save() 或运行时触发，做到 fail-fast 且不依赖数据库连接",
+              "配套测试放在 invalid_models_tests 而非普通 model_tests，强调「校验本身是否被触发」而非「业务逻辑是否正确」，测试断言 check message 而非 assertRaises",
+              "每新增一个 check 必须同步在 checks 参考文档中注册条目，形成「实现—测试—文档」三方不可拆分的提交约定"
+            ],
+            "quality_score": 0.62,
+            "source_commits": [
+              "6f6e7d01dce94668e178b26da547c4643ed3a6cc"
+            ],
+            "anchors": [
+              "django/db/models/fields/",
+              "tests/invalid_models_tests/",
+              "docs/ref/checks.txt"
+            ],
+            "relevant_files": [
+              "django/db/models/fields/related.py",
+              "tests/invalid_models_tests/test_relative_fields.py",
+              "docs/ref/checks.txt"
+            ],
+            "plan": [
+              "在字段类的 check() 或类方法中编写校验逻辑，返回 CheckMessage 列表（含 error_id 和 hint）",
+              "在 invalid_models_tests 中构造触发该校验的非法模型定义，断言期望的 check message 出现",
+              "在 checks 参考文档中追加该检查项的 identifier、级别和描述"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "8c2b405ba8343e68bc32ac2c860be0c6cfd7d631",
+        "commit_message": "Merge branch 'team-organization'.",
+        "committed_at": "2014-08-01T20:41:38",
+        "is_merge": true,
+        "title": "单体文档按职责拆分并维护交叉引用",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "单体文档按职责拆分并维护交叉引用",
+            "scenario": "当一份文档（如团队成员清单）随项目演进逐渐混入多个不同关注点（人员名单、组织架构、角色定义、流程说明），导致维护成本高、引用混乱时",
+            "patterns": [
+              "将单一巨型文档按关注点拆分为独立文件（team / organization / roles），每份文件只承担一个职责维度",
+              "保留顶层 index 文件作为目录入口，拆分后的子文件在 index 中注册，而非让读者直接猜测文件路径",
+              "拆分后全量扫描引用了旧文件的文档，统一更新交叉引用，避免悬空链接",
+              "贡献指南类文档（committing-code、triaging、security 等）中的角色描述应引用拆分后的 roles 定义，而非内联重复"
+            ],
+            "quality_score": 0.6,
+            "source_commits": [
+              "8c2b405ba8343e68bc32ac2c860be0c6cfd7d631"
+            ],
+            "anchors": [
+              "docs/internals/",
+              "docs/internals/index.txt"
+            ],
+            "relevant_files": [
+              "docs/internals/committers.txt",
+              "docs/internals/team.txt",
+              "docs/internals/organization.txt",
+              "docs/internals/roles.txt",
+              "docs/internals/index.txt"
+            ],
+            "plan": [
+              "识别单体文档中可按职责切分的关注点维度",
+              "为每个维度创建独立文件，迁移对应内容",
+              "更新 index/目录入口文件，注册新拆分文件",
+              "全局搜索旧文件名/旧路径引用，批量更新交叉引用",
+              "检查贡献流程类文档中的角色引用，指向统一的 roles 定义文件"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "ed4812692e3a103444303b0a3dd1429bbdf9511c",
+        "commit_message": "Merge pull request #2938 from dekkers/ticket_23071",
+        "committed_at": "2014-07-25T23:53:57",
+        "is_merge": true,
+        "title": "修复代码生成器缺陷后须同步清理已生成的冗余产物与测试期望",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "修复代码生成器缺陷后须同步清理已生成的冗余产物与测试期望",
+            "scenario": "当项目中有代码生成器（如 ORM 迁移自动检测器、脚手架、API schema 生成器等）存在缺陷，导致生成出冗余或不必要的操作时，修复生成逻辑后需要同步清理历史已生成的产物和编码了错误期望的测试数据。",
+            "patterns": [
+              "修复代码生成逻辑后，向前追溯清理已生成的历史产物——它们可能包含因缺陷而产生的冗余内容",
+              "测试 fixture 如果编码了「错误行为即正确期望」，修复后必须同步删除这些断言，否则测试会继续锁定旧行为",
+              "生成器修复的有效性验证 = 生成器不再产生冗余操作 AND 历史产物被简化为正确形态 AND 测试断言更新为正确期望，三者缺一则修复不完整"
+            ],
+            "quality_score": 0.62,
+            "source_commits": [
+              "ed4812692e3a103444303b0a3dd1429bbdf9511c"
+            ],
+            "anchors": [
+              "django/db/migrations/autodetector.py",
+              "django/db/migrations/loader.py",
+              "tests/migrations/"
+            ],
+            "relevant_files": [
+              "django/db/migrations/autodetector.py",
+              "django/db/migrations/loader.py",
+              "tests/migrations/test_autodetector.py",
+              "tests/migrations/test_loader.py",
+              "tests/migrations/test_migrations_latest/0001_initial.py",
+              "tests/migrations/test_migrations_latest_basic/0002_second.py",
+              "tests/migrations/test_migrations_latest_basic/0001_initial.py"
+            ],
+            "plan": [
+              "定位生成器（autodetector/loader 等）中的缺陷逻辑并修复",
+              "grep 所有由该生成器产出的历史文件，逐一审查是否含因缺陷引入的冗余操作并清理",
+              "更新测试文件中对该生成器行为的断言：移除编码旧错误行为的期望，新增验证修复行为的用例",
+              "回归测试确认生成器、历史产物、测试断言三方一致"
+            ]
+          }
+        ]
+      },
+      {
+        "commit_sha": "f751109cb240290cb946f8d4def0c7a5fb92569b",
+        "commit_message": "Merge pull request #2881 from charettes/ticket-22943-compiled-regex-deconstruction",
+        "committed_at": "2014-07-06T07:37:10",
+        "is_merge": true,
+        "title": "代码生成系统中非平凡内建类型的反序列化/反构造模式",
+        "kept_after_quality_filter": 1,
+        "total_extracted": 1,
+        "patterns": [
+          {
+            "title": "代码生成系统中非平凡内建类型的反序列化/反构造模式",
+            "scenario": "当构建代码生成或序列化系统（如 ORM 迁移生成器、配置代码生成、snapshot 序列化）时，需要将运行时 Python 对象还原为可导入、可复现的源码文本。简单类型可用 repr() 处理，但 compiled regex、datetime、Enum 等内建类型需要专用 deconstructor 才能正确还原为 `re.compile(pattern, flags)` 形式的可执行代码。",
+            "patterns": [
+              "维护一个类型→序列化器的注册表（dispatch table），而非用 if-elif 逐类型硬编码，使新类型扩展不影响核心序列化流程",
+              "对于「包装构造参数」的对象（如 compiled regex 包装 pattern+flags），反构造策略是：提取原始构造参数 + 记录 import 路径，在生成代码中还原为函数调用形式",
+              "将「如何提取参数」与「如何生成代码文本」分离——deconstructor 只负责提取 (path, args, kwargs)，writer 负责拼装为合法 Python 表达式",
+              "对 flags 类参数做位运算拆解（如 re.IGNORECASE | re.MULTILINE），确保生成代码可读且可逆"
+            ],
+            "quality_score": 0.72,
+            "source_commits": [
+              "f751109cb240290cb946f8d4def0c7a5fb92569b"
+            ],
+            "anchors": [
+              "django/db/migrations/writer.py",
+              "tests/migrations/test_writer.py"
+            ],
+            "relevant_files": [
+              "django/db/migrations/writer.py",
+              "tests/migrations/test_writer.py"
+            ],
+            "plan": [
+              "审查代码生成系统中所有经过序列化的对象类型，识别 repr() 无法正确还原的类型",
+              "为每个非平凡类型实现 deconstructor：提取模块路径、构造参数；对 flags/枚举集合做逐位拆解",
+              "在序列化器注册表中注册新类型，补充 round-trip 测试（对象→生成代码→eval→对象，断言等价）",
+              "验证生成的代码在目标版本环境中可独立 import 执行，不依赖运行时上下文"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

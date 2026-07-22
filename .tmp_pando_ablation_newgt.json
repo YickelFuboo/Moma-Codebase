@@ -1,0 +1,2852 @@
+{
+  "tag": "PANDO",
+  "rows": [
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.ReActAgent",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/__init__.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 16073.592800006736
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.BaseAgent",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/__init__.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4680.61859998852
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.ContextBuilder",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4466.481599985855
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.PlanningAgent",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/api/skills.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 22633.612600009656
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.LangGraphExecutor",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.16666666666666666,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 3,
+      "top": "app/agents/plan/__init__.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5446.35779998498
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.EmbeddingModelFactory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/infrastructure/llms/embedding_models/base.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6271.325700014131
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.OpenAIModels",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/infrastructure/llms/chat_models/factory.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 3201.2095999962185
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.jwt_validator",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5083.347400010098
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.semantic.memory",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/context/context.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 24511.386800004402
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.semantic.websocket",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/tools/market/get_realtime_quote.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 27490.13190000551
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.cn_auth",
+      "items_p": 0.3333333333333333,
+      "items_r": 0.5,
+      "union_p": 0.2222222222222222,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_middleware.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 13446.64670000202
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.cn_memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8433.909399987897
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.cn_ws",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.18181818181818182,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/channel/websocket/manager.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 25186.282200011192
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.similar.think_and_act",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5464.145300007658
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.similar.agent_state",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4294.1590000118595
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.similar.jwt_validator",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2824.5137999765575
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.similar.websocket_endpoint",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2881.468200008385
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.ContextBuilder_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9099.46850000415
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.related.jwt_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 17943.767299992032
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.cn_plan",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 2,
+      "n_also": 8,
+      "top": "app/agents/plan/react_executor.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 25088.92039998318
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.nl.cn_embedding",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/baai_embed.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 14653.2065999927
+    },
+    {
+      "config": "B",
+      "case_id": "pando.resolve.hard.short_cn_react",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 32566.123500000685
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.ReActAgent",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 4,
+      "top": "app/agents/api/agents.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "find the implementation of ReActAgent class",
+        "identifiers": [
+          "ReActAgent",
+          "react_agent",
+          "ReActAgentImpl",
+          "react_agent_impl",
+          "class ReActAgent",
+          "ReActAgentBase",
+          "create_react_agent",
+          "react_agent_factory"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 172306.6942000005
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.BaseAgent",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/__init__.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2928.0499999877065
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.ContextBuilder",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6332.072599994717
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.PlanningAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/agents/api/skills.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find the implementation of the PlanningAgent class or module",
+        "identifiers": [
+          "PlanningAgent",
+          "planning_agent",
+          "PlanningAgentImpl",
+          "create_planning_agent",
+          "build_planning_agent",
+          "PlanningAgentService",
+          "planning_agent_factory",
+          "PlanningAgentManager"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 104952.44160000584
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.LangGraphExecutor",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.16666666666666666,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 3,
+      "top": "app/agents/plan/__init__.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2437.122100003762
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.EmbeddingModelFactory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/infrastructure/llms/embedding_models/base.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2930.2451999974437
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.OpenAIModels",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/infrastructure/llms/chat_models/factory.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2943.838400009554
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.jwt_validator",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2456.6423000069335
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.semantic.memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.16666666666666666,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 3,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Default prompt template used to extract and summarize information for an agent's long-term memory store",
+        "identifiers": [
+          "memory_extract_prompt",
+          "default_memory_prompt",
+          "extract_memory_prompt",
+          "long_term_memory_prompt",
+          "memory_extraction_template",
+          "DEFAULT_EXTRACT_PROMPT",
+          "agent_memory_prompt",
+          "memoryExtractPrompt"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 120515.15589997871
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.semantic.websocket",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/tools/market/get_realtime_quote.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Manages WebSocket channel connections and routing of real-time messages",
+        "identifiers": [
+          "websocket_connection_manager",
+          "channel_manager",
+          "realtime_message_handler",
+          "WebSocketChannel",
+          "connection_pool",
+          "message_dispatcher",
+          "channel_subscription",
+          "realtime_client"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 165928.33259998588
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.cn_auth",
+      "items_p": 0.3333333333333333,
+      "items_r": 0.5,
+      "union_p": 0.14285714285714285,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/tools/policy.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Authentication and authorization logic, where credentials or permissions are checked",
+        "identifiers": [
+          "authenticate",
+          "authorize",
+          "checkAuth",
+          "authMiddleware",
+          "verifyToken",
+          "checkPermission",
+          "isAuthenticated",
+          "requireAuth"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 140754.3960000039
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.cn_memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/agents/memorys/base.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "find where memory is allocated, stored, or managed",
+        "identifiers": [
+          "memory",
+          "memory_alloc",
+          "memoryLocation",
+          "get_memory",
+          "memory_pool",
+          "memoryMap",
+          "memoryAddress",
+          "findMemory"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 95557.42029999965
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.cn_ws",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.16666666666666666,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/skills.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "websocket channel or connection implementation",
+        "identifiers": [
+          "websocket_channel",
+          "ws_channel",
+          "WebSocketChannel",
+          "websocket_connection",
+          "ws_connection",
+          "create_websocket",
+          "websocket_tunnel",
+          "open_websocket"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 124871.69950001407
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.similar.think_and_act",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 15400.603099988075
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.similar.agent_state",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8289.863400015747
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.similar.jwt_validator",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7507.680200011237
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.similar.websocket_endpoint",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4317.981900006998
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.ContextBuilder_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find where ContextBuilder assembles or builds context, including the implementation and call sites of context assembly logic",
+        "identifiers": [
+          "ContextBuilder",
+          "buildContext",
+          "build_context",
+          "assembleContext",
+          "assemble_context",
+          "createContext",
+          "context_builder",
+          "ContextAssembler"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 76199.99859997188
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.related.jwt_nl",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/skills/hub/sources/github.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find where JWTValidator is used for authentication and authorization checks",
+        "identifiers": [
+          "JWTValidator",
+          "jwt_validator",
+          "validateJwt",
+          "validate_jwt",
+          "verifyToken",
+          "verify_token",
+          "authenticate",
+          "checkAuth"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 90877.63639999321
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.cn_plan",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/skills.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "implementation of the planning agent",
+        "identifiers": [
+          "planning_agent",
+          "PlanningAgent",
+          "plan_agent",
+          "PlanAgent",
+          "PlanningAgentImpl",
+          "create_planning_agent",
+          "planner_agent",
+          "PlannerAgent"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 103897.0038999978
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.nl.cn_embedding",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05263157894736842,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/infrastructure/llms/embedding_models/base.py",
+      "passed": true,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Factory or provider that creates vector embedding models",
+        "identifiers": [
+          "embedding_model_factory",
+          "EmbeddingModelFactory",
+          "create_embedding_model",
+          "get_embedding_model",
+          "vector_embedding_model",
+          "build_embedding_model",
+          "embedding_provider",
+          "model_factory"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 132145.1226999925
+    },
+    {
+      "config": "C",
+      "case_id": "pando.resolve.hard.short_cn_react",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/agents/plan/langraph_excutor.py",
+      "passed": false,
+      "channels": [
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "inference execution, running model inference or reasoning pipeline",
+        "identifiers": [
+          "run_inference",
+          "execute_inference",
+          "inference_loop",
+          "model_forward",
+          "predict_step",
+          "infer_batch",
+          "runReasoning",
+          "executeInference"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 107900.07589999004
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.ReActAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.125,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 5,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5116.866099997424
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.BaseAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8442.29850001284
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.ContextBuilder",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9403.713900013827
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.PlanningAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/plan/planning.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 13030.931699991925
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.LangGraphExecutor",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.2,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 2,
+      "top": "app/agents/plan/langraph_excutor.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 12626.732599979732
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.EmbeddingModelFactory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6859.774200012907
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.OpenAIModels",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/infrastructure/llms/chat_models/openai_llm.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 8391.690100019332
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.jwt_validator",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4378.028100007214
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.semantic.memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7169.468100008089
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.semantic.websocket",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.10526315789473684,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/agents/tools/exec/process_manager.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 14274.88420001464
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.cn_auth",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/agents/skills/hub/lobehub_api.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5398.869399999967
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.cn_memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6403.677599999355
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.cn_ws",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.2222222222222222,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5509.017800010042
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.similar.think_and_act",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 3801.6139999963343
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.similar.agent_state",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5388.735900021857
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.similar.jwt_validator",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 1547.2624000103679
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.similar.websocket_endpoint",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 7637.0751000067685
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.ContextBuilder_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 7,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 42078.983500017785
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.related.jwt_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 12363.79780000425
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.cn_plan",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/api/agents.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5087.751700018998
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.nl.cn_embedding",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/infrastructure/llms/embedding_models/baai_embed.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9265.773699997226
+    },
+    {
+      "config": "A",
+      "case_id": "pando.resolve.hard.short_cn_react",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6147.483700013254
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.ReActAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/common.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 30624.06070000725
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.BaseAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/common.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 23266.596799978288
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.ContextBuilder",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 24886.257300007856
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.PlanningAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/agents/plan/planning.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 19640.93100000173
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.LangGraphExecutor",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/plan/langraph_excutor.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 10279.449999972712
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.EmbeddingModelFactory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6995.832500018878
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.OpenAIModels",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/infrastructure/llms/chat_models/openai_llm.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 13453.941100015072
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.jwt_validator",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 20160.633099992992
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.semantic.memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 18024.66120000463
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.semantic.websocket",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.18181818181818182,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/channel/websocket/manager.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 43016.435500001535
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.cn_auth",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/agents/skills/hub/lobehub_api.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 10096.702799986815
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.cn_memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5716.7516000045
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.cn_ws",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.18181818181818182,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 10020.57700001751
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.similar.think_and_act",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2989.469799998915
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.similar.agent_state",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 5448.885799996788
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.similar.jwt_validator",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6173.394700017525
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.similar.websocket_endpoint",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 2557.135799987009
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.ContextBuilder_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 23227.328600012697
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.related.jwt_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 26687.606299994513
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.cn_plan",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0625,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 13,
+      "top": "app/agents/skills/hub/agent_enable.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 6340.6089000054635
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.nl.cn_embedding",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 43647.8621000133
+    },
+    {
+      "config": "D",
+      "case_id": "pando.resolve.hard.short_cn_react",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep",
+        "pattern"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 13914.93349999655
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.ReActAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find the implementation of the ReActAgent class or module",
+        "identifiers": [
+          "ReActAgent",
+          "react_agent",
+          "ReactAgent",
+          "ReActAgentImpl",
+          "create_react_agent",
+          "ReActAgentImplementation",
+          "build_react_agent",
+          "ReActAgentBase"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 158910.7898999937
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.BaseAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/common.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 29862.428499996895
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.ContextBuilder",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 18138.925700011896
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.PlanningAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/agents/plan/planning.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Implementation of a PlanningAgent class or module responsible for planning logic in an agent system",
+        "identifiers": [
+          "PlanningAgent",
+          "planning_agent",
+          "class PlanningAgent",
+          "def planning_agent",
+          "PlanningAgentImpl",
+          "planning_agent_impl",
+          "create_planning_agent",
+          "PlanningAgentStrategy"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 97095.46209999826
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.LangGraphExecutor",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/plan/langraph_excutor.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 12807.185099984054
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.EmbeddingModelFactory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 25441.57580001047
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.OpenAIModels",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/infrastructure/llms/chat_models/openai_llm.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 10372.096299979603
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.jwt_validator",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 17239.58570000832
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.semantic.memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Default prompt template used for extracting and persisting long-term agent memories",
+        "identifiers": [
+          "memory_extract_prompt",
+          "default_memory_prompt",
+          "long_term_memory_prompt",
+          "extract_memory_prompt",
+          "agent_memory_prompt",
+          "memory_extraction_template",
+          "DEFAULT_MEMORY_EXTRACT_PROMPT",
+          "longTermMemoryPrompt"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 77589.08860001247
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.semantic.websocket",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.18181818181818182,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/channel/websocket/manager.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Manages WebSocket connections and channels for real-time message delivery",
+        "identifiers": [
+          "websocket_connection_manager",
+          "channel_manager",
+          "realtime_channel",
+          "ws_channel_handler",
+          "WebSocketConnectionManager",
+          "manage_channels",
+          "message_dispatcher",
+          "channel_connection"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 104285.48550000414
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.cn_auth",
+      "items_p": 0.3333333333333333,
+      "items_r": 0.5,
+      "union_p": 0.10526315789473684,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "authentication or authorization logic location",
+        "identifiers": [
+          "auth",
+          "authenticate",
+          "authorize",
+          "check_auth",
+          "verify_token",
+          "auth_middleware",
+          "is_authorized",
+          "permission_check"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 80866.69779999647
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.cn_memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "locate or access memory storage, allocation, or address",
+        "identifiers": [
+          "memory_location",
+          "memory_address",
+          "get_memory",
+          "memory_ptr",
+          "find_memory",
+          "memory_pool",
+          "memory_base",
+          "locate_memory"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 54758.0883000046
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.cn_ws",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.13333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "locate where websocket channel or connection is defined or created",
+        "identifiers": [
+          "websocket_channel",
+          "ws_channel",
+          "WebSocketChannel",
+          "websocket_connection",
+          "ws_connection",
+          "create_websocket",
+          "websocket_init",
+          "init_ws"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 422792.19320000266
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.similar.think_and_act",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 14335.878899990348
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.similar.agent_state",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 15570.815399987623
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.similar.jwt_validator",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 23833.70489999652
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.similar.websocket_endpoint",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 15709.331499994732
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.ContextBuilder_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Where context is assembled or built in the ContextBuilder class",
+        "identifiers": [
+          "ContextBuilder",
+          "build_context",
+          "assemble_context",
+          "context_builder",
+          "BuildContext",
+          "assembleContext",
+          "create_context",
+          "ContextAssembler"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 303618.4532000043
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.related.jwt_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 14,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "JWT token validation and authorization check",
+        "identifiers": [
+          "JWTValidator",
+          "validate_jwt",
+          "validateToken",
+          "verify_jwt",
+          "check_auth",
+          "authenticate",
+          "jwt_verify",
+          "token_validation"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 318639.5976000058
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.cn_plan",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.058823529411764705,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 14,
+      "top": "app/agents/plan/planning.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "planning agent implementation",
+        "identifiers": [
+          "planning_agent",
+          "PlanningAgent",
+          "plan_agent",
+          "PlanAgent",
+          "agent_planner",
+          "AgentPlanner",
+          "create_planning_agent",
+          "planning_agent_impl"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 199021.06400000048
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.nl.cn_embedding",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.06666666666666667,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 12,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Factory or builder class that creates vector embedding models",
+        "identifiers": [
+          "embedding_model_factory",
+          "EmbeddingModelFactory",
+          "create_embedding_model",
+          "build_embedding_model",
+          "get_embedding_model",
+          "vector_embedding_factory",
+          "VectorEmbeddingFactory",
+          "embedding_provider_factory"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 287576.90549999825
+    },
+    {
+      "config": "E",
+      "case_id": "pando.resolve.hard.short_cn_react",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/infrastructure/llms/text2speech_models/spark_tts.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Execute model inference or reasoning pipeline",
+        "identifiers": [
+          "run_inference",
+          "executeInference",
+          "inference_step",
+          "forward_pass",
+          "run_reasoning",
+          "executeReasoning",
+          "model_predict",
+          "generate_output"
+        ],
+        "trigger": "always"
+      },
+      "elapsed_ms": 254420.060000004
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.ReActAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/common.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 43420.47979999916
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.BaseAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.08333333333333333,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 9,
+      "top": "app/agents/api/common.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 25460.24389998638
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.ContextBuilder",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 69281.31910000229
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.PlanningAgent",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07692307692307693,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 10,
+      "top": "app/agents/plan/planning.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 46516.775700001745
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.LangGraphExecutor",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/plan/langraph_excutor.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 21010.217200004263
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.EmbeddingModelFactory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 69338.95350000239
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.OpenAIModels",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.05555555555555555,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 15,
+      "top": "app/infrastructure/llms/chat_models/openai_llm.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 23451.040899992222
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.jwt_validator",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 50437.91420001071
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.semantic.memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.09090909090909091,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 82934.47000000742
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.semantic.websocket",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.18181818181818182,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/channel/websocket/manager.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 65380.75079998816
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.cn_auth",
+      "items_p": 0.3333333333333333,
+      "items_r": 0.5,
+      "union_p": 0.10526315789473684,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/services/market/metrics.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "authentication or authorization check logic",
+        "identifiers": [
+          "auth",
+          "authenticate",
+          "authorize",
+          "check_permission",
+          "verify_token",
+          "access_control",
+          "is_authorized",
+          "authMiddleware"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 276281.7347999953
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.cn_memory",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/agents/memorys/default/memory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "Find where memory is allocated, stored, or referenced; memory address or location lookup",
+        "identifiers": [
+          "memory_address",
+          "memory_location",
+          "getMemoryPtr",
+          "mem_ptr",
+          "memory_base",
+          "find_memory",
+          "memory_offset",
+          "baseAddress"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 397679.5449999918
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.cn_ws",
+      "items_p": 0.6666666666666666,
+      "items_r": 1.0,
+      "union_p": 0.18181818181818182,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 8,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 32927.8583000123
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.similar.think_and_act",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/react.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 4711.492400005227
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.similar.agent_state",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.25,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 3,
+      "top": "app/agents/core/base.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 3341.278300009435
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.similar.jwt_validator",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9756.75910001155
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.similar.websocket_endpoint",
+      "items_p": 1.0,
+      "items_r": 1.0,
+      "union_p": 0.5,
+      "union_r": 1.0,
+      "n_items": 1,
+      "n_also": 1,
+      "top": "app/channel/websocket/websocket.py",
+      "passed": true,
+      "channels": [
+        "similar"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 23200.271699985024
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.ContextBuilder_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/agents/context/context.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 54837.92330001597
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.related.jwt_nl",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.1111111111111111,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 6,
+      "top": "app/utils/auth/jwt_validator.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 30853.42510000919
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.cn_plan",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0625,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 13,
+      "top": "app/agents/skills/hub/agent_enable.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 9877.045200002613
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.nl.cn_embedding",
+      "items_p": 0.3333333333333333,
+      "items_r": 1.0,
+      "union_p": 0.07142857142857142,
+      "union_r": 1.0,
+      "n_items": 3,
+      "n_also": 11,
+      "top": "app/infrastructure/llms/embedding_models/factory.py",
+      "passed": true,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": null,
+      "elapsed_ms": 48838.47180000157
+    },
+    {
+      "config": "F",
+      "case_id": "pando.resolve.hard.short_cn_react",
+      "items_p": 0.0,
+      "items_r": 0.0,
+      "union_p": 0.0,
+      "union_r": 0.0,
+      "n_items": 3,
+      "n_also": 16,
+      "top": "app/agents/tools/exec/shell_exec.py",
+      "passed": false,
+      "channels": [
+        "related",
+        "similar",
+        "grep"
+      ],
+      "nl_rewrite_meta": {
+        "english": "inference execution or reasoning execution logic",
+        "identifiers": [
+          "run_inference",
+          "execute_inference",
+          "inference_exec",
+          "runReasoning",
+          "execute_reasoning",
+          "infer",
+          "do_inference",
+          "reasoningEngine"
+        ],
+        "trigger": "weak"
+      },
+      "elapsed_ms": 139672.99209997873
+    }
+  ],
+  "summary": [
+    {
+      "cfg": "A",
+      "avg_iR": 0.8636363636363636,
+      "avg_uR": 0.9090909090909091,
+      "pass": "19/22",
+      "avg_ms": 9105.65591364337,
+      "p50_ms": 6859.774200012907,
+      "p95_ms": 14274.88420001464,
+      "symbol": true
+    },
+    {
+      "cfg": "D",
+      "avg_iR": 0.9090909090909091,
+      "avg_uR": 0.9545454545454546,
+      "pass": "20/22",
+      "avg_ms": 16689.548004546934,
+      "p50_ms": 13453.941100015072,
+      "p95_ms": 43016.435500001535,
+      "symbol": true
+    },
+    {
+      "cfg": "E",
+      "avg_iR": 0.9318181818181818,
+      "avg_uR": 0.9545454545454546,
+      "pass": "21/22",
+      "avg_ms": 115585.70061363572,
+      "p50_ms": 54758.0883000046,
+      "p95_ms": 318639.5976000058,
+      "symbol": true
+    },
+    {
+      "cfg": "F",
+      "avg_iR": 0.8863636363636364,
+      "avg_uR": 0.9545454545454546,
+      "pass": "20/22",
+      "avg_ms": 69509.5891909097,
+      "p50_ms": 43420.47979999916,
+      "p95_ms": 276281.7347999953,
+      "symbol": true
+    },
+    {
+      "cfg": "B",
+      "avg_iR": 0.7045454545454546,
+      "avg_uR": 0.9545454545454546,
+      "pass": "16/22",
+      "avg_ms": 12806.394349999291,
+      "p50_ms": 8433.909399987897,
+      "p95_ms": 27490.13190000551,
+      "symbol": false
+    },
+    {
+      "cfg": "C",
+      "avg_iR": 0.7954545454545454,
+      "avg_uR": 0.9090909090909091,
+      "pass": "18/22",
+      "avg_ms": 67793.18530908892,
+      "p50_ms": 76199.99859997188,
+      "p95_ms": 165928.33259998588,
+      "symbol": false
+    }
+  ]
+}

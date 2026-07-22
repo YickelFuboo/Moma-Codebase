@@ -21,9 +21,15 @@
 from __future__ import annotations
 import asyncio
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from tests.scenarios.framework.accuracy import AccuracyMetrics
+from tests.scenarios.oss_common.resolve_eval import (
+    CaseRow as OssCaseRow,
+    dump_eval_artifact,
+    print_latency_table,
+)
 from tests.scenarios.pando_agent.ground_truth import PANDO_RELATED_CASES, PANDO_RESOLVE_CASES
 from tests.scenarios.pando_agent.session_support import PandoAgentScenarioSession
 
@@ -52,6 +58,7 @@ class CaseRow:
     passed: bool
     channels: List[str] = field(default_factory=list)
     nl_rewrite_meta: Optional[Dict[str, object]] = None
+    elapsed_ms: float = 0.0
 
 
 CONFIGS = [
@@ -111,12 +118,14 @@ async def _eval_resolve(cfg: AblationConfig) -> List[CaseRow]:
     repo_id = await PandoAgentScenarioSession.ensure_repo()
     rows: List[CaseRow] = []
     for case in PANDO_RESOLVE_CASES:
+        t0 = time.perf_counter()
         result = await SearchResolveService.resolve(
             repo_id,
             case.extra["query"],
             top_k=case.top_k,
             intent="auto",
         )
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
         items = result.get("items") or []
         also = result.get("also_consider") or []
         hits = _paths(items)
@@ -138,6 +147,7 @@ async def _eval_resolve(cfg: AblationConfig) -> List[CaseRow]:
             passed=score.recall >= case.min_recall,
             channels=list(result.get("channels_used") or []),
             nl_rewrite_meta=result.get("nl_rewrite"),
+            elapsed_ms=elapsed_ms,
         )
         rows.append(row)
         rw = "N"
@@ -147,7 +157,7 @@ async def _eval_resolve(cfg: AblationConfig) -> List[CaseRow]:
         print(
             f"[{cfg.label}/resolve] {case.case_id} "
             f"iR={row.items_r:.0%} uR={row.union_r:.0%} rw={rw} "
-            f"top={row.top} pass={row.passed}",
+            f"ms={row.elapsed_ms:.0f} top={row.top} pass={row.passed}",
             flush=True,
         )
     return rows
@@ -218,7 +228,7 @@ def _avg(rows: List[CaseRow], attr: str) -> float:
 def _print_summary(all_rows: List[CaseRow]) -> None:
     print("\n===== SUMMARY (by config × kind) =====", flush=True)
     print(
-        f"{'cfg':<4} {'kind':<8} {'avg_iR':>7} {'avg_uR':>7} {'pass':>8} "
+        f"{'cfg':<4} {'kind':<8} {'avg_iR':>7} {'avg_uR':>7} {'pass':>8} {'avg_ms':>8} "
         f"{'symbol':>7} {'nl2c':>5} {'rewr':>5} {'mode':>6}",
         flush=True,
     )
@@ -235,12 +245,36 @@ def _print_summary(all_rows: List[CaseRow]) -> None:
                 f"{label:<4} {kind:<8} "
                 f"{_avg(rows, 'items_r'):>6.0%} {_avg(rows, 'union_r'):>6.0%} "
                 f"{sum(1 for r in rows if r.passed)}/{len(rows):<4} "
+                f"{_avg(rows, 'elapsed_ms'):>7.0f} "
                 f"{'ON' if cfg.symbol_on else 'OFF':>7} "
                 f"{'ON' if cfg.nl2code else 'OFF':>5} "
                 f"{'ON' if cfg.nl_rewrite else 'OFF':>5} "
                 f"{mode:>6}",
                 flush=True,
             )
+
+    resolve_rows = [r for r in all_rows if r.kind == "resolve"]
+    if resolve_rows:
+        oss_rows = [
+            OssCaseRow(
+                config=r.config,
+                case_id=r.case_id,
+                items_p=r.items_p,
+                items_r=r.items_r,
+                union_p=r.union_p,
+                union_r=r.union_r,
+                n_items=r.n_items,
+                n_also=r.n_also,
+                top=r.top,
+                passed=r.passed,
+                channels=list(r.channels),
+                nl_rewrite_meta=r.nl_rewrite_meta,
+                elapsed_ms=r.elapsed_ms,
+            )
+            for r in resolve_rows
+        ]
+        print_latency_table("PANDO", oss_rows)
+        dump_eval_artifact("PANDO", oss_rows, CONFIGS)
 
     print("\n===== FOCUS resolve NL cases (unionR) =====", flush=True)
     focus = {
@@ -283,8 +317,11 @@ async def main() -> None:
     )
 
     all_rows: List[CaseRow] = []
-    want = set(only.replace(",", " ").split()) if only else set(ALL_LABELS)
-    want.discard("")
+    if not only or only in {"ALL", "*"}:
+        want = set(ALL_LABELS)
+    else:
+        want = set(only.replace(",", " ").split())
+        want.discard("")
 
     async def _eval_cfg(cfg: AblationConfig) -> None:
         print(f"\n--- eval config {cfg.label} ---", flush=True)

@@ -1,10 +1,14 @@
-"""Django 开源仓 resolve GT：覆盖 db / http / contrib / forms / urls / views / middleware。"""
+"""Django 开源仓 resolve GT（Agent 向配比）。
+
+目标分布约：纯符号 25–30% | 符号+NL 15–20% | 纯 NL 30–35% | similar 15–20% | 难例 10–15%。
+范围：整包 django/。
+"""
 from __future__ import annotations
 from tests.scenarios.framework.case_spec import PathSetCase
 
 
 DJANGO_RESOLVE_CASES = [
-    # ---- db / ORM ----
+    # ---- 纯符号 (~25%) ----
     PathSetCase(
         case_id="django.resolve.related.Model",
         description="纯符号：Model",
@@ -12,7 +16,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "Model", "expect_intent": "related"},
+        extra={"query": "Model", "expect_intent": "related", "case_kind": "sym"},
     ),
     PathSetCase(
         case_id="django.resolve.related.QuerySet",
@@ -21,27 +25,8 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "QuerySet", "expect_intent": "related"},
+        extra={"query": "QuerySet", "expect_intent": "related", "case_kind": "sym"},
     ),
-    PathSetCase(
-        case_id="django.resolve.related.Manager",
-        description="纯符号：Manager",
-        expected_paths=["django/db/models/manager.py"],
-        min_precision=0.25,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "Manager", "expect_intent": "related"},
-    ),
-    PathSetCase(
-        case_id="django.resolve.related.Field",
-        description="纯符号：Field",
-        expected_paths=["django/db/models/fields/__init__.py"],
-        min_precision=0.2,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "Field", "expect_intent": "related"},
-    ),
-    # ---- http ----
     PathSetCase(
         case_id="django.resolve.related.HttpRequest",
         description="纯符号：HttpRequest",
@@ -49,7 +34,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "HttpRequest", "expect_intent": "related"},
+        extra={"query": "HttpRequest", "expect_intent": "related", "case_kind": "sym"},
     ),
     PathSetCase(
         case_id="django.resolve.related.HttpResponse",
@@ -58,26 +43,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "HttpResponse", "expect_intent": "related"},
-    ),
-    PathSetCase(
-        case_id="django.resolve.related.JsonResponse",
-        description="纯符号：JsonResponse",
-        expected_paths=["django/http/response.py"],
-        min_precision=0.3,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "JsonResponse", "expect_intent": "related"},
-    ),
-    # ---- contrib / auth ----
-    PathSetCase(
-        case_id="django.resolve.related.User",
-        description="中文+符号：User 认证模型",
-        expected_paths=["django/contrib/auth/models.py"],
-        min_precision=0.25,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "User 用户模型在哪", "expect_intent": "related"},
+        extra={"query": "HttpResponse", "expect_intent": "related", "case_kind": "sym"},
     ),
     PathSetCase(
         case_id="django.resolve.related.AuthenticationMiddleware",
@@ -86,7 +52,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "AuthenticationMiddleware", "expect_intent": "related"},
+        extra={"query": "AuthenticationMiddleware", "expect_intent": "related", "case_kind": "sym"},
     ),
     PathSetCase(
         case_id="django.resolve.related.authenticate",
@@ -95,16 +61,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.25,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "authenticate", "expect_intent": "related"},
-    ),
-    PathSetCase(
-        case_id="django.resolve.related.login",
-        description="中文+符号：login 登录",
-        expected_paths=["django/contrib/auth/__init__.py"],
-        min_precision=0.2,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "login 用户登录函数在哪", "expect_intent": "related"},
+        extra={"query": "authenticate", "expect_intent": "related", "case_kind": "sym"},
     ),
     PathSetCase(
         case_id="django.resolve.related.AdminSite",
@@ -113,26 +70,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "AdminSite", "expect_intent": "related"},
-    ),
-    PathSetCase(
-        case_id="django.resolve.related.SessionMiddleware",
-        description="纯符号：SessionMiddleware",
-        expected_paths=["django/contrib/sessions/middleware.py"],
-        min_precision=0.3,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "SessionMiddleware", "expect_intent": "related"},
-    ),
-    # ---- forms / urls / views / middleware / core ----
-    PathSetCase(
-        case_id="django.resolve.related.Form",
-        description="纯符号：Form",
-        expected_paths=["django/forms/forms.py"],
-        min_precision=0.25,
-        min_recall=1.0,
-        top_k=5,
-        extra={"query": "Form", "expect_intent": "related"},
+        extra={"query": "AdminSite", "expect_intent": "related", "case_kind": "sym"},
     ),
     PathSetCase(
         case_id="django.resolve.related.URLResolver",
@@ -141,36 +79,64 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "URLResolver", "expect_intent": "related"},
+        extra={"query": "URLResolver", "expect_intent": "related", "case_kind": "sym"},
     ),
+    # ---- 符号 + NL (~19%) ----
     PathSetCase(
-        case_id="django.resolve.related.View",
-        description="纯符号：View",
-        expected_paths=["django/views/generic/base.py"],
+        case_id="django.resolve.related.User",
+        description="符号+NL：User 用户模型",
+        expected_paths=["django/contrib/auth/models.py"],
         min_precision=0.25,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "View", "expect_intent": "related"},
+        extra={"query": "User 用户模型在哪", "expect_intent": "related", "case_kind": "sym_nl"},
     ),
     PathSetCase(
-        case_id="django.resolve.related.CommonMiddleware",
-        description="纯符号：CommonMiddleware",
-        expected_paths=["django/middleware/common.py"],
+        case_id="django.resolve.related.login",
+        description="符号+NL：login 登录",
+        expected_paths=["django/contrib/auth/__init__.py"],
+        min_precision=0.2,
+        min_recall=1.0,
+        top_k=5,
+        extra={"query": "login 用户登录函数在哪", "expect_intent": "related", "case_kind": "sym_nl"},
+    ),
+    PathSetCase(
+        case_id="django.resolve.related.SessionMiddleware",
+        description="符号+NL：SessionMiddleware",
+        expected_paths=["django/contrib/sessions/middleware.py"],
         min_precision=0.3,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "CommonMiddleware", "expect_intent": "related"},
+        extra={"query": "SessionMiddleware 会话中间件在哪", "expect_intent": "related", "case_kind": "sym_nl"},
     ),
     PathSetCase(
-        case_id="django.resolve.related.BaseHandler",
-        description="纯符号：BaseHandler",
-        expected_paths=["django/core/handlers/base.py"],
+        case_id="django.resolve.related.Form",
+        description="符号+NL：Form 表单基类",
+        expected_paths=["django/forms/forms.py"],
         min_precision=0.25,
         min_recall=1.0,
         top_k=5,
-        extra={"query": "BaseHandler", "expect_intent": "related"},
+        extra={"query": "Form 表单基类在哪", "expect_intent": "related", "case_kind": "sym_nl"},
     ),
-    # ---- 中文 NL ----
+    PathSetCase(
+        case_id="django.resolve.related.Manager",
+        description="符号+NL：Manager 模型管理器",
+        expected_paths=["django/db/models/manager.py"],
+        min_precision=0.25,
+        min_recall=1.0,
+        top_k=5,
+        extra={"query": "Manager 模型管理器在哪", "expect_intent": "related", "case_kind": "sym_nl"},
+    ),
+    PathSetCase(
+        case_id="django.resolve.related.JsonResponse",
+        description="符号+NL：JsonResponse",
+        expected_paths=["django/http/response.py"],
+        min_precision=0.3,
+        min_recall=1.0,
+        top_k=5,
+        extra={"query": "JsonResponse JSON 响应在哪", "expect_intent": "related", "case_kind": "sym_nl"},
+    ),
+    # ---- 纯 NL (~31%) ----
     PathSetCase(
         case_id="django.resolve.nl.cn_orm",
         description="中文 NL：ORM 模型基类在哪",
@@ -178,7 +144,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "ORM 模型基类在哪", "expect_intent": "related"},
+        extra={"query": "ORM 模型基类在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_auth",
@@ -191,7 +157,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=0.33,
         top_k=10,
-        extra={"query": "用户认证在哪", "expect_intent": "related"},
+        extra={"query": "用户认证在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_queryset",
@@ -200,7 +166,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "数据库查询集合 QuerySet 在哪", "expect_intent": "related"},
+        extra={"query": "数据库查询集合在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_middleware",
@@ -209,7 +175,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "认证中间件在哪", "expect_intent": "related"},
+        extra={"query": "认证中间件在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_forms",
@@ -218,7 +184,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "表单 Form 基类在哪", "expect_intent": "related"},
+        extra={"query": "表单基类在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_url_resolve",
@@ -227,7 +193,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "URL 路由解析在哪", "expect_intent": "related"},
+        extra={"query": "URL 路由解析在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_admin",
@@ -236,7 +202,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "后台管理 AdminSite 在哪", "expect_intent": "related"},
+        extra={"query": "后台管理站点在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_session",
@@ -245,7 +211,7 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "会话 Session 中间件在哪", "expect_intent": "related"},
+        extra={"query": "会话中间件在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
     PathSetCase(
         case_id="django.resolve.nl.cn_request",
@@ -254,9 +220,18 @@ DJANGO_RESOLVE_CASES = [
         min_precision=0.1,
         min_recall=1.0,
         top_k=10,
-        extra={"query": "HTTP 请求对象在哪", "expect_intent": "related"},
+        extra={"query": "HTTP 请求对象在哪", "expect_intent": "related", "case_kind": "nl"},
     ),
-    # ---- similar ----
+    PathSetCase(
+        case_id="django.resolve.nl.en_orm_save",
+        description="英文 NL：persist model instance",
+        expected_paths=["django/db/models/base.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={"query": "where does django save a model instance to the database", "expect_intent": "related", "case_kind": "nl"},
+    ),
+    # ---- similar (~16%) ----
     PathSetCase(
         case_id="django.resolve.similar.model_class",
         description="代码片段：class Model",
@@ -273,6 +248,7 @@ DJANGO_RESOLVE_CASES = [
                 "        _setattr = setattr\n"
             ),
             "expect_intent": "similar",
+            "case_kind": "similar",
         },
     ),
     PathSetCase(
@@ -290,6 +266,7 @@ DJANGO_RESOLVE_CASES = [
                 "            user = backend.authenticate(request, **credentials)\n"
             ),
             "expect_intent": "similar",
+            "case_kind": "similar",
         },
     ),
     PathSetCase(
@@ -306,6 +283,77 @@ DJANGO_RESOLVE_CASES = [
                 "        self.is_bound = data is not None or files is not None\n"
             ),
             "expect_intent": "similar",
+            "case_kind": "similar",
         },
+    ),
+    PathSetCase(
+        case_id="django.resolve.similar.queryset_filter",
+        description="代码片段：QuerySet.filter",
+        expected_paths=["django/db/models/query.py"],
+        min_precision=0.3,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "def filter(self, *args, **kwargs):\n"
+                "    return self._filter_or_exclude(False, args, kwargs)\n"
+            ),
+            "expect_intent": "similar",
+            "case_kind": "similar",
+        },
+    ),
+    PathSetCase(
+        case_id="django.resolve.similar.url_resolve",
+        description="代码片段：URLResolver.resolve",
+        expected_paths=["django/urls/resolvers.py"],
+        min_precision=0.3,
+        min_recall=1.0,
+        top_k=3,
+        extra={
+            "query": (
+                "def resolve(self, path):\n"
+                "    path = str(path)\n"
+                "    match = self.regex.search(path)\n"
+            ),
+            "expect_intent": "similar",
+            "case_kind": "similar",
+        },
+    ),
+    # ---- 难例 (~12%) ----
+    PathSetCase(
+        case_id="django.resolve.hard.ambiguous_view",
+        description="难例：View 同名多处，期望 generic base",
+        expected_paths=["django/views/generic/base.py"],
+        min_precision=0.15,
+        min_recall=1.0,
+        top_k=8,
+        extra={"query": "View", "expect_intent": "related", "case_kind": "hard"},
+    ),
+    PathSetCase(
+        case_id="django.resolve.hard.ambiguous_field",
+        description="难例：Field 同名多处，期望 models.fields",
+        expected_paths=["django/db/models/fields/__init__.py"],
+        min_precision=0.15,
+        min_recall=1.0,
+        top_k=8,
+        extra={"query": "Field", "expect_intent": "related", "case_kind": "hard"},
+    ),
+    PathSetCase(
+        case_id="django.resolve.hard.short_cn_login",
+        description="难例：短中文「登录」",
+        expected_paths=["django/contrib/auth/__init__.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={"query": "登录", "expect_intent": "related", "case_kind": "hard"},
+    ),
+    PathSetCase(
+        case_id="django.resolve.hard.cn_handler",
+        description="难例：请求处理入口（BaseHandler）",
+        expected_paths=["django/core/handlers/base.py"],
+        min_precision=0.1,
+        min_recall=1.0,
+        top_k=10,
+        extra={"query": "WSGI 请求处理入口在哪", "expect_intent": "related", "case_kind": "hard"},
     ),
 ]
