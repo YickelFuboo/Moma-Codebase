@@ -25,7 +25,7 @@ _GO_SRC_ALL = {
 
 
 class GoOssScenarioSession(CodebaseScenarioBase):
-    """登记并分析 Go 标准库三包子集（默认 A：符号摘要 ON，NL2Code OFF）。"""
+    """登记并分析 Go 标准库三包子集（默认 B：符号摘要 ON，NL2Code OFF）。"""
 
     ENABLE_SYMBOL_SUMMARY = True
     ENABLE_CODE_GRAPH = False

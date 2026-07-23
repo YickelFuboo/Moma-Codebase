@@ -1,8 +1,8 @@
-"""开源大仓 resolve 评测共用逻辑（含 A–F 消融）。
+"""开源大仓 resolve 评测共用逻辑（含 A–F + G 消融）。
 
 符号摘要开关在**查询时**生效：关则不走 match_symbols / 符号向量，
-只走 path_fallback（行块路径）+ similar 行块。因此 A–F 对比
-**不必**为 B/C 清库重建无符号索引；复用已有（含符号）索引即可。
+只走 path_fallback（行块路径）+ similar 行块。因此档位对比
+**不必**为无符号档清库重建；复用已有（含符号）索引即可。
 """
 from __future__ import annotations
 import json
@@ -41,20 +41,21 @@ class CaseRow:
     elapsed_ms: float = 0.0
 
 
-# 与 Pando §5.12 对齐：A=符号（产品默认）B=NL C=NL+always D=符号+NL E=符号+NL+always F=符号+NL+weak
+# 档位：A=仅Chunk B=符号(产品默认) C=NL D=NL+always E=符号+NL F=符号+NL+always G=符号+NL+weak
 ALL_CONFIGS: List[AblationConfig] = [
-    AblationConfig("A", symbol_on=True, nl2code=False, nl_rewrite=False),
-    AblationConfig("B", symbol_on=False, nl2code=True, nl_rewrite=False),
-    AblationConfig("C", symbol_on=False, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
-    AblationConfig("D", symbol_on=True, nl2code=True, nl_rewrite=False),
-    AblationConfig("E", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
-    AblationConfig("F", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="weak"),
+    AblationConfig("A", symbol_on=False, nl2code=False, nl_rewrite=False),
+    AblationConfig("B", symbol_on=True, nl2code=False, nl_rewrite=False),
+    AblationConfig("C", symbol_on=False, nl2code=True, nl_rewrite=False),
+    AblationConfig("D", symbol_on=False, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
+    AblationConfig("E", symbol_on=True, nl2code=True, nl_rewrite=False),
+    AblationConfig("F", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
+    AblationConfig("G", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="weak"),
 ]
 
-# 评测顺序：先有符号通道档，再关符号档（均不重建索引）
-EVAL_ORDER = ("A", "D", "E", "F", "B", "C")
+# 评测顺序：基线 Chunk → 有符号档 → 无符号 NL 档（均不重建索引）
+EVAL_ORDER = ("A", "B", "E", "F", "G", "C", "D")
 
-DEFAULT_A = next(c for c in ALL_CONFIGS if c.label == "A")
+DEFAULT_B = next(c for c in ALL_CONFIGS if c.label == "B")
 
 
 def paths(items: List[Dict[str, Any]]) -> List[str]:
@@ -92,12 +93,37 @@ async def eval_resolve(
     rows: List[CaseRow] = []
     for case in cases:
         t0 = time.perf_counter()
-        result = await SearchResolveService.resolve(
-            repo_id,
-            case.extra["query"],
-            top_k=case.top_k,
-            intent="auto",
-        )
+        try:
+            result = await SearchResolveService.resolve(
+                repo_id,
+                case.extra["query"],
+                top_k=case.top_k,
+                intent="auto",
+            )
+        except Exception as exc:
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            row = CaseRow(
+                config=cfg.label,
+                case_id=case.case_id,
+                items_p=0.0,
+                items_r=0.0,
+                union_p=0.0,
+                union_r=0.0,
+                n_items=0,
+                n_also=0,
+                top=None,
+                passed=False,
+                channels=[],
+                nl_rewrite_meta={"error": f"{type(exc).__name__}: {exc}"},
+                elapsed_ms=elapsed_ms,
+            )
+            rows.append(row)
+            print(
+                f"[{tag}/{cfg.label}] {case.case_id} "
+                f"ERROR={type(exc).__name__}: {exc} ms={elapsed_ms:.0f} pass=False",
+                flush=True,
+            )
+            continue
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         items = result.get("items") or []
         also = result.get("also_consider") or []
@@ -181,7 +207,9 @@ def print_latency_table(tag: str, all_rows: List[CaseRow]) -> None:
 
 def dump_eval_artifact(tag: str, all_rows: List[CaseRow], configs: Sequence[AblationConfig]) -> Path:
     """写出 JSON + Markdown，便于人工检视准确率与耗时。"""
-    out_dir = Path(".")
+    from tests.scenarios.oss_common.eval_output import ScenarioOutputDir
+
+    out_dir = ScenarioOutputDir.ensure()
     json_path = out_dir / f".tmp_{tag.lower()}_ablation_newgt.json"
     md_path = out_dir / f".tmp_{tag.lower()}_ablation_newgt.md"
     payload = {
@@ -324,7 +352,7 @@ async def run_resolve_ablation(
     only_env: str,
     configs: Sequence[AblationConfig] = ALL_CONFIGS,
 ) -> List[CaseRow]:
-    """A–F resolve 消融：默认复用已有索引，仅切换查询时开关。"""
+    """A–G resolve 消融：默认复用已有索引，仅切换查询时开关。"""
     session_cls.require_repo_or_skip()
     skip = env_truthy(skip_env) or not env_truthy(clear_env)
     want = parse_only(os.environ.get(only_env, "ALL"))

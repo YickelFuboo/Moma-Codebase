@@ -1,12 +1,13 @@
 """NL2Code × 符号摘要 六档消融：重建索引后对比 resolve/related 准确率。
 
 档位：
-  A. 符号 ON  + NL2Code OFF + rewrite OFF          → 符号
-  B. 符号 OFF + NL2Code ON  + rewrite OFF          → NL
-  C. 符号 OFF + NL2Code ON  + rewrite ON(always)   → NL+always
-  D. 符号 ON  + NL2Code ON  + rewrite OFF          → 符号+NL
-  E. 符号 ON  + NL2Code ON  + rewrite ON(always)   → 符号+NL+always
-  F. 符号 ON  + NL2Code ON  + rewrite ON(weak)     → 符号+NL+weak（弱召回才改写）
+  A. 符号 OFF + NL2Code OFF + rewrite OFF          → 仅Chunk（行块）
+  B. 符号 ON  + NL2Code OFF + rewrite OFF          → 符号（产品默认）
+  C. 符号 OFF + NL2Code ON  + rewrite OFF          → NL
+  D. 符号 OFF + NL2Code ON  + rewrite ON(always)   → NL+always
+  E. 符号 ON  + NL2Code ON  + rewrite OFF          → 符号+NL
+  F. 符号 ON  + NL2Code ON  + rewrite ON(always)   → 符号+NL+always
+  G. 符号 ON  + NL2Code ON  + rewrite ON(weak)     → 符号+NL+weak（弱召回才改写）
 
 用法（仓根、venv）：
   PANDO_CLEAR=1 python -m tests.scenarios.pando_agent.run_nl2code_ablation
@@ -62,12 +63,13 @@ class CaseRow:
 
 
 CONFIGS = [
-    AblationConfig("A", symbol_on=True, nl2code=False, nl_rewrite=False),
-    AblationConfig("B", symbol_on=False, nl2code=True, nl_rewrite=False),
-    AblationConfig("C", symbol_on=False, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
-    AblationConfig("D", symbol_on=True, nl2code=True, nl_rewrite=False),
-    AblationConfig("E", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
-    AblationConfig("F", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="weak"),
+    AblationConfig("A", symbol_on=False, nl2code=False, nl_rewrite=False),
+    AblationConfig("B", symbol_on=True, nl2code=False, nl_rewrite=False),
+    AblationConfig("C", symbol_on=False, nl2code=True, nl_rewrite=False),
+    AblationConfig("D", symbol_on=False, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
+    AblationConfig("E", symbol_on=True, nl2code=True, nl_rewrite=False),
+    AblationConfig("F", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="always"),
+    AblationConfig("G", symbol_on=True, nl2code=True, nl_rewrite=True, rewrite_mode="weak"),
 ]
 
 ALL_LABELS = [c.label for c in CONFIGS]
@@ -309,8 +311,8 @@ async def main() -> None:
     do_related = kind in {"all", "related"}
 
     print(
-        "[nl2code-ablation] A=符号 | B=NL | C=NL+always | D=符号+NL | "
-        "E=符号+NL+always | F=符号+NL+weak "
+        "[nl2code-ablation] A=仅Chunk | B=符号 | C=NL | D=NL+always | "
+        "E=符号+NL | F=符号+NL+always | G=符号+NL+weak "
         f"only={only or 'ALL'} kind={kind} skip_rebuild={skip_rebuild} "
         f"resolve_cases={len(PANDO_RESOLVE_CASES)}",
         flush=True,

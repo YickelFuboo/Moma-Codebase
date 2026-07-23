@@ -2,11 +2,11 @@
 from __future__ import annotations
 import asyncio
 import json
-from pathlib import Path
 from sqlalchemy import select
 from app.infrastructure.database import get_db_session
 from app.repo_analysis.models.experience_status import ExperienceItemStatus, MrExperienceItem
 from app.runtime import init_runtime, release_runtime
+from tests.scenarios.oss_common.eval_output import ScenarioOutputDir
 
 
 REPOS = [
@@ -64,8 +64,8 @@ async def dump() -> None:
     finally:
         await release_runtime()
 
-    json_path = Path(".tmp_oss_experience_dump.json")
-    md_path = Path(".tmp_oss_experience_dump.md")
+    json_path = ScenarioOutputDir.path(".tmp_oss_experience_dump.json")
+    md_path = ScenarioOutputDir.path(".tmp_oss_experience_dump.md")
     json_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
     lines = ["# Go / Django MR 经验全量导出", ""]

@@ -62,8 +62,10 @@ config.toml
 参考项目/
 参考/
 
-# 测试中间产出
+# 测试中间产出（统一落 tests/output）
 .tmp_*.txt
+tests/output/
+!tests/output/.gitkeep
 
 # 前台服务
 node_modules
