@@ -550,6 +550,79 @@ class TestSearchResolveService:
         assert out[0]["file_path"] == "target.py"
         assert out[0]["match_source"] == "exact"
 
+    def test_agent_items_query_boosts_path_over_hub_file(self):
+        items = [
+            {
+                "file_path": "lib/express.js",
+                "score": 3.0,
+                "match_source": "exact",
+                "exact_tier": "symbol",
+                "symbol_name": "createApplication",
+            },
+            {
+                "file_path": "lib/application.js",
+                "score": 0.95,
+                "match_source": "symbol_summary",
+                "symbol_name": "use",
+            },
+            {
+                "file_path": "lib/response.js",
+                "score": 0.80,
+                "match_source": "symbol_summary",
+                "symbol_name": "json",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="res.json 返回 JSON")
+        assert out[0]["file_path"] == "lib/response.js"
+        out_use = ResolveResultPresenter.agent_items(items, query="app.use")
+        assert out_use[0]["file_path"] == "lib/application.js"
+
+    def test_agent_items_penalizes_test_and_vendor_paths(self):
+        items = [
+            {
+                "file_path": "src/encoding/json/encode_test.go",
+                "score": 0.99,
+                "match_source": "symbol_summary",
+            },
+            {
+                "file_path": "src/encoding/json/encode.go",
+                "score": 0.70,
+                "match_source": "symbol_summary",
+            },
+            {
+                "file_path": "include/spdlog/fmt/bundled/format.h",
+                "score": 0.98,
+                "match_source": "symbol_summary",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="json encode")
+        paths = [it["file_path"] for it in out]
+        assert paths[0] == "src/encoding/json/encode.go"
+        assert "encode_test.go" not in paths[:1]
+
+    def test_agent_items_dedupes_path_family(self):
+        items = [
+            {
+                "file_path": "include/spdlog/logger-inl.h",
+                "score": 0.95,
+                "match_source": "symbol_summary",
+            },
+            {
+                "file_path": "include/spdlog/logger.h",
+                "score": 0.90,
+                "match_source": "symbol_summary",
+            },
+            {
+                "file_path": "include/spdlog/async.h",
+                "score": 0.85,
+                "match_source": "symbol_summary",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="logger")
+        paths = [it["file_path"] for it in out]
+        assert sum(1 for p in paths if "logger" in p) == 1
+        assert "include/spdlog/async.h" in paths
+
     def test_resolve_nl_runs_related_similar_grep(self, monkeypatch):
         from app.config.settings import settings
 

@@ -221,7 +221,10 @@ class SearchResolveService:
                     channels_used.append(fb_channel)
 
         annotated = ResolveResultPresenter.annotate(fused_items)
-        agent_items, also_consider = ResolveResultPresenter.split_for_agent(annotated)
+        agent_items, also_consider = ResolveResultPresenter.split_for_agent(
+            annotated,
+            query=query,
+        )
         if agent_items:
             indexed_paths = await ExactMatchService.list_indexed_file_paths(repo_id)
             also_consider = DirSiblingExpander.expand(

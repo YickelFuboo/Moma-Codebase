@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import Dict, List, Optional
+import re
+from pathlib import PurePosixPath
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 
 class ResolveResultPresenter:
@@ -18,6 +20,53 @@ class ResolveResultPresenter:
         "mr_experience": "历史经验",
         "api": "公开接口",
     }
+
+    _TEST_PATH_MARKERS = (
+        "/test/",
+        "/tests/",
+        "/testing/",
+        "/__tests__/",
+        "_test.",
+        ".test.",
+        "_spec.",
+        ".spec.",
+        "/fixtures/",
+    )
+    _VENDOR_PATH_MARKERS = (
+        "/bundled/",
+        "/vendor/",
+        "/third_party/",
+        "/third-party/",
+        "/node_modules/",
+        "/external/",
+    )
+    _UMBRELLA_NAMES = {
+        "http.go",
+        "nng.c",
+        "index.js",
+        "express.js",
+        "main.go",
+        "main.c",
+        "main.cpp",
+        "common.h",
+        "common.hpp",
+        "types.h",
+        "util.go",
+        "utils.go",
+        "helpers.js",
+    }
+    _UMBRELLA_STEMS = {
+        "http",
+        "nng",
+        "common",
+        "util",
+        "utils",
+        "helpers",
+        "misc",
+        "base",
+    }
+    _FAMILY_SUFFIXES = ("-inl", "_inl", "-impl", "_impl", ".min", "-internal")
+    _TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+|[\u4e00-\u9fff]{2,}")
 
     @classmethod
     def why_for(cls, item: Dict[str, object]) -> str:
@@ -68,7 +117,136 @@ class ResolveResultPresenter:
         return str(it.get("symbol_name") or id(it))
 
     @classmethod
-    def _prefer_key(cls, it: Dict[str, object]) -> tuple:
+    def _normalize_path(cls, file_path: str) -> str:
+        return str(file_path or "").replace("\\", "/").strip()
+
+    @classmethod
+    def query_tokens(cls, query: str) -> List[str]:
+        """从查询抽取可用于路径/符号对齐的词元。"""
+        text = str(query or "").strip()
+        if not text:
+            return []
+        out: List[str] = []
+        seen: Set[str] = set()
+        for raw in cls._TOKEN_RE.findall(text):
+            tok = raw.strip().lower()
+            if len(tok) < 2:
+                continue
+            if tok in seen:
+                continue
+            seen.add(tok)
+            out.append(tok)
+            # res.json / app.use 类：保留点号前后已由 regex 切开
+            parts = re.findall(r"[a-z0-9]+", tok)
+            if len(parts) >= 2:
+                for p in parts:
+                    if len(p) >= 2 and p not in seen:
+                        seen.add(p)
+                        out.append(p)
+        return out
+
+    @classmethod
+    def path_noise_penalty(cls, file_path: str) -> int:
+        """路径噪声惩罚：越大越不该进 items 主列表。"""
+        fp = cls._normalize_path(file_path).lower()
+        if not fp:
+            return 0
+        pen = 0
+        if any(m in fp for m in cls._TEST_PATH_MARKERS):
+            pen += 40
+        name = PurePosixPath(fp).name
+        if name.endswith(("_test.go", "_test.py", "_test.c", "_test.cpp", "_test.js")):
+            pen += 40
+        if name.startswith("test_") and name.endswith((".py", ".go", ".js")):
+            pen += 30
+        if any(m in fp for m in cls._VENDOR_PATH_MARKERS):
+            pen += 35
+        if name in cls._UMBRELLA_NAMES:
+            pen += 12
+        stem = PurePosixPath(fp).stem.lower()
+        if stem in cls._UMBRELLA_STEMS:
+            pen += 6
+        return pen
+
+    @classmethod
+    def path_family_key(cls, file_path: str) -> str:
+        """同实现族（如 logger.h / logger-inl.h）归并键。"""
+        fp = cls._normalize_path(file_path)
+        if not fp:
+            return ""
+        path = PurePosixPath(fp)
+        stem = path.stem.lower()
+        for suf in cls._FAMILY_SUFFIXES:
+            if stem.endswith(suf):
+                stem = stem[: -len(suf)]
+                break
+        parent = str(path.parent).replace("\\", "/")
+        return f"{parent}/{stem}"
+
+    _QUERY_PATH_ALIASES = {
+        "res": "response",
+        "req": "request",
+        "app": "application",
+    }
+
+    @classmethod
+    def _ident_parts(cls, text: str) -> List[str]:
+        return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+    @classmethod
+    def _token_hits_text(cls, tok: str, text: str) -> bool:
+        """词元命中标识符片段；避免 res⊂express 这类误伤。"""
+        if not tok or not text:
+            return False
+        parts = cls._ident_parts(text)
+        if tok in parts:
+            return True
+        alias = cls._QUERY_PATH_ALIASES.get(tok)
+        if alias and alias in parts:
+            return True
+        # 前缀：res→response，要求词元足够长且目标不是更长无关词
+        if len(tok) >= 3:
+            for p in parts:
+                if p.startswith(tok) and len(p) - len(tok) <= 10:
+                    return True
+        return False
+
+    @classmethod
+    def query_relevance(cls, it: Dict[str, object], query: str) -> int:
+        """查询与路径/符号的对齐分；越高越应进入 items。"""
+        tokens = cls.query_tokens(query)
+        if not tokens:
+            if it.get("nl_token_hit") or it.get("nl_alias_hit"):
+                return 2
+            return 0
+        fp = cls._normalize_path(str(it.get("file_path") or "")).lower()
+        symbol = str(it.get("symbol_name") or "").strip().lower()
+        title = str(it.get("title") or it.get("pattern_title") or "").strip().lower()
+        stem = PurePosixPath(fp).stem.lower() if fp else ""
+        name = PurePosixPath(fp).name.lower() if fp else ""
+        score = 0
+        for tok in tokens:
+            if symbol and (tok == symbol or tok in cls._ident_parts(symbol)):
+                score += 8
+            elif symbol and cls._token_hits_text(tok, symbol):
+                score += 5
+            if stem and (tok == stem or cls._QUERY_PATH_ALIASES.get(tok) == stem):
+                score += 7
+            elif name and cls._token_hits_text(tok, name):
+                score += 4
+            elif cls._token_hits_text(tok, fp) or cls._token_hits_text(tok, title):
+                score += 2
+        if it.get("nl_token_hit") or it.get("nl_alias_hit"):
+            score += 3
+        return score
+
+    @classmethod
+    def _prefer_key(
+        cls,
+        it: Dict[str, object],
+        *,
+        query: str = "",
+    ) -> Tuple[int, int, int, float]:
         source = str(it.get("match_source") or "")
         tier = str(it.get("exact_tier") or "")
         score = float(it.get("score") or it.get("quality_score") or it.get("similarity") or 0)
@@ -90,32 +268,81 @@ class ResolveResultPresenter:
             band = 6
         else:
             band = 7
-        return (band, -score)
+        penalty = cls.path_noise_penalty(str(it.get("file_path") or ""))
+        relevance = cls.query_relevance(it, query)
+        # 强查询对齐可抬升档位，避免 exact 噪声压住真正相关的符号摘要命中
+        if relevance >= 10:
+            band = min(band, 0)
+        elif relevance >= 7:
+            band = min(band, 1)
+        elif relevance >= 4:
+            band = min(band, 2)
+        if relevance >= 7 and penalty > 0:
+            penalty = max(0, penalty - 8)
+        # 弱相关的伞文件额外惩罚
+        name = PurePosixPath(cls._normalize_path(str(it.get("file_path") or ""))).name.lower()
+        if name in cls._UMBRELLA_NAMES and relevance < 4:
+            penalty += 10
+        return (band, penalty, -relevance, -score)
 
     @classmethod
-    def agent_items(cls, items: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    def _ordered_items(
+        cls,
+        items: Sequence[Dict[str, object]],
+        *,
+        query: str = "",
+    ) -> List[Dict[str, object]]:
+        return sorted(items, key=lambda it: cls._prefer_key(it, query=query))
+
+    @classmethod
+    def _pick_primary(
+        cls,
+        ordered: Sequence[Dict[str, object]],
+        *,
+        limit: int,
+        skip_keys: Optional[Set[str]] = None,
+    ) -> List[Dict[str, object]]:
+        """按序挑主列表，同实现族只留一条。"""
+        primary: List[Dict[str, object]] = []
+        seen: Set[str] = set(skip_keys or ())
+        seen_families: Set[str] = set()
+        for it in ordered:
+            k = cls._item_key(it)
+            if not k or k in seen:
+                continue
+            fam = cls.path_family_key(str(it.get("file_path") or ""))
+            if fam and fam in seen_families:
+                continue
+            seen.add(k)
+            if fam:
+                seen_families.add(fam)
+            primary.append(it)
+            if len(primary) >= limit:
+                break
+        return primary
+
+    @classmethod
+    def agent_items(
+        cls,
+        items: List[Dict[str, object]],
+        *,
+        query: str = "",
+    ) -> List[Dict[str, object]]:
         """对外最多 Top3；精确命中优先；若有兜底条，强制占 1 席。"""
         limit = cls.AGENT_ITEM_LIMIT
         if not items:
             return []
 
-        ordered = sorted(items, key=cls._prefer_key)
+        ordered = cls._ordered_items(items, query=query)
         fallback = next((it for it in ordered if it.get("fallback")), None)
         if fallback is None:
-            return list(ordered[:limit])
+            return cls._pick_primary(ordered, limit=limit)
 
-        primary: List[Dict[str, object]] = []
-        seen = {cls._item_key(fallback)}
-        for it in ordered:
-            if it.get("fallback"):
-                continue
-            k = cls._item_key(it)
-            if k in seen:
-                continue
-            seen.add(k)
-            primary.append(it)
-            if len(primary) >= max(0, limit - 1):
-                break
+        primary = cls._pick_primary(
+            [it for it in ordered if not it.get("fallback")],
+            limit=max(0, limit - 1),
+            skip_keys={cls._item_key(fallback)},
+        )
         return primary + [fallback]
 
     @classmethod
@@ -123,12 +350,14 @@ class ResolveResultPresenter:
         cls,
         items: List[Dict[str, object]],
         primary: List[Dict[str, object]],
+        *,
+        query: str = "",
     ) -> List[Dict[str, object]]:
         """主列表之外的融合候选，供 Agent 防漏扫路径（默认不带 snippet）。"""
         if not items:
             return []
         primary_keys = {cls._item_key(it) for it in primary}
-        ordered = sorted(items, key=cls._prefer_key)
+        ordered = cls._ordered_items(items, query=query)
         out: List[Dict[str, object]] = []
         seen: set[str] = set()
         for it in ordered:
@@ -145,9 +374,11 @@ class ResolveResultPresenter:
     def split_for_agent(
         cls,
         items: List[Dict[str, object]],
+        *,
+        query: str = "",
     ) -> tuple[List[Dict[str, object]], List[Dict[str, object]]]:
-        primary = cls.agent_items(items)
-        also = cls.also_consider_items(items, primary)
+        primary = cls.agent_items(items, query=query)
+        also = cls.also_consider_items(items, primary, query=query)
         return primary, also
 
     @classmethod
