@@ -53,4 +53,8 @@
 }
 ```
 
-稳定 `error.code`：`repo_not_found` | `permission_denied` | `business_error` | `timeout` | `system_error`。
+稳定 `error.code`：`repo_not_found` | `permission_denied` | `business_error` | `timeout` | `system_error` | `index_not_ready`。
+
+`index_not_ready`：`search resolve` 在目标仓尚无可搜索文件时返回（勿当「代码里没有」）；`error.details` 可含 `hint` / `stale_hint` / `status_message`。建议先 `mcb setup` 或 `mcb analyze status`。
+
+resolve 单通道超时由 `RESOLVE_CHANNEL_TIMEOUT_MS`（默认 120000）控制：超时只记入 `channel_errors`，其它通道仍融合（部分成功）。

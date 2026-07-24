@@ -842,6 +842,12 @@ class AnalysisService:
             "enrichment_pending": embedded > 0,
             "scan_active_in_process": in_memory_scan,
         }
+        status_message, next_action = AnalysisService._build_status_message(
+            analysis_summary=analysis_summary,
+            scan=scan,
+            stale_reasons=stale_reasons,
+            index_age_seconds=index_age_seconds,
+        )
         return {
             "repo_id": repo_id,
             "scan": scan,
@@ -849,6 +855,8 @@ class AnalysisService:
             "index_age_seconds": index_age_seconds,
             "stale": bool(stale_reasons),
             "stale_hint": "; ".join(stale_reasons) if stale_reasons else None,
+            "status_message": status_message,
+            "next_action": next_action,
             "incremental_scan": {
                 "enabled": bool(settings.enable_incremental_scan),
                 "interval_sec": int(settings.incremental_scan_interval_sec),
@@ -865,6 +873,53 @@ class AnalysisService:
                 for row in fail_rows
             ],
         }
+
+    @staticmethod
+    def _build_status_message(
+        *,
+        analysis_summary: Dict[str, object],
+        scan: Dict[str, object],
+        stale_reasons: List[str],
+        index_age_seconds: Optional[int],
+    ) -> tuple[str, str]:
+        """给人话进度与下一步动作；再次 analyze 会继续补 pending/failed。"""
+        searchable = bool(analysis_summary.get("searchable"))
+        searchable_files = int(analysis_summary.get("searchable_files") or 0)
+        pending = int(analysis_summary.get("pending_files") or 0)
+        running = int(analysis_summary.get("running_files") or 0)
+        failed = int(analysis_summary.get("failed_files") or 0)
+        embedded = int(analysis_summary.get("embedded_files") or 0)
+        scan_status = str(scan.get("scan_status") or "")
+        in_memory = bool(analysis_summary.get("scan_active_in_process"))
+
+        if not searchable and (scan_status == RepoAnalysisStatus.RUNNING.value or in_memory or running > 0 or pending > 0):
+            msg = (
+                f"索引构建中：已可搜 {searchable_files}，待处理 {pending}，"
+                f"运行中 {running}，失败 {failed}。"
+                "中断后再次 analyze 会继续补 pending/failed，无需清空重来。"
+            )
+            return msg, "等待可检索后执行 search resolve；可用 analyze status 轮询"
+        if not searchable:
+            msg = (
+                f"尚不可检索（searchable_files={searchable_files}）。"
+                f"scan_status={scan_status or 'unknown'}；失败文件 {failed}。"
+            )
+            return msg, "执行 mcb analyze --path <仓> 或 mcb setup --path <仓>"
+        if pending > 0 or running > 0 or embedded > 0:
+            msg = (
+                f"已可检索（{searchable_files} 文件），仍有未完成："
+                f"pending={pending}, running={running}, embedded={embedded}, failed={failed}。"
+                "再次 analyze 只补缺口，不丢已入库结果。"
+            )
+            return msg, "可先 search resolve；若命中偏旧再等分析完成或重新 analyze"
+        if stale_reasons:
+            age = f"，索引约 {index_age_seconds}s 前更新" if index_age_seconds is not None else ""
+            msg = f"可检索（{searchable_files} 文件）但索引可能过期{age}：{'; '.join(stale_reasons)}。"
+            return msg, "改完代码若感觉飘，先 analyze 再 resolve"
+        return (
+            f"索引可检索（{searchable_files} 文件）。参考加速，非精确全库索引。",
+            "可执行 search resolve",
+        )
 
     @staticmethod
     async def get_scan_status(

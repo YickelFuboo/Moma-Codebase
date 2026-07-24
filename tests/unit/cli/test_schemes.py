@@ -61,6 +61,16 @@ class TestResponseScheme:
             == ErrorCode.REPO_NOT_FOUND
         )
 
+    def test_classify_index_not_ready(self):
+        assert (
+            ResponseScheme.classify_click_message("索引未就绪：无可搜索文件")
+            == ErrorCode.INDEX_NOT_READY
+        )
+        assert (
+            ResponseScheme.classify_click_message("索引仍在构建中，尚无可搜索文件")
+            == ErrorCode.INDEX_NOT_READY
+        )
+
     def test_exit_codes_stable(self):
         assert ExitCode.OK == 0
         assert ExitCode.BUSINESS == 2

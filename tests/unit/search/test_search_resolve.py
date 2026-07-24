@@ -119,6 +119,13 @@ class TestSearchIntentRouter:
 
 
 class TestSearchResolveService:
+    @pytest.fixture(autouse=True)
+    def _skip_readiness_gate(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.ResolveReadiness.ensure_searchable",
+            AsyncMock(return_value={"analysis_summary": {"searchable": True}}),
+        )
+
     def test_resolve_related_channel(self, monkeypatch):
         from app.config.settings import settings
 
@@ -632,3 +639,76 @@ class TestSearchResolveService:
         assert "grep" in used
         assert result["items"][0]["file_path"] == "memory.py"
         assert result["items"][0]["match_source"] == "exact"
+
+    def test_channel_timeout_partial_success(self, monkeypatch):
+        """单通道超时不拖垮整次 resolve，其它通道仍融合。"""
+        from app.config.settings import settings
+
+        monkeypatch.setattr(settings, "resolve_channel_timeout_ms", 50)
+        monkeypatch.setattr(settings, "code_analysis_symbol_summary_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_content_grep_enabled", True)
+        monkeypatch.setattr(settings, "code_analysis_related_include_graph", False)
+
+        class _Repo:
+            id = "r1"
+            kind = "code"
+
+        class _CM:
+            async def __aenter__(self):
+                db = AsyncMock()
+                db.scalar = AsyncMock(return_value=_Repo())
+                return db
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.get_db_session",
+            lambda: _CM(),
+        )
+        monkeypatch.setattr(
+            "app.repo_analysis.services.search_resolve.resolve_service.SearchIndexMeta.for_repo",
+            AsyncMock(return_value={}),
+        )
+
+        async def _slow_similar(*args, **kwargs):
+            await asyncio.sleep(0.2)
+            return {"total": 0, "items": []}
+
+        async def _run():
+            with patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_related_files",
+                AsyncMock(
+                    return_value={
+                        "total": 1,
+                        "items": [
+                            {
+                                "file_path": "ok.py",
+                                "score": 1.0,
+                                "match_source": "exact",
+                            }
+                        ],
+                    }
+                ),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchService.search_similar_code",
+                AsyncMock(side_effect=_slow_similar),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.SearchResolveService._run_grep_channel",
+                AsyncMock(return_value={"total": 0, "items": []}),
+            ), patch(
+                "app.repo_analysis.services.search_resolve.resolve_service.ExactMatchService.list_indexed_file_paths",
+                AsyncMock(return_value=["ok.py"]),
+            ):
+                return await SearchResolveService.resolve(
+                    "r1",
+                    "定位 ok",
+                    intent="auto",
+                    top_k=5,
+                )
+
+        result = asyncio.run(_run())
+        assert result["items"][0]["file_path"] == "ok.py"
+        assert "similar" in (result.get("channel_errors") or {})
+        assert "related" in (result.get("channels_used") or [])

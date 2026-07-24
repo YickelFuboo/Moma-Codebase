@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import os
 import sys
 from typing import Any, Dict, List
@@ -23,6 +24,7 @@ class DoctorService:
         checks.append(await cls._check_database())
         checks.append(cls._check_vector_store())
         checks.append(cls._check_codegraph())
+        checks.append(await cls._check_embedding())
         checks.append(await cls._check_repos())
         ok = all(c.get("ok") for c in checks)
         return {
@@ -123,6 +125,49 @@ class DoctorService:
             row["ok"] = bool(cli)
             if not cli:
                 row["message"] = "未找到 codegraph CLI（交互模式启动时会尝试安装）"
+            return row
+        except Exception as exc:
+            row["ok"] = False
+            row["message"] = str(exc)
+            return row
+
+    @staticmethod
+    async def _check_embedding() -> Dict[str, Any]:
+        """实调一条极短 embed，避免 analyze/resolve 跑到一半才发现模型不可用。"""
+        from app.infrastructure.llms import embedding_factory
+
+        timeout_ms = int(settings.doctor_embed_probe_timeout_ms or 15000)
+        row: Dict[str, Any] = {
+            "name": "embedding",
+            "timeout_ms": timeout_ms,
+        }
+        try:
+            model = embedding_factory.create_model()
+            if not model:
+                row["ok"] = False
+                row["message"] = "embedding 模型不可用（未配置默认模型）"
+                return row
+            row["provider"] = getattr(model, "model_provider", None)
+            row["model"] = getattr(model, "model_name", None)
+
+            async def _probe():
+                vectors, tokens = await model.encode(["mcb doctor probe"])
+                return vectors, tokens
+
+            vectors, tokens = await asyncio.wait_for(
+                _probe(),
+                timeout=max(1.0, timeout_ms / 1000.0),
+            )
+            dim = int(len(vectors[0])) if vectors is not None and len(vectors) > 0 else 0
+            row["ok"] = dim > 0
+            row["dim"] = dim
+            row["tokens"] = int(tokens or 0)
+            if dim <= 0:
+                row["message"] = "embedding 返回空向量"
+            return row
+        except asyncio.TimeoutError:
+            row["ok"] = False
+            row["message"] = f"embedding 探测超时（{timeout_ms} ms），可稍后重试或检查模型服务"
             return row
         except Exception as exc:
             row["ok"] = False

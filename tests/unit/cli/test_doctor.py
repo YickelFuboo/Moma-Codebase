@@ -29,6 +29,12 @@ class TestDoctorService:
                 return_value={"name": "codegraph", "ok": True},
             ), patch.object(
                 DoctorService,
+                "_check_embedding",
+                new=AsyncMock(
+                    return_value={"name": "embedding", "ok": True, "dim": 8}
+                ),
+            ), patch.object(
+                DoctorService,
                 "_check_repos",
                 new=AsyncMock(
                     return_value={"name": "registered_repos", "ok": True, "total": 0}
@@ -38,4 +44,4 @@ class TestDoctorService:
 
         out = asyncio.run(_run())
         assert out["ok"] is True
-        assert len(out["checks"]) == 5
+        assert len(out["checks"]) == 6

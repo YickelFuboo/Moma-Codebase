@@ -181,6 +181,18 @@ class Settings(BaseSettings):
         env="ENABLE_INCREMENTAL_SCAN",
     )
     incremental_scan_interval_sec: int = Field(default=300, ge=30, description="增量扫描间隔（秒）", env="INCREMENTAL_SCAN_INTERVAL_SEC")
+    resolve_channel_timeout_ms: int = Field(
+        default=120000,
+        ge=0,
+        description="resolve 单通道超时毫秒；0=不限制。超时只丢该通道，其它通道仍融合",
+        env="RESOLVE_CHANNEL_TIMEOUT_MS",
+    )
+    doctor_embed_probe_timeout_ms: int = Field(
+        default=15000,
+        ge=1000,
+        description="doctor/setup 探测 embedding 的超时毫秒",
+        env="DOCTOR_EMBED_PROBE_TIMEOUT_MS",
+    )
 
     class Config:
         env_file = "env"

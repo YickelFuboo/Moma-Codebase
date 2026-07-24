@@ -842,7 +842,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 | 套件                                     | 结果                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------ |
 | `tests/unit/search/nl2code_enhance/` 等 | **84 passed**（完备性收口时）                                                    |
-| 真仓七档消融                                 | 见 **§5.12**（新 GT：Pando 22 / KB 17 / Go 32 / Django 33；**产品默认 B**；含仅 Chunk 基线 A） |
+| 真仓七档消融                                 | 见 **§5.12**（七仓：Pando22 / KB17 / Go32 / Django33 / HCL32 / NNG32 / spdlog32；**产品默认 B**） |
 
 
 ---
@@ -871,14 +871,14 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 
 
 
-### 5.12 整体配置开关对比测试（四仓 + 本仓 related）
+### 5.12 整体配置开关对比测试（七仓 + 本仓 related）
 
-日期：**2026-07-23**（Qwen3-Embedding-8B 清库重测 KB/Go/Django 的 A/B/E/F/G；Pando A=仅 Chunk 同日补测；Pando B/E 取 8B 重建评测；C/D 与部分 Pando 档沿用 07-22 newgt 映射）。  
-日志：`tests/output/.tmp_three_repo_adefg_8b.log` / `tests/output/.tmp_kb_adefg_8b_rerun.log` / `tests/output/.tmp_pando_A_chunk.log`；明细 `tests/output/.tmp_{kb,go,django}_ablation_8b_adefg.md`。
+日期：**2026-07-24**（中型开源三仓 HCL/NNG/spdlog 新 GT×32、A–G 全量；`RESOLVE_CHANNEL_TIMEOUT_MS=0` 消融跑批）。前四仓沿用 **2026-07-23** 8B 结果（C/D 与部分 Pando 档由 07-22 newgt 映射）。  
+日志：`tests/output/.tmp_mid_oss_abcdefg.log`；明细 `tests/output/.tmp_{hcl,nng,spdlog}_ablation_newgt.md`（及既有 `.tmp_{kb,go,django}_ablation_8b_adefg.md`）。
 
 **档位重标号（相对旧版）**：旧 G→**A**，旧 A→**B**，旧 B→**C**，旧 C→**D**，旧 D→**E**，旧 E→**F**，旧 F→**G**。
 
-四仓 resolve 消融共用七档 **A–G**：
+七仓 resolve 消融共用七档 **A–G**：
 
 
 | 档           | 符号摘要 | NL2Code | NL_REWRITE   | 短标签          |
@@ -908,31 +908,34 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 
 
 
-| 仓                         | 角色          | 分析范围                         | resolve/related 案数                 | 档位覆盖       | 脚本                                                 |
-| ------------------------- | ----------- | ---------------------------- | ---------------------------------- | ---------- | -------------------------------------------------- |
-| **Pando-Agent**           | 业务 Agent 真仓 | `app/`                       | **22** resolve                     | A–G        | `tests.scenarios.pando_agent.run_nl2code_ablation` |
-| **KnowledegBase-Service** | 第二业务真仓      | 全仓 `app/` 等                  | **17** resolve                     | A–G        | `tests.scenarios.knowledge_base.run_resolve_eval`  |
-| **Go（开源）**                | 大仓多包        | `src` 下 net+encoding+context | **32** resolve                     | A–G        | `tests.scenarios.go_oss.run_resolve_eval`          |
-| **Django（开源）**            | 大仓整包        | `django/`                    | **33** resolve                     | A–G        | `tests.scenarios.django_oss.run_resolve_eval`      |
-| **本仓 Moma-CodeBase**      | 框架回归        | 本仓 `app/`                    | **11** related（+ similar/graph 另计） | related 场景 | `tests.scenarios.vector_related` 等                 |
+| 仓                         | 主要语言 | 角色          | 分析范围                         | resolve/related 案数                 | 档位覆盖       | 脚本                                                 |
+| ------------------------- | ---- | ----------- | ---------------------------- | ---------------------------------- | ---------- | -------------------------------------------------- |
+| **Pando-Agent**           | Python | 业务 Agent 真仓 | `app/`                       | **22** resolve                     | A–G        | `tests.scenarios.pando_agent.run_nl2code_ablation` |
+| **KnowledegBase-Service** | Python | 第二业务真仓      | 全仓 `app/` 等                  | **17** resolve                     | A–G        | `tests.scenarios.knowledge_base.run_resolve_eval`  |
+| **Go（开源）**                | Go | 大仓多包        | `src` 下 net+encoding+context | **32** resolve                     | A–G        | `tests.scenarios.go_oss.run_resolve_eval`          |
+| **Django（开源）**            | Python | 大仓整包        | `django/`                    | **33** resolve                     | A–G        | `tests.scenarios.django_oss.run_resolve_eval`      |
+| **HCL（开源）**               | Go | 中型 Go 库     | 全仓                           | **32** resolve                     | A–G        | `tests.scenarios.hcl_oss` / `mid_oss.run_be_eval`  |
+| **NNG（开源）**               | C | 中型 C 库      | 全仓                           | **32** resolve                     | A–G        | `tests.scenarios.nng_oss` / `mid_oss.run_be_eval`  |
+| **spdlog（开源）**            | C++ | 中型 C++ 头库   | 全仓                           | **32** resolve                     | A–G        | `tests.scenarios.spdlog_oss` / `mid_oss.run_be_eval` |
+| **本仓 Moma-CodeBase**      | Python | 框架回归        | 本仓 `app/`                    | **11** related（+ similar/graph 另计） | related 场景 | `tests.scenarios.vector_related` 等                 |
 
 
-GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`。
+GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`。中型三仓配比均为 sym8 / sym_nl6 / nl10 / similar5 / hard3。
 
-#### 四仓结果总表（resolve，新 GT：Pando22 / KB17 / Go32 / Django33）
+#### 七仓结果总表（resolve）
 
 仓内效果序（同仓 A–G）：主序 **pass**，同 pass 比 **avg iR**，再比 **avg uR**；并列则按档位字母。单元格末尾 **①最好 → ⑦最弱**。
 
 
-| 档       | 短标签          | Pando 22          | KB 17              | Go 32†            | Django 33         |
-| ------- | ------------ | ----------------- | ------------------ | ----------------- | ----------------- |
-| **A**   | 仅Chunk        | 59%/86% · 13/22 ⑦ | 35%/76% · 6/17 ⑦   | 19%/56% · 7/32 ⑦  | 24%/64% · 8/33 ⑦  |
-| **B** ★ | 符号           | 86%/91% · 19/22 ④ | 71%/88% · 12/17 ④  | 58%/89% · 20/32 ② | 85%/98% · 28/33 ① |
-| **C**   | NL           | 70%/95% · 16/22 ⑥ | 82%/94% · 14/17 ①  | 31%/58% · 11/32 ⑥ | 40%/78% · 14/33 ⑤ |
-| **D**   | NL+always    | 80%/91% · 18/22 ⑤ | 65%/82% · 11/17 ⑥  | 39%/66% · 14/32 ⑤ | 36%/68% · 12/33 ⑥ |
-| **E**   | 符号+NL        | 91%/95% · 20/22 ② | 71%/88% · 12/17 ⑤  | 58%/78% · 20/32 ③ | 73%/95% · 24/33 ④ |
-| **F**   | 符号+NL+always | 93%/95% · 21/22 ① | 76%/94% · 13/17 ③  | 61%/88% · 20/32 ① | 80%/97% · 27/33 ② |
-| **G**   | 符号+NL+weak   | 89%/95% · 20/22 ③ | 76%/100% · 13/17 ② | 58%/78% · 20/32 ④ | 74%/94% · 25/33 ③ |
+| 档       | 短标签          | Pando 22          | KB 17              | Go 32†            | Django 33         | HCL 32            | NNG 32            | spdlog 32         |
+| ------- | ------------ | ----------------- | ------------------ | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| **A**   | 仅Chunk        | 59%/86% · 13/22 ⑦ | 35%/76% · 6/17 ⑦   | 19%/56% · 7/32 ⑦  | 24%/64% · 8/33 ⑦  | 24%/59% · 9/32 ⑦  | 40%/60% · 20/32 ⑥ | 14%/45% · 7/32 ⑦  |
+| **B** ★ | 符号           | 86%/91% · 19/22 ④ | 71%/88% · 12/17 ④  | 58%/89% · 20/32 ② | 85%/98% · 28/33 ① | 58%/77% · 21/32 ④ | 55%/80% · 24/32 ① | 41%/71% · 18/32 ① |
+| **C**   | NL           | 70%/95% · 16/22 ⑥ | 82%/94% · 14/17 ①  | 31%/58% · 11/32 ⑥ | 40%/78% · 14/33 ⑤ | 43%/54% · 16/32 ⑥ | 54%/66% · 23/32 ④ | 34%/52% · 15/32 ② |
+| **D**   | NL+always    | 80%/91% · 18/22 ⑤ | 65%/82% · 11/17 ⑥  | 39%/66% · 14/32 ⑤ | 36%/68% · 12/33 ⑥ | 48%/73% · 18/32 ⑤ | 43%/67% · 18/32 ⑦ | 27%/50% · 12/32 ⑥ |
+| **E**   | 符号+NL        | 91%/95% · 20/22 ② | 71%/88% · 12/17 ⑤  | 58%/78% · 20/32 ③ | 73%/95% · 24/33 ④ | 54%/74% · 22/32 ③ | 53%/70% · 24/32 ③ | 31%/69% · 15/32 ③ |
+| **F**   | 符号+NL+always | 93%/95% · 21/22 ① | 76%/94% · 13/17 ③  | 61%/88% · 20/32 ① | 80%/97% · 27/33 ② | 58%/81% · 23/32 ① | 45%/61% · 20/32 ⑤ | 31%/62% · 14/32 ④ |
+| **G**   | 符号+NL+weak   | 89%/95% · 20/22 ③ | 76%/100% · 13/17 ② | 58%/78% · 20/32 ④ | 74%/94% · 25/33 ③ | 56%/77% · 23/32 ② | 53%/72% · 24/32 ② | 27%/66% · 12/32 ⑤ |
 
 
 仓内效果序一览：
@@ -944,25 +947,28 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 | KB     | C   | G   | F   | B   | E   | D   | A   |
 | Go     | F   | B   | E   | G   | D   | C   | A   |
 | Django | B   | F   | G   | E   | C   | D   | A   |
+| HCL    | F   | G   | E   | B   | D   | C   | A   |
+| NNG    | B   | G   | E   | C   | F   | A   | D   |
+| spdlog | B   | C   | E   | F   | G   | D   | A   |
 
 
-（口径：avg iR / avg uR · pass。KB/Go/Django 的 A/B/E/F/G 与 Pando A/B/E 为 07-23 8B；C/D 及 Pando F/G 由 07-22 newgt 按重标号映射。）  
+（口径：avg iR / avg uR · pass。前四仓为 07-23 8B；HCL/NNG/spdlog 为 07-24，timeout=0。）  
 † Go：**net/encoding/context** 三包子集。
 
-#### 四仓档位平均耗时（ms / 次 resolve）
+#### 七仓档位平均耗时（ms / 次 resolve）
 
 仓内速度序：**①最快 → ⑦最慢**（数字越小越好）。
 
 
-| 档       | Pando  | KB     | Go     | Django |
-| ------- | ------ | ------ | ------ | ------ |
-| **A**   | ① 6.2k | ① 2.9k | ① 6.6k | ① 6.2k |
-| **B** ★ | ② 8.7k | ② 7.0k | ③ 18k  | ③ 19k  |
-| **C**   | ④ 13k  | ③ 8k   | ② 14k  | ② 11k  |
-| **D**   | ⑤ 68k  | ⑦ 144k | ⑦ 95k  | ⑥ 58k  |
-| **E**   | ③ 13k  | ④ 9.5k | ④ 24k  | ④ 23k  |
-| **F**   | ⑦ 116k | ⑤ 54k  | ⑥ 69k  | ⑦ 68k  |
-| **G**   | ⑥ 70k  | ⑥ 80k  | ⑤ 28k  | ⑤ 49k  |
+| 档       | Pando  | KB     | Go     | Django | HCL    | NNG    | spdlog |
+| ------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| **A**   | ① 6.2k | ① 2.9k | ① 6.6k | ① 6.2k | ① 4.4k | ① 5.9k | ② 6.5k |
+| **B** ★ | ② 8.7k | ② 7.0k | ③ 18k  | ③ 19k  | ③ 9.3k | ③ 9.2k | ④ 11k  |
+| **C**   | ④ 13k  | ③ 8k   | ② 14k  | ② 11k  | ② 9.3k | ④ 13k  | ① 4.5k |
+| **D**   | ⑤ 68k  | ⑦ 144k | ⑦ 95k  | ⑥ 58k  | ⑥ 56k  | ⑦ 87k  | ⑦ 48k  |
+| **E**   | ③ 13k  | ④ 9.5k | ④ 24k  | ④ 23k  | ④ 16k  | ② 8.2k | ③ 10k  |
+| **F**   | ⑦ 116k | ⑤ 54k  | ⑥ 69k  | ⑦ 68k  | ⑦ 82k  | ⑥ 68k  | ⑥ 42k  |
+| **G**   | ⑥ 70k  | ⑥ 80k  | ⑤ 28k  | ⑤ 49k  | ⑤ 17k  | ⑤ 38k  | ⑤ 24k  |
 
 
 仓内速度序一览：
@@ -974,29 +980,35 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 | KB     | A   | B   | C   | E   | F   | G   | D   |
 | Go     | A   | C   | B   | E   | G   | F   | D   |
 | Django | A   | C   | B   | E   | G   | D   | F   |
+| HCL    | A   | C   | B   | E   | G   | D   | F   |
+| NNG    | A   | E   | B   | C   | G   | F   | D   |
+| spdlog | C   | A   | E   | B   | G   | F   | D   |
 
 
-每用例 × 档位耗时见：`tests/output/.tmp_kb_ablation_8b_adefg.md` / `tests/output/.tmp_go_ablation_8b_adefg.md` / `tests/output/.tmp_django_ablation_8b_adefg.md`（及历史 `tests/output/.tmp_*_ablation_newgt.md`）。
+每用例 × 档位耗时见：`tests/output/.tmp_{hcl,nng,spdlog}_ablation_newgt.md` / `.tmp_{kb,go,django}_ablation_8b_adefg.md`。
 
 #### B vs E 专项（决定默认值）
 
-争议点：总表上 Pando 的 E（符号+NL）略高于 B（20/22 vs 19/22），是否应默认 E？对中国区是否必须开 NL2Code？
+争议点：总表上部分仓 E（符号+NL）略高于或接近 B，是否应默认 E？对中国区是否必须开 NL2Code？
 
-**1）按** `case_kind` **看 B/E（pass）**（沿用 07-22 分型结论，标签已重映射）
-
-
-| 仓          | nl  | hard     | 其它 NL 向结论     |
-| ---------- | --- | -------- | ------------- |
-| Pando / KB | B=E | B=E      | **无 pass 翻转** |
-| Go         | E 略好 | E 略好     | 仅个别条 E 赢      |
-| Django     | B=E | **B 更好** | sym_nl / hard 上 E 偶发把 B 搞挂 |
+**1）按** `case_kind` **看 B/E（pass）**（前四仓沿用 07-22 分型；中型三仓为 07-24）
 
 
-→ 分类型后 **没有稳定的「非符号问法上 E 系统性优于 B」**。
+| 仓          | nl / hard 向结论 |
+| ---------- | ------------- |
+| Pando / KB | B=E，**无 pass 翻转** |
+| Go         | E 略好（个别条） |
+| Django     | hard 上 **B 更好**；E 偶发搞挂 |
+| HCL        | E pass 略高（22 vs 21），差距很小 |
+| NNG        | B=E（24/32），B 的 iR/uR 更好 |
+| spdlog     | **B 明显更好**（18 vs 15） |
+
+
+→ 分类型 / 跨仓后 **没有稳定的「E 系统性优于 B」**；中型 C++ 头仓上 B 反而更稳。
 
 **2）纯中文子集（无拉丁字母，中国区最相关）**
 
-四仓合计 **19** 条纯中文（如 `鉴权在哪`、`知识库服务在哪`、`用户认证在哪`、`登录`、`路由`）：
+前四仓合计 **19** 条纯中文：
 
 
 | 指标                   | B         | E         |
@@ -1008,23 +1020,25 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 仅 2 条出现 **uR** 软差异（答案进 `also_consider`，仍不算 pass）：KB `文档解析在哪`、Django `用户认证在哪`。  
 → **以 items/pass 为准，纯中文上对比不出 B、E 效果差**；NL2Code（E 相对 B 多开的部分）**没有把这些中文问抬进 items**。
 
+中型三仓纯 NL 上 B 仍偏弱（答案常进 also_consider 或漂到噪声路径），但 E 也未形成稳定翻盘（HCL 仅 +1 pass；spdlog E 更差）。
+
 **3）延迟**
 
-同仓速度序上 B 恒快于 E（约 0.5～0.8×）；F/G 因 LLM 改写可再慢一个数量级。A（仅 Chunk）最快但准度最差。
+多数仓速度序上 B 不慢于 E；F/G/D 因 LLM 改写可再慢一个数量级。A（仅 Chunk）最快但准度最差。
 
 **4）F 慢的原因（排除作默认）**
 
 `rewrite_mode=always` → 凡 `looks_like_nl` **先打一轮 LLM 改写再检索**，再叠加更多 embed 视角；墙钟常到几十秒～数分钟。G（weak）仅弱召回才改写，仍明显贵于 B/E。
 
-#### 产品默认选型逻辑（2026-07-23 起 = **B**）
+#### 产品默认选型逻辑（2026-07-23 起 = **B**；07-24 七仓复核仍成立）
 
 决策顺序：
 
-1. **先保证符号通道**：仅 Chunk 的 A 与无符号的 C/D 在四仓上明显弱 → 默认必须 **symbol ON**（排除 A/C/D）。
+1. **先保证符号通道**：仅 Chunk 的 A 与无符号的 C/D 在多数仓上明显弱 → 默认必须 **symbol ON**（排除 A/C/D）。例外：KB 的 C、spdlog 的 C 可冲高，但不跨仓稳定。
 2. **在有符号的 B/E/F/G 中比收益/成本**：
-  - F：准度常①，但延迟⑦ → **不默认**。  
-  - G：KB 可②，但平均延迟远高于 B/E → **不默认**；难例可开。  
-  - E vs B：总表接近；分类型无稳定 E 胜；**19 条纯中文 pass 全平**；E 更慢 → **不默认开 NL2Code**。
+  - F：HCL/Pando/Go 可①，但延迟常⑦ → **不默认**。  
+  - G：延迟远高于 B/E → **不默认**；难例可开。  
+  - E vs B：总表接近或互有胜负；**纯中文前四仓全平**；中型三仓无稳定 E 胜；E 往往更慢或差不多 → **不默认开 NL2Code**。
 3. **落点 B**：`SYMBOL_SUMMARY=ON` + `NL_TO_CODE=OFF` + `NL_REWRITE=OFF`。
 4. **可选增强**：业务仓确认中文/意图难例收益 > 延迟时，再开 E；弱改写开 G；勿默认 always（F）。
 
@@ -1042,12 +1056,13 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 
 落地文件：`app/config/settings.py`（字段默认）、`env` / `env.example`、本文 §5.13。
 
-#### 四仓交叉结论（新 GT）
+#### 七仓交叉结论（新 GT）
 
-1. **必须开符号**：A（仅 Chunk）与 C/D（无符号）在四仓上明显弱于有符号档。
-2. **产品默认 = B**：见上节选型逻辑；NL2Code（E）与 LLM 改写（G/F）作可选，不默认开。
-3. **仓内效果序不一**：Pando 偏 F→E→G；KB 偏 C→G；Go 偏 F→B；Django 偏 **B→F**——跨仓没有「唯一最优档」，故默认取 **准度够用且较快的有符号档 B**。
-4. **中国区**：已有纯中文用例；在这些用例上 B≈E，默认 B 与中文证据一致。若日后补「无码词长句转述」且 E 稳定翻盘，再评估改默认 E。
+1. **必须开符号**：A 在七仓均为末档或近末档；无符号 C/D 多数仓弱于有符号档（KB/spdlog 的 C 是局部例外）。
+2. **产品默认 = B**：见上节选型逻辑；NL2Code（E）与 LLM 改写（G/F）作可选，不默认开。NNG/spdlog/Django 上 B 即仓内①。
+3. **仓内效果序不一**：Pando/HCL/Go 偏 F；KB 偏 C；NNG/spdlog/Django 偏 **B**——跨仓没有「唯一最优档」，故默认取 **准度够用且较快的有符号档 B**。
+4. **中国区 / 中型仓**：纯 NL 仍是短板；B≈E 或 B 更好，默认 B 与证据一致。中型头文件仓（spdlog）对符号通道更敏感，开 NL 反而易扰动。
+5. **耗时**：D/F（always 改写）在中型仓仍可到 40–80s+/次；消融应用 `RESOLVE_CHANNEL_TIMEOUT_MS=0`，日常 Agent 建议保留有限超时（如 120s）。
 
 ---
 
@@ -1064,14 +1079,17 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 | KB resolve     | **17** | 18% | 18%    | 35% | 18%     | 12%  |
 | Go resolve     | **32** | 25% | 19%    | 31% | 16%     | 9%   |
 | Django resolve | **33** | 24% | 18%    | 30% | 15%     | 12%  |
+| HCL resolve    | **32** | 25% | 19%    | 31% | 16%     | 9%   |
+| NNG resolve    | **32** | 25% | 19%    | 31% | 16%     | 9%   |
+| spdlog resolve | **32** | 25% | 19%    | 31% | 16%     | 9%   |
 | 本仓 related     | **11** | 36% | 27%    | 27% | —       | 9%   |
 
 
-相对旧版主要变化：Go/Django **砍冗余纯符号**、补 **符号+NL / 难例 / 英文 NL / similar**；Pando/KB **补混合问法与短中文难例**；本仓 related **补中文 NL 与 MR 经验定位**。
+相对旧版主要变化：Go/Django **砍冗余纯符号**、补 **符号+NL / 难例 / 英文 NL / similar**；Pando/KB **补混合问法与短中文难例**；**新增 HCL/NNG/spdlog** 中型三语言仓同配比；本仓 related **补中文 NL 与 MR 经验定位**。
 
-纯中文（query 无拉丁字母）规模约：Pando 3 / KB 7 / Go 2 / Django 7（合计 19）；B vs E 专项见 §5.12。
+纯中文（query 无拉丁字母）规模约：Pando 3 / KB 7 / Go 2 / Django 7（合计 19）；中型三仓另有多条中文 NL/hard；B vs E 专项见 §5.12。
 
-路径默认：Pando `PANDO_AGENT_PATH`；KB `KB_SERVICE_PATH`；Go `GO_OSS_PATH`（三包子集）；Django `DJANGO_OSS_PATH`。
+路径默认：Pando `PANDO_AGENT_PATH`；KB `KB_SERVICE_PATH`；Go `GO_OSS_PATH`（三包子集）；Django `DJANGO_OSS_PATH`；HCL/NNG/spdlog 见各 `session_support` / 本地开源目录。
 
 ---
 
@@ -1083,6 +1101,8 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 cd F:\Product_Dev\MOMA\Moma-CodeBase
 $env:ENABLE_INCREMENTAL_SCAN="false"
 $env:PYTHONPATH="F:\Product_Dev\MOMA\Moma-CodeBase"
+# 消融建议关闭单通道超时，避免 similar 被掐断
+$env:RESOLVE_CHANNEL_TIMEOUT_MS="0"
 
 # Pando A–G（需按符号开关重建时清库）
 $env:PANDO_CLEAR="1"
@@ -1099,6 +1119,9 @@ $env:GO_SKIP_REBUILD="1"; $env:GO_ABLATION_ONLY="ALL"
 .\.venv\Scripts\python.exe -u -m tests.scenarios.go_oss.run_resolve_eval
 $env:DJANGO_SKIP_REBUILD="1"; $env:DJANGO_ABLATION_ONLY="ALL"
 .\.venv\Scripts\python.exe -u -m tests.scenarios.django_oss.run_resolve_eval
+
+# HCL / NNG / spdlog A–G（复用索引）
+poetry run python -m tests.scenarios.mid_oss.run_be_eval --skip-analyze --configs A,B,C,D,E,F,G
 ```
 
 ---
@@ -1121,9 +1144,10 @@ $env:DJANGO_SKIP_REBUILD="1"; $env:DJANGO_ABLATION_ONLY="ALL"
 | `CODE_ANALYSIS_NL_REWRITE_MODE`                | weak           | `weak` | `always`（勿默认 always=F）                    |
 | `CODE_ANALYSIS_RELATED_INCLUDE_GRAPH`          | OFF            | related 是否融 CodeGraph                              |
 | `CODE_GRAPH_ENABLED` / `PROVIDER`              | ON / codegraph | 图谱                                                 |
+| `RESOLVE_CHANNEL_TIMEOUT_MS`                   | 120000（0=不限）   | resolve 单通道超时；超时只丢该通道                               |
 | `ENABLE_INCREMENTAL_SCAN`                      | 可配             | 后台增量扫描                                             |
 | `PANDO_CLEAR` / `PANDO_AGENT_PATH`             | 评测用            | Pando 消融重建与路径                                      |
-| `KB_*` / `GO_*` / `DJANGO_*`                   | 评测用            | 各仓 `CLEAR` / `SKIP_REBUILD` / `ABLATION_ONLY` / 路径 |
+| `KB_*` / `GO_*` / `DJANGO_*` / `HCL_*` / `NNG_*` / `SPDLOG_*` | 评测用 | 各仓 `CLEAR` / `SKIP_REBUILD` / `ABLATION_ONLY` / 路径 |
 
 
 ## 6. 评测与复现
@@ -1136,11 +1160,12 @@ $env:DJANGO_SKIP_REBUILD="1"; $env:DJANGO_ABLATION_ONLY="ALL"
 | Pando 消融         | `tests/scenarios/pando_agent/`                               |
 | KB 消融            | `tests/scenarios/knowledge_base/`                            |
 | Go / Django 开源消融 | `tests/scenarios/go_oss/`、`django_oss/`、`oss_common/`        |
+| HCL / NNG / spdlog | `tests/scenarios/hcl_oss/`、`nng_oss/`、`spdlog_oss/`、`mid_oss/` |
 | Lib API          | `tests/scenarios/lib_api/`                                   |
 | MR 经验            | `tests/scenarios/mr_experience/`                             |
 
 
-四仓 resolve 配置对比与用例清单见 **§5.12**。
+七仓 resolve 配置对比与用例清单见 **§5.12**。
 
 ```powershell
 $env:PYTHONPATH="F:\Product_Dev\MOMA\Moma-CodeBase"

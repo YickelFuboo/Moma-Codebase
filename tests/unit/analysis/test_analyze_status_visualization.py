@@ -68,6 +68,9 @@ class TestAnalyzeStatusVisualization:
         assert out["stale"] is True
         assert "pending_files" in (out["stale_hint"] or "")
         assert "symbol_enrichment_pending" in (out["stale_hint"] or "")
+        assert out["status_message"]
+        assert out["next_action"]
+        assert "可检索" in out["status_message"] or "未完成" in out["status_message"]
         assert out["incremental_scan"]["enabled"] is True
         assert out["incremental_scan"]["interval_sec"] == 120
         assert out["index_age_seconds"] is not None

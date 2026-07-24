@@ -20,6 +20,7 @@ from app.repo_analysis.services.nl2code_enhance.weakness import NlRetrievalWeakn
 from app.repo_analysis.services.dir_sibling_expander import DirSiblingExpander
 from app.repo_analysis.services.search_index_meta import SearchIndexMeta
 from app.repo_analysis.services.search_resolve.intent import ResolvePlan, SearchIntentRouter
+from app.repo_analysis.services.search_resolve.readiness import ResolveReadiness
 from app.repo_analysis.services.search_resolve.result_presenter import ResolveResultPresenter
 from app.repo_analysis.services.search_resolve.weak_fallback import ResolveWeakFallback
 from app.repo_analysis.services.search_service import SearchService
@@ -48,6 +49,7 @@ class SearchResolveService:
         *,
         top_k: int = 10,
         intent: Optional[str] = None,
+        require_searchable: bool = True,
     ) -> Dict[str, object]:
         async with get_db_session() as db:
             repo = await db.scalar(select(GitRepository).where(GitRepository.id == repo_id))
@@ -55,35 +57,50 @@ class SearchResolveService:
                 raise ValueError("仓库不存在")
             kind = getattr(repo, "kind", None) or RepoKind.CODE
 
+        if require_searchable:
+            await ResolveReadiness.ensure_searchable(repo_id)
+
         plan = SearchIntentRouter.plan(query, repo_kind=kind, intent_override=intent)
         base_keywords = list(plan.keywords or ([query] if query else []))
         nl_rewrite_meta: Optional[Dict[str, object]] = None
         nl_prep: Optional[NlQueryPrepResult] = None
+        channel_errors: Dict[str, str] = {}
         if NlToCodeEnhancement.is_enabled():
-            nl_prep = await NlQueryPrep.prepare(
-                repo_id,
-                query,
-                keywords=base_keywords,
-                rewrite="auto",
-            )
-            if nl_prep.rewrite and nl_prep.rewrite.seeds():
-                nl_rewrite_meta = nl_prep.meta()
-            # 保留原始 query 作为 code_text，改写只进 keywords / embed 种子
-            plan = replace(
-                plan,
-                keywords=list(nl_prep.keywords),
-                code_text=query,
-            )
+            try:
+                nl_prep = await cls._await_channel(
+                    "nl_prep",
+                    NlQueryPrep.prepare(
+                        repo_id,
+                        query,
+                        keywords=base_keywords,
+                        rewrite="auto",
+                    ),
+                )
+                if nl_prep.rewrite and nl_prep.rewrite.seeds():
+                    nl_rewrite_meta = nl_prep.meta()
+                # 保留原始 query 作为 code_text，改写只进 keywords / embed 种子
+                plan = replace(
+                    plan,
+                    keywords=list(nl_prep.keywords),
+                    code_text=query,
+                )
+            except Exception as exc:
+                channel_errors["nl_prep"] = str(exc)
+                logging.warning(
+                    "resolve NL 预备失败，降级为无 NL 增强 repo_id=%s error=%s",
+                    repo_id,
+                    exc,
+                )
+                nl_prep = None
 
         sections: Dict[str, object] = {}
-        channel_errors: Dict[str, str] = {}
         fused_items: List[Dict[str, object]] = []
         channels_used: List[str] = []
 
         tasks = []
         for channel in plan.channels:
             tasks.append(
-                cls._run_channel(repo_id, channel, plan, top_k=top_k, nl_prep=nl_prep)
+                cls._run_channel_safe(repo_id, channel, plan, top_k=top_k, nl_prep=nl_prep)
             )
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for channel, result in zip(plan.channels, results):
@@ -113,9 +130,14 @@ class SearchResolveService:
                 fused_items.append(fused)
 
         fused_items = cls._fuse_items(fused_items, top_k=max(top_k * 2, top_k))
-        lexicon = (nl_prep.lexicon if nl_prep else None) or await NlToCodeEnhancement.lexicon_for_repo(
-            repo_id
-        )
+        try:
+            lexicon = (nl_prep.lexicon if nl_prep else None) or await NlToCodeEnhancement.lexicon_for_repo(
+                repo_id
+            )
+        except Exception as exc:
+            channel_errors["lexicon"] = str(exc)
+            logging.warning("resolve lexicon 失败 repo_id=%s error=%s", repo_id, exc)
+            lexicon = nl_prep.lexicon if nl_prep else None
         if NlToCodeEnhancement.is_enabled():
             cls._mark_nl_token_hits(fused_items, plan.keywords or [query], lexicon=lexicon)
 
@@ -125,14 +147,21 @@ class SearchResolveService:
             and NlQueryRewriter.should_rewrite_on_weak(query)
             and cls._is_nl_retrieval_weak(fused_items)
         ):
-            rewrite_prep = await NlQueryPrep.prepare(
-                repo_id,
-                query,
-                keywords=base_keywords,
-                rewrite="force",
-                rewrite_trigger="weak",
-            )
-            if rewrite_prep.rewrite and rewrite_prep.rewrite.seeds():
+            try:
+                rewrite_prep = await cls._await_channel(
+                    "nl_rewrite",
+                    NlQueryPrep.prepare(
+                        repo_id,
+                        query,
+                        keywords=base_keywords,
+                        rewrite="force",
+                        rewrite_trigger="weak",
+                    ),
+                )
+            except Exception as exc:
+                channel_errors["nl_rewrite"] = str(exc)
+                rewrite_prep = None
+            if rewrite_prep and rewrite_prep.rewrite and rewrite_prep.rewrite.seeds():
                 nl_rewrite_meta = rewrite_prep.meta()
                 rewrite_plan = replace(
                     plan,
@@ -144,7 +173,7 @@ class SearchResolveService:
                     extra_channels.append("related")
                 for channel in extra_channels:
                     try:
-                        extra = await cls._run_channel(
+                        extra = await cls._run_channel_safe(
                             repo_id,
                             channel,
                             rewrite_plan,
@@ -178,7 +207,7 @@ class SearchResolveService:
                 repo_id,
                 plan,
                 fused_items,
-                run_channel=cls._run_channel,
+                run_channel=cls._run_channel_safe,
             )
             if fb_channel and fb_section is not None and fb_channel not in sections:
                 sections[fb_channel] = fb_section
@@ -234,6 +263,37 @@ class SearchResolveService:
             "also_consider": also_consider,
             "sections": sections,
         }
+
+    @classmethod
+    async def _await_channel(cls, name: str, awaitable):
+        timeout_ms = int(settings.resolve_channel_timeout_ms or 0)
+        if timeout_ms > 0:
+            try:
+                return await asyncio.wait_for(awaitable, timeout=timeout_ms / 1000.0)
+            except asyncio.TimeoutError as exc:
+                raise TimeoutError(f"{name} 超时（{timeout_ms} ms）") from exc
+        return await awaitable
+
+    @classmethod
+    async def _run_channel_safe(
+        cls,
+        repo_id: str,
+        channel: str,
+        plan: ResolvePlan,
+        *,
+        top_k: int,
+        nl_prep: Optional[NlQueryPrepResult] = None,
+    ) -> Dict[str, object]:
+        return await cls._await_channel(
+            channel,
+            cls._run_channel(
+                repo_id,
+                channel,
+                plan,
+                top_k=top_k,
+                nl_prep=nl_prep,
+            ),
+        )
 
     @classmethod
     def _is_nl_retrieval_weak(cls, items: List[Dict[str, object]]) -> bool:

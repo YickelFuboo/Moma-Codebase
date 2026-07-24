@@ -27,6 +27,22 @@ class ErrorCode:
     TIMEOUT = "timeout"
     INVALID_PAYLOAD = "invalid_payload"
     SYSTEM = "system_error"
+    INDEX_NOT_READY = "index_not_ready"
+
+
+class StructuredClickException(click.ClickException):
+    """带稳定 error.code / details 的业务异常，供 JSON 失败信封使用。"""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = ErrorCode.BUSINESS,
+        details: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = str(code or ErrorCode.BUSINESS)
+        self.details = dict(details) if details else None
 
 
 class ResponseScheme:
@@ -64,6 +80,8 @@ class ResponseScheme:
             return ErrorCode.REPO_NOT_FOUND
         if "无权限" in text:
             return ErrorCode.PERMISSION_DENIED
+        if "索引未就绪" in text or "尚无可搜索文件" in text or "索引仍在构建" in text:
+            return ErrorCode.INDEX_NOT_READY
         return ErrorCode.BUSINESS
 
     @classmethod
@@ -167,8 +185,14 @@ class ResponseScheme:
 
     @classmethod
     def echo_click_exception_and_exit(cls, exc: click.ClickException) -> None:
-        code = cls.classify_click_message(str(exc))
-        cls.echo_failure_and_exit(code, str(exc), exit_code=ExitCode.BUSINESS)
+        code = getattr(exc, "error_code", None) or cls.classify_click_message(str(exc))
+        details = getattr(exc, "details", None)
+        cls.echo_failure_and_exit(
+            code,
+            str(exc),
+            exit_code=ExitCode.BUSINESS,
+            details=details if isinstance(details, Mapping) else None,
+        )
 
     @staticmethod
     async def run_with_timeout(awaitable: Awaitable[T], timeout_ms: int) -> T:
@@ -214,3 +238,14 @@ class ResponseScheme:
             )
         except click.ClickException as exc:
             cls.echo_click_exception_and_exit(exc)
+        except Exception as exc:
+            error_code = getattr(exc, "error_code", None)
+            if error_code == ErrorCode.INDEX_NOT_READY:
+                details = getattr(exc, "details", None)
+                cls.echo_failure_and_exit(
+                    ErrorCode.INDEX_NOT_READY,
+                    str(exc),
+                    exit_code=ExitCode.BUSINESS,
+                    details=details if isinstance(details, Mapping) else None,
+                )
+            raise
