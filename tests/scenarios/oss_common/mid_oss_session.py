@@ -1,6 +1,7 @@
 """中等开源仓 scenario 会话基类：登记路径 + 按需清库分析。"""
 from __future__ import annotations
 import asyncio
+import json
 import os
 from pathlib import Path
 from typing import ClassVar, Optional, Set
@@ -117,16 +118,23 @@ class MidOssScenarioSession(CodebaseScenarioBase):
                     flush=True,
                 )
                 await FileAnalysisService.stop_global_scheduler()
+                # 停掉其它仓 worker，避免占满 _MAX_CONCURRENT_REPO_POOLS
+                for other_id in list(FileAnalysisService._running_tasks.keys()):
+                    try:
+                        await FileAnalysisService.stop_analysis(other_id)
+                    except Exception:
+                        pass
+                # 取消后重建信号量，避免残留占用导致本仓 worker 永远等池
+                FileAnalysisService._repo_pool_semaphore = asyncio.Semaphore(
+                    FileAnalysisService._MAX_CONCURRENT_REPO_POOLS
+                )
                 try:
                     await AnalysisService.stop_scan(repo_id, reason=f"{cls.TAG} reset")
                 except Exception:
                     pass
                 if need_clear:
                     await AnalysisService.delete_repo_analysis_data(repo_id)
-                FileAnalysisService.start_global_scheduler(
-                    interval_seconds=2.0,
-                    worker_count=cls.FILE_WORKER_COUNT,
-                )
+                # 不启全局调度：只由 run_analyze 对本仓 start_analysis，避免其它仓抢池
                 prev = cls.CLEAR_BEFORE_ANALYZE
                 cls.CLEAR_BEFORE_ANALYZE = False
                 try:
@@ -140,5 +148,9 @@ class MidOssScenarioSession(CodebaseScenarioBase):
                     f"searchable={a.get('searchable_files')}",
                     flush=True,
                 )
+                if int(a.get("pending_files") or 0) or int(a.get("embedded_files") or 0):
+                    raise AssertionError(
+                        f"[{cls.TAG}] 索引未收口: {json.dumps(a, ensure_ascii=False)}"
+                    )
                 cls._vector_ready = True
             return repo_id

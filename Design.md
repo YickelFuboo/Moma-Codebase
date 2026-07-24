@@ -1084,10 +1084,10 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 | 项 | 说明 |
 | --- | --- |
 | 实现 | `app/repo_analysis/services/search_resolve/result_presenter.py`；`resolve` 传入 `query` 参与切分 |
-| 查询相关性 | 路径/符号与 query 词元对齐加权；`res→response`、`app→application` 等别名；避免 `res⊂express` 误伤 |
+| 查询相关性 | 路径/符号与 query 词元对齐加权；短词防误伤（禁止静态业务/项目别名词表） |
 | 档位抬升 | 高相关性可压低 band，避免无关 exact 压住真正相关的符号摘要命中 |
-| 噪声惩罚 | 测试路径、`bundled/vendor`、伞文件名（如 `http.go` / `express.js` / `common.h`）降权 |
-| 同族去重 | `logger.h` / `logger-inl.h` 等同实现族主列表只留一条 |
+| 噪声惩罚 | 测试路径、`vendor/third_party`、跨语言常见入口/杂项文件名（`main`/`index`/`common`/`util` 等）降权；**不含具体项目名** |
+| 同族去重 | `*-inl` / `*_impl` 等同实现族主列表只留一条 |
 
 **摘要 prompt（分析端，同日）**：去掉「鉴权/会话/缓存」等业务套话示例，改为贴合源码真实职责（`code_summary.py` / `api_summary.py`）。已入库摘要需 **re-analyze** 才生效；下表 **未** 重跑分析，仅体现检索排序。
 

@@ -553,11 +553,11 @@ class TestSearchResolveService:
     def test_agent_items_query_boosts_path_over_hub_file(self):
         items = [
             {
-                "file_path": "lib/express.js",
+                "file_path": "lib/index.js",
                 "score": 3.0,
                 "match_source": "exact",
                 "exact_tier": "symbol",
-                "symbol_name": "createApplication",
+                "symbol_name": "createApp",
             },
             {
                 "file_path": "lib/application.js",
@@ -572,9 +572,9 @@ class TestSearchResolveService:
                 "symbol_name": "json",
             },
         ]
-        out = ResolveResultPresenter.agent_items(items, query="res.json 返回 JSON")
+        out = ResolveResultPresenter.agent_items(items, query="response json")
         assert out[0]["file_path"] == "lib/response.js"
-        out_use = ResolveResultPresenter.agent_items(items, query="app.use")
+        out_use = ResolveResultPresenter.agent_items(items, query="application use")
         assert out_use[0]["file_path"] == "lib/application.js"
 
     def test_agent_items_penalizes_test_and_vendor_paths(self):

@@ -401,16 +401,12 @@ class CodeVectorService:
         symbol_name: str,
         summary: str,
     ) -> str:
-        """符号向量入库文本：路径/符号名 + 摘要，提升自然语言检索命中。"""
+        """符号向量入库文本：文件路径 + 符号 + 摘要（检索友好靠摘要「检索词」，不做路径切词）。"""
         fp = (file_path or "").replace("\\", "/").strip()
-        stem = fp.rsplit("/", 1)[-1].rsplit(".", 1)[0] if fp else ""
-        path_tokens = " ".join(
-            part for part in fp.replace(".", "/").split("/") if part and part not in {"app", "src"}
-        )
+        name = (symbol_name or "").strip()
         parts = [
             f"文件: {fp}" if fp else "",
-            f"符号: {symbol_kind} {symbol_name}".strip(),
-            f"路径词: {path_tokens} {stem}".strip(),
+            f"符号: {symbol_kind} {name}".strip(),
             (summary or "").strip(),
         ]
         return "\n".join(p for p in parts if p)

@@ -99,20 +99,27 @@ class CodebaseScenarioBase(ABC):
 
     @classmethod
     async def run_analyze(cls) -> Dict[str, Any]:
-        from app.repo_analysis.models.analysis_status import FileAnalysisStatus, RepoAnalysisStatus
+        from app.repo_analysis.models.analysis_status import RepoAnalysisStatus
         from app.repo_analysis.services.analysis_service import AnalysisService
+        from app.repo_analysis.services.file_analysis_service import FileAnalysisService
 
         repo_id = cls._repo_id or await cls.ensure_repo()
         if cls.CLEAR_BEFORE_ANALYZE:
             await AnalysisService.delete_repo_analysis_data(repo_id)
-        start = await AnalysisService.start_scan(
+        await AnalysisService.start_scan(
             repo_id=repo_id,
             target_rel_path=cls.ANALYZE_TARGET,
         )
         deadline = time.time() + cls.ANALYZE_TIMEOUT_SEC
         last: Dict[str, Any] = {}
         stable = 0
+        worker_count = int(getattr(cls, "FILE_WORKER_COUNT", 4) or 4)
         while time.time() < deadline:
+            # 只拉起本仓 worker，避免其它仓占满并发池导致 pending 空转
+            await FileAnalysisService.start_analysis(
+                repo_id=repo_id,
+                worker_count=worker_count,
+            )
             summary = await AnalysisService.get_summary(repo_id)
             last = summary
             scan = (summary.get("scan") or {})
@@ -149,8 +156,15 @@ class CodebaseScenarioBase(ABC):
             )
             await asyncio.sleep(cls.POLL_INTERVAL_SEC)
         a = (last.get("analysis_summary") or {})
-        if int(a.get("completed_files") or 0) <= 0:
-            raise AssertionError(f"分析未产生完成文件: {json.dumps(last, ensure_ascii=False, default=str)}")
+        pending = int(a.get("pending_files") or 0)
+        running = int(a.get("running_files") or 0)
+        embedded = int(a.get("embedded_files") or 0)
+        completed = int(a.get("completed_files") or 0)
+        if completed <= 0 or pending > 0 or running > 0 or embedded > 0:
+            raise AssertionError(
+                "分析未完整收口（须 completed>0 且 pending/running/embedded=0）: "
+                f"{json.dumps(last, ensure_ascii=False, default=str)}"
+            )
         return last
 
     @classmethod

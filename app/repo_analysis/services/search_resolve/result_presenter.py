@@ -40,30 +40,41 @@ class ResolveResultPresenter:
         "/node_modules/",
         "/external/",
     )
+    # 跨语言常见「入口/杂项」文件名启发式，不含具体项目名（禁止 nng/express 等评测特化）
     _UMBRELLA_NAMES = {
-        "http.go",
-        "nng.c",
         "index.js",
-        "express.js",
+        "index.ts",
+        "index.tsx",
         "main.go",
         "main.c",
         "main.cpp",
+        "main.py",
+        "main.rs",
+        "main.java",
         "common.h",
         "common.hpp",
+        "common.py",
         "types.h",
+        "types.ts",
         "util.go",
         "utils.go",
+        "utils.py",
+        "utils.js",
         "helpers.js",
+        "helpers.py",
+        "misc.py",
+        "base.py",
     }
     _UMBRELLA_STEMS = {
-        "http",
-        "nng",
+        "index",
+        "main",
         "common",
         "util",
         "utils",
         "helpers",
         "misc",
         "base",
+        "types",
     }
     _FAMILY_SUFFIXES = ("-inl", "_inl", "-impl", "_impl", ".min", "-internal")
     _TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+|[\u4e00-\u9fff]{2,}")
@@ -183,28 +194,19 @@ class ResolveResultPresenter:
         parent = str(path.parent).replace("\\", "/")
         return f"{parent}/{stem}"
 
-    _QUERY_PATH_ALIASES = {
-        "res": "response",
-        "req": "request",
-        "app": "application",
-    }
-
     @classmethod
     def _ident_parts(cls, text: str) -> List[str]:
         return re.findall(r"[a-z0-9]+", (text or "").lower())
 
     @classmethod
     def _token_hits_text(cls, tok: str, text: str) -> bool:
-        """词元命中标识符片段；避免 res⊂express 这类误伤。"""
+        """词元命中标识符片段；避免短词误伤（如 res⊂express）。"""
         if not tok or not text:
             return False
         parts = cls._ident_parts(text)
         if tok in parts:
             return True
-        alias = cls._QUERY_PATH_ALIASES.get(tok)
-        if alias and alias in parts:
-            return True
-        # 前缀：res→response，要求词元足够长且目标不是更长无关词
+        # 前缀对齐：app→application；要求词元足够长，避免 2 字母误匹配
         if len(tok) >= 3:
             for p in parts:
                 if p.startswith(tok) and len(p) - len(tok) <= 10:
@@ -230,12 +232,14 @@ class ResolveResultPresenter:
                 score += 8
             elif symbol and cls._token_hits_text(tok, symbol):
                 score += 5
-            if stem and (tok == stem or cls._QUERY_PATH_ALIASES.get(tok) == stem):
+            if stem and tok == stem:
                 score += 7
             elif name and cls._token_hits_text(tok, name):
                 score += 4
             elif cls._token_hits_text(tok, fp) or cls._token_hits_text(tok, title):
                 score += 2
+            elif stem and cls._token_hits_text(tok, stem):
+                score += 5
         if it.get("nl_token_hit") or it.get("nl_alias_hit"):
             score += 3
         return score
