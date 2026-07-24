@@ -1,15 +1,18 @@
-"""三仓串联：先分析（可清库），再跑 A–G resolve 消融。
+"""中型开源仓串联：先分析（可清库），再跑 A–G resolve 消融。
 
 用法（项目根）：
-  poetry run python -m tests.scenarios.mid_oss.run_be_eval
-  poetry run python -m tests.scenarios.mid_oss.run_be_eval --skip-analyze
-  poetry run python -m tests.scenarios.mid_oss.run_be_eval --skip-analyze --configs B,E
+  poetry run python -m tests.scenarios.mid_oss.run_be_eval --only gson,express
+  poetry run python -m tests.scenarios.mid_oss.run_be_eval --skip-analyze --only gson,express
   MID_OSS_CLEAR=1 poetry run python -m tests.scenarios.mid_oss.run_be_eval
 """
 from __future__ import annotations
 import argparse
 import asyncio
 import os
+from tests.scenarios.express_oss.ground_truth import EXPRESS_RESOLVE_CASES
+from tests.scenarios.express_oss.session_support import ExpressOssScenarioSession
+from tests.scenarios.gson_oss.ground_truth import GSON_RESOLVE_CASES
+from tests.scenarios.gson_oss.session_support import GsonOssScenarioSession
 from tests.scenarios.hcl_oss.ground_truth import HCL_RESOLVE_CASES
 from tests.scenarios.hcl_oss.session_support import HclOssScenarioSession
 from tests.scenarios.nng_oss.ground_truth import NNG_RESOLVE_CASES
@@ -23,6 +26,8 @@ _JOBS = (
     ("hcl", HclOssScenarioSession, HCL_RESOLVE_CASES, "HCL_CLEAR", "HCL_SKIP_REBUILD", "HCL_ABLATION_ONLY"),
     ("nng", NngOssScenarioSession, NNG_RESOLVE_CASES, "NNG_CLEAR", "NNG_SKIP_REBUILD", "NNG_ABLATION_ONLY"),
     ("spdlog", SpdlogOssScenarioSession, SPDLOG_RESOLVE_CASES, "SPDLOG_CLEAR", "SPDLOG_SKIP_REBUILD", "SPDLOG_ABLATION_ONLY"),
+    ("gson", GsonOssScenarioSession, GSON_RESOLVE_CASES, "GSON_CLEAR", "GSON_SKIP_REBUILD", "GSON_ABLATION_ONLY"),
+    ("express", ExpressOssScenarioSession, EXPRESS_RESOLVE_CASES, "EXPRESS_CLEAR", "EXPRESS_SKIP_REBUILD", "EXPRESS_ABLATION_ONLY"),
 )
 
 
@@ -76,7 +81,7 @@ async def _run_one(
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="hcl/nng/spdlog A–G resolve 评测")
+    parser = argparse.ArgumentParser(description="中型开源仓 A–G resolve 评测")
     parser.add_argument(
         "--skip-analyze",
         action="store_true",
@@ -84,8 +89,8 @@ async def main() -> None:
     )
     parser.add_argument(
         "--only",
-        default="hcl,nng,spdlog",
-        help="逗号分隔：hcl,nng,spdlog",
+        default="hcl,nng,spdlog,gson,express",
+        help="逗号分隔：hcl,nng,spdlog,gson,express",
     )
     parser.add_argument(
         "--configs",
