@@ -874,6 +874,7 @@ SearchService / ResolveService 共用 Prep；resolve 传 `nl_prep` 给 similar/r
 ### 5.12 整体配置开关对比测试（九仓 + 本仓 related）
 
 日期：**2026-07-24**（中型开源 HCL/NNG/spdlog + **Gson(Java)/Express(JS)** 新 GT×32、A–G 全量；`RESOLVE_CHANNEL_TIMEOUT_MS=0`）。前四仓沿用 **2026-07-23** 8B 结果。  
+同日下午追加 **items 主列表排序优化**（见本节末「items 主列表排序优化」）；七仓 B 复测明细 `tests/output/_seven_repo_b_before_after.md`。  
 日志：`tests/output/.tmp_mid_oss_abcdefg.log` / `.tmp_gson_express_abcdefg.log`；明细 `tests/output/.tmp_{hcl,nng,spdlog,gson,express}_ablation_newgt.md`。
 
 **档位重标号（相对旧版）**：旧 G→**A**，旧 A→**B**，旧 B→**C**，旧 C→**D**，旧 D→**E**，旧 E→**F**，旧 F→**G**。
@@ -958,7 +959,7 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 
 （口径：avg iR / avg uR · pass。前四仓 07-23 8B；HCL/NNG/spdlog/Gson/Express 07-24，timeout=0。）  
 † Go：**net/encoding/context** 三包子集。  
-‡ Express：核心仅约 **7** 个 `.js`，极小仓；Chunk/改写档易冲高，**B 反而仓内最弱**（uR 仍 100%，多是 items 排序被符号通道扰动）。
+‡ Express：核心仅约 **7** 个 `.js`，极小仓；Chunk/改写档易冲高。上表 Express **B=⑦** 为 **排序优化前**（uR 100%、items 被枢纽文件挤占）；优化后 B 达 **94%/100% · 32/32**，见本节「items 主列表排序优化」。
 
 #### 九仓档位平均耗时（ms / 次 resolve）
 
@@ -1069,9 +1070,42 @@ GT：`*/ground_truth.py`；`extra.case_kind` ∈ `{sym,sym_nl,nl,similar,hard}`�
 
 1. **必须开符号（常规仓）**：A 在多数仓为末档；Gson/Django/NNG/spdlog 上 B 为仓内①或前列。
 2. **产品默认 = B**：见上节选型逻辑；NL2Code（E）与 LLM 改写（G/F）作可选。Gson 上 B≫E（24 vs 14）进一步支持默认不开 NL。
-3. **仓内效果序不一**：Pando/HCL/Go/Express 偏 F；KB 偏 C；NNG/spdlog/Django/Gson 偏 **B**——跨仓没有「唯一最优档」。
-4. **语言覆盖**：已含 Python / Go / C / C++ / **Java** / **JS**。Java（Gson）与业务 Python 接近（B≈72% pass）；极小 JS 仓（Express）Chunk 即可，不宜外推到大型前端仓。
+3. **仓内效果序不一**：Pando/HCL/Go/Express 偏 F；KB 偏 C；NNG/spdlog/Django/Gson 偏 **B**——跨仓没有「唯一最优档」（Express 仓内序为排序优化前；优化后 B 单项已满分，见下节）。
+4. **语言覆盖**：已含 Python / Go / C / C++ / **Java** / **JS**。Java（Gson）与业务 Python 接近（排序优化后 B≈82% iR / 28/32 pass）；极小 JS 仓（Express）不宜外推到大型前端仓。
 5. **耗时**：D/F（always 改写）仍可到 40–80s+/次；消融用 `RESOLVE_CHANNEL_TIMEOUT_MS=0`，日常 Agent 建议有限超时（如 120s）。
+6. **items 排序**：见下节；优先抬升已召回真阳性进主列表，比再开通道更划算。
+
+#### items 主列表排序优化（2026-07-24）
+
+**背景**：多仓出现 **uR 高、iR/pass 偏低**——正确答案已在融合池 / `also_consider`，但 `ResolveResultPresenter` 对外 **Top3 items** 被伞文件、测试路径或弱相关 exact 噪声占满（Express / Go / Gson-NL 最典型）。
+
+**改动**（检索端，不增通道、不改默认 B 开关）：
+
+| 项 | 说明 |
+| --- | --- |
+| 实现 | `app/repo_analysis/services/search_resolve/result_presenter.py`；`resolve` 传入 `query` 参与切分 |
+| 查询相关性 | 路径/符号与 query 词元对齐加权；`res→response`、`app→application` 等别名；避免 `res⊂express` 误伤 |
+| 档位抬升 | 高相关性可压低 band，避免无关 exact 压住真正相关的符号摘要命中 |
+| 噪声惩罚 | 测试路径、`bundled/vendor`、伞文件名（如 `http.go` / `express.js` / `common.h`）降权 |
+| 同族去重 | `logger.h` / `logger-inl.h` 等同实现族主列表只留一条 |
+
+**摘要 prompt（分析端，同日）**：去掉「鉴权/会话/缓存」等业务套话示例，改为贴合源码真实职责（`code_summary.py` / `api_summary.py`）。已入库摘要需 **re-analyze** 才生效；下表 **未** 重跑分析，仅体现检索排序。
+
+**七仓默认 B 前后对比**（改前 = 上表 §5.12 A–G 中 B 行；改后 = `skip_rebuild` 只跑 B；脚本 `tests.scenarios.mid_oss.run_b_before_after`；明细 `tests/output/_seven_repo_b_before_after.md`）：
+
+
+| 仓 | 改前 iR/uR · pass | 改后 iR/uR · pass | Δ pass |
+| --- | --- | --- | --- |
+| Go | 58%/89% · 20/32 | 58%/89% · 20/32 | 0 |
+| Django | 85%/98% · 28/33 | 82%/98% · 27/33 | −1 |
+| HCL | 58%/77% · 21/32 | 61%/77% · 23/32 | +2 |
+| NNG | 55%/80% · 24/32 | 54%/80% · 25/32 | +1 |
+| spdlog | 41%/71% · 18/32 | 45%/76% · 24/32 | **+6** |
+| Gson | 72%/90% · 24/32 | **82%/95% · 28/32** | **+4** |
+| Express | 64%/100% · 21/32 | **94%/100% · 32/32** | **+11** |
+
+
+**结论**：整体有帮助——收益最大在「融合池已召回、items 排不进」；Express/Gson/spdlog 明显升，HCL/NNG 小幅升，Go 持平，Django 略回退 1 条。上表 A–G 全量数字仍为排序优化前快照（含 Express B 仓内⑦）；**当前产品 B 以本小节改后列为准**。A–G 仓内①–⑦ 需全量重跑后才能更新。
 
 ---
 
@@ -1119,6 +1153,9 @@ $env:RESOLVE_CHANNEL_TIMEOUT_MS="0"
 # 中型开源仓 A–G（含 Java Gson + JS Express）
 poetry run python -m tests.scenarios.mid_oss.run_be_eval --only gson,express
 poetry run python -m tests.scenarios.mid_oss.run_be_eval --skip-analyze --configs A,B,C,D,E,F,G
+
+# 七仓默认 B 排序优化前后对比（skip rebuild）
+poetry run python -m tests.scenarios.mid_oss.run_b_before_after
 ```
 
 ---
