@@ -554,11 +554,15 @@ class AnalysisService:
                 repo_id=repo_id,
                 file_path=rel_file_path,
                 status=FileAnalysisStatus.PENDING.value,
+                is_embedded=False,
+                is_symboled=False,
             ))
         else:
             file_modified_at = datetime.fromtimestamp(os.path.getmtime(abs_file_path))
             if AnalysisService._should_refresh_state(record, file_modified_at):
                 record.status = FileAnalysisStatus.PENDING.value
+                record.is_embedded = False
+                record.is_symboled = False
                 record.last_error = None
         return True
 
@@ -768,6 +772,43 @@ class AnalysisService:
                 count = int(cnt or 0)
                 total += count
                 by_status[status] = by_status.get(status, 0) + count
+            # 未 embed 的 pending：真正「还不能搜」的排队
+            pending_embed = int(
+                await db.scalar(
+                    select(func.count())
+                    .select_from(RepoFileAnalysisState)
+                    .where(
+                        RepoFileAnalysisState.repo_id == repo_id,
+                        RepoFileAnalysisState.status == FileAnalysisStatus.PENDING.value,
+                        RepoFileAnalysisState.is_embedded.is_(False),
+                    )
+                )
+                or 0
+            )
+            # 已 embed、符号未齐（兼容旧字段 embedded_files）
+            pending_symbol = int(
+                await db.scalar(
+                    select(func.count())
+                    .select_from(RepoFileAnalysisState)
+                    .where(
+                        RepoFileAnalysisState.repo_id == repo_id,
+                        RepoFileAnalysisState.is_embedded.is_(True),
+                        RepoFileAnalysisState.is_symboled.is_(False),
+                    )
+                )
+                or 0
+            )
+            searchable_files = int(
+                await db.scalar(
+                    select(func.count())
+                    .select_from(RepoFileAnalysisState)
+                    .where(
+                        RepoFileAnalysisState.repo_id == repo_id,
+                        RepoFileAnalysisState.is_embedded.is_(True),
+                    )
+                )
+                or 0
+            )
             scan = await AnalysisService.get_scan_status(repo_id)
             in_memory_scan = (
                 repo_id in AnalysisService._running_scan_tasks
@@ -785,14 +826,12 @@ class AnalysisService:
                 )
             ).all()
 
-        pending = by_status.get(FileAnalysisStatus.PENDING.value, 0)
+        pending = pending_embed
         running = by_status.get(FileAnalysisStatus.RUNNING.value, 0)
-        embedded = by_status.get(FileAnalysisStatus.EMBEDDED.value, 0)
+        embedded = pending_symbol
         completed = by_status.get(FileAnalysisStatus.COMPLETED.value, 0)
         failed = by_status.get(FileAnalysisStatus.FAILED.value, 0)
         skipped = by_status.get(FileAnalysisStatus.SKIPPED.value, 0)
-        # 行块已入库即可 similar；completed + embedded 均算可搜
-        searchable_files = completed + embedded
 
         finished_raw = scan.get("last_scan_finished_at")
         index_age_seconds: Optional[int] = None
@@ -811,7 +850,7 @@ class AnalysisService:
         if pending > 0:
             stale_reasons.append("pending_files")
         if embedded > 0:
-            stale_reasons.append("symbol_enrichment_pending")
+            stale_reasons.append("pending_symbol")
         if running > 0 or in_memory_scan or scan.get("scan_status") == RepoAnalysisStatus.RUNNING.value:
             stale_reasons.append("scan_or_analysis_running")
         if index_age_seconds is not None and index_age_seconds >= 86400:
@@ -839,7 +878,7 @@ class AnalysisService:
             "skipped_files": skipped,
             "searchable_files": searchable_files,
             "searchable": searchable_files > 0,
-            "enrichment_pending": embedded > 0,
+            "pending_symbol": embedded > 0,
             "scan_active_in_process": in_memory_scan,
         }
         status_message, next_action = AnalysisService._build_status_message(

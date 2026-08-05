@@ -7,10 +7,13 @@ from app.repo_analysis.services.file_analysis_service import FileAnalysisService
 
 
 class TestFileAnalysisPhases:
-    def test_claimable_includes_embedded(self):
-        assert FileAnalysisStatus.EMBEDDED.value in FileAnalysisService._claimable_statuses()
+    def test_claimable_is_pending_and_failed_only(self):
+        assert FileAnalysisService._claimable_statuses() == [
+            FileAnalysisStatus.PENDING.value,
+            FileAnalysisStatus.FAILED.value,
+        ]
 
-    def test_embed_phase_returns_embedded_when_symbol_on(self, tmp_path, monkeypatch):
+    def test_embed_phase_awaits_symbol_when_symbol_on(self, tmp_path, monkeypatch):
         from app.config.settings import settings
 
         monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
@@ -39,12 +42,12 @@ class TestFileAnalysisPhases:
                     str(src),
                 )
 
-        ok, err, next_status = asyncio.run(_run())
+        ok, err, await_symbol = asyncio.run(_run())
         assert ok is True
         assert err is None
-        assert next_status == FileAnalysisStatus.EMBEDDED.value
+        assert await_symbol is True
 
-    def test_embed_phase_returns_completed_when_symbol_off(self, tmp_path, monkeypatch):
+    def test_embed_phase_completes_when_symbol_off(self, tmp_path, monkeypatch):
         from app.config.settings import settings
 
         monkeypatch.setattr(settings, "code_analysis_line_chunk_enabled", True)
@@ -70,10 +73,10 @@ class TestFileAnalysisPhases:
                     str(src),
                 )
 
-        ok, err, next_status = asyncio.run(_run())
+        ok, err, await_symbol = asyncio.run(_run())
         assert ok is True
         assert err is None
-        assert next_status == FileAnalysisStatus.COMPLETED.value
+        assert await_symbol is False
 
     def test_symbol_phase_does_not_touch_line_chunks(self, tmp_path, monkeypatch):
         from app.config.settings import settings

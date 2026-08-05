@@ -577,6 +577,26 @@ class TestSearchResolveService:
         out_use = ResolveResultPresenter.agent_items(items, query="application use")
         assert out_use[0]["file_path"] == "lib/application.js"
 
+    def test_agent_items_app_prefix_beats_express_hub(self):
+        """app.use：文件名 app→application 应压过入口 hub exact。"""
+        items = [
+            {
+                "file_path": "lib/express.js",
+                "score": 3.0,
+                "match_source": "exact",
+                "exact_tier": "symbol",
+                "symbol_name": "createApplication",
+            },
+            {
+                "file_path": "lib/application.js",
+                "score": 0.85,
+                "match_source": "symbol_summary",
+                "symbol_name": "use",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="app.use")
+        assert out[0]["file_path"] == "lib/application.js"
+
     def test_agent_items_penalizes_test_and_vendor_paths(self):
         items = [
             {
@@ -622,6 +642,106 @@ class TestSearchResolveService:
         paths = [it["file_path"] for it in out]
         assert sum(1 for p in paths if "logger" in p) == 1
         assert "include/spdlog/async.h" in paths
+
+    def test_agent_items_weak_path_token_does_not_outrank_exact_symbol(self):
+        """路径目录弱前缀（model⊂models）不得抬过精确符号命中。"""
+        items = [
+            {
+                "file_path": "pkg/db/models/base.py",
+                "score": 1.0,
+                "match_source": "exact",
+                "exact_tier": "symbol",
+                "symbol_name": "Model",
+            },
+            {
+                "file_path": "pkg/contrib/postgres/fields/array.py",
+                "score": 2.5,
+                "match_source": "symbol_summary",
+                "symbol_name": "ArrayField",
+            },
+            {
+                "file_path": "pkg/db/models/manager.py",
+                "score": 2.2,
+                "match_source": "symbol_summary",
+                "symbol_name": "Manager",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="Model")
+        assert out[0]["file_path"] == "pkg/db/models/base.py"
+
+    def test_agent_items_symbol_fragment_does_not_band_lift_over_exact(self):
+        """符号驼峰片段（ModelAdmin 含 model）不得抬到与精确 Model 同档。"""
+        items = [
+            {
+                "file_path": "pkg/db/models/base.py",
+                "score": 1.0,
+                "match_source": "exact",
+                "exact_tier": "symbol",
+                "symbol_name": "Model",
+            },
+            {
+                "file_path": "pkg/contrib/admin/options.py",
+                "score": 3.0,
+                "match_source": "symbol_summary",
+                "symbol_name": "ModelAdmin",
+            },
+            {
+                "file_path": "pkg/forms/models.py",
+                "score": 2.8,
+                "match_source": "symbol_summary",
+                "symbol_name": "ModelChoiceField",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="Model")
+        assert out[0]["file_path"] == "pkg/db/models/base.py"
+
+    def test_agent_items_deep_base_py_not_umbrella_blocked(self):
+        """深路径 base.py 常是真实基类，不应被浅路径伞文件启发式压掉。"""
+        items = [
+            {
+                "file_path": "framework/db/models/base.py",
+                "score": 1.1,
+                "match_source": "exact",
+                "exact_tier": "symbol",
+                "symbol_name": "Model",
+            },
+            {
+                "file_path": "framework/http/handler.py",
+                "score": 2.0,
+                "match_source": "symbol_summary",
+                "symbol_name": "Handler",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="Model")
+        assert out[0]["file_path"] == "framework/db/models/base.py"
+        shallow = ResolveResultPresenter.path_noise_penalty("base.py")
+        deep = ResolveResultPresenter.path_noise_penalty("framework/db/models/base.py")
+        assert shallow > deep
+
+    def test_agent_items_path_dir_prefix_does_not_outrank_symbol_stem(self):
+        """目录前缀 model⊂models 不得压过文件名/符号强对齐。"""
+        items = [
+            {
+                "file_path": "pkg/db/models/base.py",
+                "score": 0.55,
+                "match_source": "symbol_summary",
+                "symbol_name": "Model",
+            },
+            {
+                "file_path": "pkg/contrib/postgres/fields/array.py",
+                "score": 2.8,
+                "match_source": "symbol_summary",
+                "symbol_name": "ArrayField",
+            },
+            {
+                "file_path": "pkg/db/models/manager.py",
+                "score": 2.4,
+                "match_source": "symbol_summary",
+                "symbol_name": "Manager",
+            },
+        ]
+        out = ResolveResultPresenter.agent_items(items, query="Model")
+        assert out[0]["file_path"] == "pkg/db/models/base.py"
 
     def test_resolve_nl_runs_related_similar_grep(self, monkeypatch):
         from app.config.settings import settings

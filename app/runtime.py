@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from app.config.settings import APP_NAME, APP_VERSION
 from app.infrastructure.database import close_db
@@ -36,13 +37,16 @@ async def init_runtime() -> None:
         logging.info("%s v%s 运行环境已就绪", APP_NAME, APP_VERSION)
 
 
-async def ensure_scheduler() -> None:
-    """启动文件分析调度器；可选启动已登记仓库的增量扫描。"""
+async def ensure_scheduler(repo_path: Optional[str] = None) -> None:
+    """启动文件分析调度器；可选启动已登记仓库的增量扫描。
+
+    repo_path 非空时增量扫描只扫该仓（TUI 模式）；为空时扫所有已登记仓（常驻服务模式）。
+    """
     from app.repo_analysis.services.file_analysis_service import FileAnalysisService
     from app.repo_analysis.services.incremental_scan_service import IncrementalScanService
 
     FileAnalysisService.start_global_scheduler()
-    IncrementalScanService.start()
+    IncrementalScanService.start(repo_path=repo_path)
 
 
 async def startup() -> None:

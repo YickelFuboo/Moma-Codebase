@@ -32,6 +32,8 @@ class RepoExperienceTask(Base):
     total_items = Column(Integer, nullable=False, default=0, comment="条目总数")
     ready_items = Column(Integer, nullable=False, default=0, comment="已就绪条目数")
     failed_items = Column(Integer, nullable=False, default=0, comment="失败条目数")
+    last_collected_commit_sha = Column(String(64), nullable=True, comment="最后一次收集到的 MR commit SHA（增量检测用）")
+    last_collected_committed_at = Column(DateTime, nullable=True, comment="最后一次收集到的 MR 提交时间（观测用）")
 
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

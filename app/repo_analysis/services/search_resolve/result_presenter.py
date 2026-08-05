@@ -157,6 +157,13 @@ class ResolveResultPresenter:
         return out
 
     @classmethod
+    def _path_depth(cls, file_path: str) -> int:
+        fp = cls._normalize_path(file_path)
+        if not fp:
+            return 0
+        return len([p for p in PurePosixPath(fp).parts if p not in (".", "")])
+
+    @classmethod
     def path_noise_penalty(cls, file_path: str) -> int:
         """路径噪声惩罚：越大越不该进 items 主列表。"""
         fp = cls._normalize_path(file_path).lower()
@@ -172,11 +179,19 @@ class ResolveResultPresenter:
             pen += 30
         if any(m in fp for m in cls._VENDOR_PATH_MARKERS):
             pen += 35
+        # 伞文件只惩罚浅路径入口/杂项；深路径 base.py 等常是真实基类实现
+        depth = cls._path_depth(fp)
         if name in cls._UMBRELLA_NAMES:
-            pen += 12
+            if depth <= 2:
+                pen += 12
+            elif depth <= 3:
+                pen += 4
         stem = PurePosixPath(fp).stem.lower()
         if stem in cls._UMBRELLA_STEMS:
-            pen += 6
+            if depth <= 2:
+                pen += 6
+            elif depth <= 3:
+                pen += 2
         return pen
 
     @classmethod
@@ -199,50 +214,101 @@ class ResolveResultPresenter:
         return re.findall(r"[a-z0-9]+", (text or "").lower())
 
     @classmethod
-    def _token_hits_text(cls, tok: str, text: str) -> bool:
+    def _camel_parts(cls, text: str) -> List[str]:
+        """保留驼峰边界后再小写，避免 ModelAdmin→modeladmin 丢片段。"""
+        raw = str(text or "").strip()
+        if not raw:
+            return []
+        parts = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+", raw)
+        if parts:
+            return [p.lower() for p in parts if p]
+        return cls._ident_parts(raw)
+
+    @classmethod
+    def _token_hits_text(
+        cls,
+        tok: str,
+        text: str,
+        *,
+        allow_prefix: bool = True,
+        max_prefix_extra: int = 10,
+    ) -> bool:
         """词元命中标识符片段；避免短词误伤（如 res⊂express）。"""
         if not tok or not text:
             return False
         parts = cls._ident_parts(text)
         if tok in parts:
             return True
-        # 前缀对齐：app→application；要求词元足够长，避免 2 字母误匹配
+        if not allow_prefix:
+            return False
+        # 前缀对齐：app→application（extra=8）；文件名允许较宽，符号侧宜更紧
         if len(tok) >= 3:
             for p in parts:
-                if p.startswith(tok) and len(p) - len(tok) <= 10:
+                if p.startswith(tok) and len(p) - len(tok) <= max_prefix_extra:
                     return True
         return False
 
     @classmethod
-    def query_relevance(cls, it: Dict[str, object], query: str) -> int:
-        """查询与路径/符号的对齐分；越高越应进入 items。"""
+    def _path_segment_hit(cls, tok: str, file_path: str) -> bool:
+        """路径段精确命中；禁止 model⊂models 这类目录前缀蹭分。"""
+        if not tok or not file_path:
+            return False
+        segs = [s for s in re.split(r"[/_.\\-]+", file_path.lower()) if s]
+        return tok in segs
+
+    @classmethod
+    def query_relevance_parts(cls, it: Dict[str, object], query: str) -> Tuple[int, int]:
+        """返回 (strong, weak)。strong 才允许抬档；weak 只参与同分排序。"""
         tokens = cls.query_tokens(query)
         if not tokens:
             if it.get("nl_token_hit") or it.get("nl_alias_hit"):
-                return 2
-            return 0
+                return (0, 2)
+            return (0, 0)
         fp = cls._normalize_path(str(it.get("file_path") or "")).lower()
-        symbol = str(it.get("symbol_name") or "").strip().lower()
+        symbol_raw = str(it.get("symbol_name") or "").strip()
+        symbol = symbol_raw.lower()
+        symbol_parts = cls._camel_parts(symbol_raw)
         title = str(it.get("title") or it.get("pattern_title") or "").strip().lower()
         stem = PurePosixPath(fp).stem.lower() if fp else ""
         name = PurePosixPath(fp).name.lower() if fp else ""
-        score = 0
+        strong = 0
+        weak = 0
         for tok in tokens:
-            if symbol and (tok == symbol or tok in cls._ident_parts(symbol)):
-                score += 8
-            elif symbol and cls._token_hits_text(tok, symbol):
-                score += 5
+            if symbol and tok == symbol:
+                strong += 8
+            elif symbol and tok in symbol_parts:
+                # 驼峰整词命中：仅作弱信号，避免 Model⊂ModelAdmin 抬到 exact 同档
+                weak += 3
+            elif symbol and cls._token_hits_text(
+                tok, symbol, allow_prefix=True, max_prefix_extra=4
+            ):
+                weak += 2
             if stem and tok == stem:
-                score += 7
-            elif name and cls._token_hits_text(tok, name):
-                score += 4
-            elif cls._token_hits_text(tok, fp) or cls._token_hits_text(tok, title):
-                score += 2
-            elif stem and cls._token_hits_text(tok, stem):
-                score += 5
+                strong += 7
+            elif name and (tok == PurePosixPath(name).stem.lower() or tok == name):
+                strong += 6
+            # 文件名/stem 前缀放宽：保住 app→application；目录段仍禁止 model⊂models
+            elif name and cls._token_hits_text(
+                tok, name, allow_prefix=True, max_prefix_extra=10
+            ):
+                strong += 4
+            elif stem and cls._token_hits_text(
+                tok, stem, allow_prefix=True, max_prefix_extra=10
+            ):
+                strong += 4
+            elif cls._path_segment_hit(tok, fp):
+                weak += 2
+            elif title and cls._token_hits_text(tok, title, allow_prefix=False):
+                weak += 1
         if it.get("nl_token_hit") or it.get("nl_alias_hit"):
-            score += 3
-        return score
+            weak += 3
+        return (strong, weak)
+
+    @classmethod
+    def query_relevance(cls, it: Dict[str, object], query: str) -> int:
+        """查询与路径/符号的对齐分；越高越应进入 items。"""
+        strong, weak = cls.query_relevance_parts(it, query)
+        return strong + weak
 
     @classmethod
     def _prefer_key(
@@ -273,19 +339,25 @@ class ResolveResultPresenter:
         else:
             band = 7
         penalty = cls.path_noise_penalty(str(it.get("file_path") or ""))
-        relevance = cls.query_relevance(it, query)
-        # 强查询对齐可抬升档位，避免 exact 噪声压住真正相关的符号摘要命中
-        if relevance >= 10:
+        strong, weak = cls.query_relevance_parts(it, query)
+        relevance = strong + weak
+        # 仅强对齐（符号全名 / 文件名 stem）可抬档；路径弱前缀不得抬到 exact 同档
+        if strong >= 8:
             band = min(band, 0)
-        elif relevance >= 7:
+        elif strong >= 6:
             band = min(band, 1)
-        elif relevance >= 4:
+        elif strong >= 4:
             band = min(band, 2)
-        if relevance >= 7 and penalty > 0:
+        if strong >= 6 and penalty > 0:
             penalty = max(0, penalty - 8)
-        # 弱相关的伞文件额外惩罚
-        name = PurePosixPath(cls._normalize_path(str(it.get("file_path") or ""))).name.lower()
-        if name in cls._UMBRELLA_NAMES and relevance < 4:
+        # 弱相关的浅路径伞文件额外惩罚
+        fp = cls._normalize_path(str(it.get("file_path") or ""))
+        name = PurePosixPath(fp).name.lower()
+        if (
+            name in cls._UMBRELLA_NAMES
+            and cls._path_depth(fp) <= 3
+            and strong < 4
+        ):
             penalty += 10
         return (band, penalty, -relevance, -score)
 

@@ -25,14 +25,14 @@ class TestAnalyzeStatusVisualization:
             repo = SimpleNamespace(local_path=str(tmp_path))
             status_rows = [
                 (FileAnalysisStatus.COMPLETED.value, 3),
-                (FileAnalysisStatus.EMBEDDED.value, 2),
-                (FileAnalysisStatus.PENDING.value, 1),
+                (FileAnalysisStatus.PENDING.value, 3),
                 (FileAnalysisStatus.FAILED.value, 1),
             ]
             exec_result = MagicMock()
             exec_result.all.return_value = status_rows
             db.execute = AsyncMock(return_value=exec_result)
-            db.scalar = AsyncMock(return_value=repo)
+            # scalar: repo, pending_embed=1, pending_symbol=2, searchable=5
+            db.scalar = AsyncMock(side_effect=[repo, 1, 2, 5])
             fail_scalars = MagicMock()
             fail_scalars.all.return_value = [fail_row]
             db.scalars = AsyncMock(return_value=fail_scalars)
@@ -64,10 +64,10 @@ class TestAnalyzeStatusVisualization:
         assert out["analysis_summary"]["embedded_files"] == 2
         assert out["analysis_summary"]["searchable_files"] == 5
         assert out["analysis_summary"]["searchable"] is True
-        assert out["analysis_summary"]["enrichment_pending"] is True
+        assert out["analysis_summary"]["pending_symbol"] is True
         assert out["stale"] is True
         assert "pending_files" in (out["stale_hint"] or "")
-        assert "symbol_enrichment_pending" in (out["stale_hint"] or "")
+        assert "pending_symbol" in (out["stale_hint"] or "")
         assert out["status_message"]
         assert out["next_action"]
         assert "可检索" in out["status_message"] or "未完成" in out["status_message"]

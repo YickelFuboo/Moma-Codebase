@@ -72,6 +72,7 @@ class ExperienceService:
         repo_id: str,
         *,
         since: Optional[str] = None,
+        after_sha: Optional[str] = None,
         limit: int = 50,
     ) -> Dict[str, object]:
         if not settings.mr_experience_enabled:
@@ -104,7 +105,7 @@ class ExperienceService:
             return {"repo_id": repo_id, "job_status": ExperienceJobStatus.RUNNING.value, "info": "already running"}
 
         ExperienceService._running_jobs[repo_id] = asyncio.create_task(
-            ExperienceService._run_analyze(repo_id, local_path, since=since, limit=limit)
+            ExperienceService._run_analyze(repo_id, local_path, since=since, after_sha=after_sha, limit=limit)
         )
         ExperienceService.ensure_retry_scheduler()
         return {
@@ -112,6 +113,7 @@ class ExperienceService:
             "job_status": ExperienceJobStatus.RUNNING.value,
             "info": "experience analyze started",
             "since": since,
+            "after_sha": after_sha,
             "limit": limit,
         }
 
@@ -121,10 +123,11 @@ class ExperienceService:
         local_path: str,
         *,
         since: Optional[str],
+        after_sha: Optional[str],
         limit: int,
     ) -> None:
         try:
-            entries = GitHistorySource.collect(local_path, since=since, limit=limit)
+            entries = GitHistorySource.collect(local_path, since=since, after_sha=after_sha, limit=limit)
             created = 0
             async with get_db_session() as db:
                 for entry in entries:
@@ -175,9 +178,28 @@ class ExperienceService:
                         created += 1
                 await db.commit()
 
-            await ExperienceService._process_pending_and_failed(repo_id, include_failed=False)
+            # 更新高水位（git log 默认最新优先，entries[0] 是最新收集到的）
+            if entries:
+                newest = entries[0]
+                async with get_db_session() as db:
+                    task = await db.scalar(select(RepoExperienceTask).where(RepoExperienceTask.repo_id == repo_id))
+                    if task:
+                        task.last_collected_commit_sha = newest.commit_sha
+                        task.last_collected_committed_at = newest.committed_at
+                        await db.commit()
+
+            await ExperienceService._process_pending_and_failed(
+                repo_id,
+                include_failed=False,
+                max_items=settings.mr_experience_process_batch_size,
+            )
             await ExperienceService._refresh_counters(repo_id, job_status=ExperienceJobStatus.COMPLETED.value)
-            logging.info("experience analyze 完成 repo_id=%s created=%s", repo_id, created)
+            logging.info(
+                "experience analyze 完成 repo_id=%s created=%s collected=%s",
+                repo_id,
+                created,
+                len(entries),
+            )
         except Exception as e:
             logging.error("experience analyze 失败 repo_id=%s error=%s", repo_id, e)
             async with get_db_session() as db:
@@ -191,11 +213,19 @@ class ExperienceService:
             ExperienceService._running_jobs.pop(repo_id, None)
 
     @staticmethod
-    async def _process_pending_and_failed(repo_id: str, *, include_failed: bool) -> None:
+    async def _process_pending_and_failed(
+        repo_id: str,
+        *,
+        include_failed: bool,
+        max_items: Optional[int] = None,
+    ) -> None:
         statuses = [ExperienceItemStatus.PENDING.value]
         if include_failed:
             statuses.append(ExperienceItemStatus.FAILED.value)
+        processed = 0
         while True:
+            if max_items is not None and processed >= max_items:
+                return
             async with get_db_session() as db:
                 item = await db.scalar(
                     select(MrExperienceItem)
@@ -228,6 +258,7 @@ class ExperienceService:
                 await db.commit()
 
             await ExperienceService._process_one_item(item_id)
+            processed += 1
     @staticmethod
     async def _process_one_item(item_id: str) -> None:
         async with get_db_session() as db:
@@ -454,11 +485,15 @@ class ExperienceService:
             try:
                 if cls._retry_stop_event and cls._retry_stop_event.is_set():
                     return
-                repo_ids = await cls._list_repos_with_failed()
+                repo_ids = await cls._list_repos_with_pending_or_failed()
                 for repo_id in repo_ids:
                     if repo_id in cls._running_jobs and not cls._running_jobs[repo_id].done():
                         continue
-                    await cls._process_pending_and_failed(repo_id, include_failed=True)
+                    await cls._process_pending_and_failed(
+                        repo_id,
+                        include_failed=True,
+                        max_items=settings.mr_experience_process_batch_size,
+                    )
                     await cls._refresh_counters(repo_id)
                 await asyncio.sleep(max(interval_seconds, 5.0))
             except asyncio.CancelledError:
@@ -468,13 +503,18 @@ class ExperienceService:
                 await asyncio.sleep(max(interval_seconds, 5.0))
 
     @staticmethod
-    async def _list_repos_with_failed() -> List[str]:
+    async def _list_repos_with_pending_or_failed() -> List[str]:
         async with get_db_session() as db:
             rows = (
                 await db.execute(
                     select(MrExperienceItem.repo_id)
                     .where(
-                        MrExperienceItem.status == ExperienceItemStatus.FAILED.value,
+                        MrExperienceItem.status.in_(
+                            [
+                                ExperienceItemStatus.PENDING.value,
+                                ExperienceItemStatus.FAILED.value,
+                            ]
+                        ),
                         MrExperienceItem.retry_count < ExperienceService.MAX_RETRY,
                     )
                     .distinct()

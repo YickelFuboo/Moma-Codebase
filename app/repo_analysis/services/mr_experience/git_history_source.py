@@ -14,15 +14,16 @@ class GitHistorySource:
         repo_path: str,
         *,
         since: Optional[str] = None,
+        after_sha: Optional[str] = None,
         limit: int = 50,
     ) -> List[GitHistoryEntry]:
         merges = GitHistorySource._list_commits(
-            repo_path, merges_only=True, since=since, limit=limit
+            repo_path, merges_only=True, since=since, after_sha=after_sha, limit=limit
         )
         if merges:
             return [GitHistorySource._enrich(repo_path, e) for e in merges]
         normals = GitHistorySource._list_commits(
-            repo_path, merges_only=False, since=since, limit=limit
+            repo_path, merges_only=False, since=since, after_sha=after_sha, limit=limit
         )
         return [GitHistorySource._enrich(repo_path, e) for e in normals]
 
@@ -83,14 +84,17 @@ class GitHistorySource:
         *,
         merges_only: bool,
         since: Optional[str],
-        limit: int,
+        after_sha: Optional[str] = None,
+        limit: int = 50,
     ) -> List[GitHistoryEntry]:
         args = ["log", f"-n{max(1, limit)}", "--format=%H%x09%ct%x09%s%x09%P"]
         if merges_only:
             args.append("--merges")
         else:
             args.append("--no-merges")
-        if since:
+        if after_sha:
+            args.append(f"{after_sha}..HEAD")
+        elif since:
             args.append(f"--since={since}")
         try:
             out = GitHistorySource._run_git(repo_path, args)

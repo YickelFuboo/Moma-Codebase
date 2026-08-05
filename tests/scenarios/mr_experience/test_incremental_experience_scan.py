@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
+from app.config.settings import settings
 from app.repo_analysis.services.incremental_scan_service import IncrementalScanService
 from app.repo_analysis.services.mr_experience.git_history_source import GitHistorySource
 from app.repo_mgmt.models.git_repo_mgmt import GitRepository, RepoKind
@@ -79,10 +80,12 @@ class TestIncrementalExperienceScanScenario:
 
         async def _run(after_sha):
             with patch(
-                "app.repo_analysis.services.experience_service.get_db_session"
+                "app.repo_analysis.services.incremental_scan_service.get_db_session"
             ) as mock_cm:
+                task_mock = MagicMock()
+                task_mock.last_collected_commit_sha = after_sha
                 db = MagicMock()
-                db.scalar = AsyncMock(return_value=after_sha)
+                db.scalar = AsyncMock(return_value=task_mock)
                 mock_cm.return_value.__aenter__ = AsyncMock(return_value=db)
                 mock_cm.return_value.__aexit__ = AsyncMock(return_value=False)
                 return await IncrementalScanService._needs_experience_rescan(git_repo)
@@ -124,13 +127,11 @@ class TestIncrementalExperienceScanScenario:
                         "_needs_rescan",
                         AsyncMock(return_value=False),
                     ):
-                        with patch(
-                            "app.repo_analysis.services.experience_service.get_db_session"
-                        ) as exp_cm:
-                            exp_db = MagicMock()
-                            exp_db.scalar = AsyncMock(return_value=first_merge_sha)
-                            exp_cm.return_value.__aenter__ = AsyncMock(return_value=exp_db)
-                            exp_cm.return_value.__aexit__ = AsyncMock(return_value=False)
+                        with patch.object(
+                            IncrementalScanService,
+                            "_get_last_collected_sha",
+                            AsyncMock(return_value=first_merge_sha),
+                        ):
                             start_analyze = AsyncMock()
                             with patch(
                                 "app.repo_analysis.services.incremental_scan_service.ExperienceService.start_analyze",
@@ -143,7 +144,8 @@ class TestIncrementalExperienceScanScenario:
                                     await IncrementalScanService.run_once()
                                     start_analyze.assert_awaited_once_with(
                                         "exp-inc-2",
-                                        limit=50,
+                                        after_sha=first_merge_sha,
+                                        limit=settings.mr_experience_max_collect_per_run,
                                     )
 
         asyncio.run(_run())

@@ -13,6 +13,7 @@ from app.repo_analysis.models.analysis_status import (
     RepoAnalysisTask,
     RepoFileAnalysisState,
 )
+from app.repo_analysis.models.experience_status import RepoExperienceTask
 from app.repo_analysis.services.analysis_service import AnalysisService
 from app.repo_analysis.services.experience_service import ExperienceService
 from app.repo_analysis.services.file_analysis_service import FileAnalysisService
@@ -33,7 +34,7 @@ class IncrementalScanService:
     STALE_RUNNING_SEC = 1800
 
     @staticmethod
-    def start() -> bool:
+    def start(repo_path: Optional[str] = None) -> bool:
         if not settings.enable_incremental_scan:
             logging.info("增量扫描已关闭（ENABLE_INCREMENTAL_SCAN=false）")
             return False
@@ -43,11 +44,13 @@ class IncrementalScanService:
         IncrementalScanService._stop_event = asyncio.Event()
         interval = max(float(settings.incremental_scan_interval_sec), 30.0)
         IncrementalScanService._task = asyncio.create_task(
-            IncrementalScanService._loop(interval_seconds=interval)
+            IncrementalScanService._loop(interval_seconds=interval, repo_path=repo_path)
         )
+        scope = f"repo_path={repo_path}" if repo_path else "all registered repos"
         logging.info(
-            "后台 tick 已启动：已登记仓的变更/补扫 + 失败重处理 interval=%ss",
+            "后台 tick 已启动：已登记仓的变更/补扫 + 失败重处理 interval=%ss scope=%s",
             interval,
+            scope,
         )
         return True
 
@@ -67,24 +70,31 @@ class IncrementalScanService:
         IncrementalScanService._task = None
 
     @staticmethod
-    async def _loop(interval_seconds: float) -> None:
-        await IncrementalScanService.run_once()
+    async def _loop(interval_seconds: float, repo_path: Optional[str] = None) -> None:
+        await IncrementalScanService.run_once(repo_path=repo_path)
         while True:
             try:
                 stop_event = IncrementalScanService._stop_event
                 if stop_event and stop_event.is_set():
                     return
                 await asyncio.sleep(interval_seconds)
-                await IncrementalScanService.run_once()
+                await IncrementalScanService.run_once(repo_path=repo_path)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
                 logging.error("增量扫描循环异常: %s", e)
 
     @staticmethod
-    async def run_once() -> None:
+    async def run_once(repo_path: Optional[str] = None) -> None:
+        """repo_path 非空时只扫该仓；为空时扫所有已登记仓。"""
         async with get_db_session() as db:
-            repos = (await db.scalars(select(GitRepository))).all()
+            if repo_path:
+                repo = await db.scalar(
+                    select(GitRepository).where(GitRepository.local_path == repo_path)
+                )
+                repos = [repo] if repo else []
+            else:
+                repos = (await db.scalars(select(GitRepository))).all()
         for repo in repos:
             kind = (getattr(repo, "kind", None) or RepoKind.CODE).strip().lower()
             if kind not in (RepoKind.CODE, RepoKind.LIB):
@@ -141,7 +151,6 @@ class IncrementalScanService:
                         [
                             FileAnalysisStatus.PENDING.value,
                             FileAnalysisStatus.FAILED.value,
-                            FileAnalysisStatus.EMBEDDED.value,
                         ]
                     ),
                 )
@@ -210,26 +219,52 @@ class IncrementalScanService:
         try:
             if await ExperienceService.is_job_running(repo.id):
                 return
-            if not await IncrementalScanService._needs_experience_rescan(repo):
+            last_sha = await IncrementalScanService._get_last_collected_sha(repo.id)
+            if last_sha is None:
+                # 首次：回看 lookback_days 天
+                since_date = (datetime.now() - timedelta(days=settings.mr_experience_lookback_days)).date().isoformat()
+                await ExperienceService.start_analyze(
+                    repo.id,
+                    since=since_date,
+                    limit=settings.mr_experience_max_collect_per_run,
+                )
+                logging.info(
+                    "增量扫描触发 MR 经验分析（首次）repo_id=%s path=%s since=%s",
+                    repo.id,
+                    repo.local_path,
+                    since_date,
+                )
+                return
+            if not GitHistorySource.has_new_entries(repo.local_path, after_sha=last_sha):
                 return
             await ExperienceService.start_analyze(
                 repo.id,
-                limit=ExperienceService.DEFAULT_ANALYZE_LIMIT,
+                after_sha=last_sha,
+                limit=settings.mr_experience_max_collect_per_run,
             )
             logging.info(
-                "增量扫描触发 MR 经验分析 repo_id=%s path=%s",
+                "增量扫描触发 MR 经验分析（增量）repo_id=%s path=%s after_sha=%s",
                 repo.id,
                 repo.local_path,
+                last_sha[:10],
             )
         except Exception as e:
             logging.warning("增量 MR 经验分析触发失败 repo_id=%s error=%s", repo.id, e)
 
     @staticmethod
+    async def _get_last_collected_sha(repo_id: str) -> Optional[str]:
+        async with get_db_session() as db:
+            task = await db.scalar(
+                select(RepoExperienceTask).where(RepoExperienceTask.repo_id == repo_id)
+            )
+            return task.last_collected_commit_sha if task else None
+
+    @staticmethod
     async def _needs_experience_rescan(repo: GitRepository) -> bool:
-        last_sha = await ExperienceService.get_latest_analyzed_commit_sha(repo.id)
+        last_sha = await IncrementalScanService._get_last_collected_sha(repo.id)
         if not last_sha:
-            # 从未跑过 experience analyze：首次留给人工
-            return False
+            # 从未收集过：首次自动触发
+            return True
         return GitHistorySource.has_new_entries(repo.local_path, after_sha=last_sha)
 
     @staticmethod

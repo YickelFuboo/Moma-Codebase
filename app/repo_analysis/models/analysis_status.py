@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Column,String,Text,ForeignKey,Index,DateTime,func,UniqueConstraint
+from sqlalchemy import Boolean,Column,String,Text,ForeignKey,Index,DateTime,func,UniqueConstraint
 from app.infrastructure.database import Base
 
 
@@ -12,10 +12,10 @@ class RepoAnalysisStatus(str, enum.Enum):
 
 
 class FileAnalysisStatus(str, enum.Enum):
+    """文件级生命周期：管「这个文件分析完没有」。进度见 is_embedded / is_symboled。"""
+
     PENDING = "pending"
     RUNNING = "running"
-    # 行块 embedding 已入库、可搜；符号摘要仍待补齐（快路径）
-    EMBEDDED = "embedded"
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
@@ -46,13 +46,32 @@ class RepoAnalysisTask(Base):
 
 
 class RepoFileAnalysisState(Base):
-    """文件级分析状态：每个文件一条记录，分析时跑全量类型。"""
+    """文件级分析状态：status 管是否做完；is_embedded/is_symboled 标记阶段进度。"""
     __tablename__ = "repo_file_analysis_state"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="ID")
     repo_id = Column(String(36), ForeignKey("git_repositories.id"), nullable=False, comment="代码仓ID")
     file_path = Column(String(500), nullable=False, comment="相对路径")
-    status = Column(String(32), nullable=False, default=FileAnalysisStatus.PENDING.value, comment="状态")
+    status = Column(
+        String(32),
+        nullable=False,
+        default=FileAnalysisStatus.PENDING.value,
+        comment="pending|running|completed|failed|skipped",
+    )
+    is_embedded = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="行块 embedding 已入库（可检索）",
+    )
+    is_symboled = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="符号摘要已补齐",
+    )
     last_error = Column(Text, nullable=True, comment="最近错误")
     last_started_at = Column(DateTime, nullable=True, comment="最近开始分析时间")
     last_finished_at = Column(DateTime, nullable=True, comment="最近结束分析时间")

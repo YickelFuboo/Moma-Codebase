@@ -14,6 +14,7 @@ _LAZY_COMMANDS: dict[str, str] = {
     "migrate": "app.cli.db",
     "doctor": "app.cli.doctor",
     "setup": "app.cli.setup",
+    "mcp": "app.cli.mcp",
 }
 
 

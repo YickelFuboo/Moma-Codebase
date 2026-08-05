@@ -173,6 +173,24 @@ class Settings(BaseSettings):
         description="检索时是否按场景合并多条MR经验",
         env="MR_EXPERIENCE_MERGE_BY_SCENARIO",
     )
+    mr_experience_lookback_days: int = Field(
+        default=730,
+        ge=1,
+        description="MR经验首次分析回看天数（默认2年）",
+        env="MR_EXPERIENCE_LOOKBACK_DAYS",
+    )
+    mr_experience_max_collect_per_run: int = Field(
+        default=5000,
+        ge=1,
+        description="单次收集 MR 条目上限（保护性，防止极端活跃仓拉爆 git log）",
+        env="MR_EXPERIENCE_MAX_COLLECT_PER_RUN",
+    )
+    mr_experience_process_batch_size: int = Field(
+        default=50,
+        ge=1,
+        description="单轮处理 PENDING 条目数（跨 tick 推进，支持多天完成）",
+        env="MR_EXPERIENCE_PROCESS_BATCH_SIZE",
+    )
 
     repo_storage_path: str = Field(default="./data/repos", description="远程克隆/上传仓库的本地存储根目录", env="REPO_STORAGE_PATH")
     enable_incremental_scan: bool = Field(

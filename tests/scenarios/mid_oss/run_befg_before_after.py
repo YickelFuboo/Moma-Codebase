@@ -46,7 +46,7 @@ class Score:
     total: int
 
     def fmt(self) -> str:
-        return f"{self.i_r:.0%}/{self.u_r:.0%} · {self.passed}/{self.total}"
+        return f"{self.passed}/{self.total} · {self.i_r:.0%}/{self.u_r:.0%}"
 
 
 # Design.md §5.12 排序优化前快照（A–G 表）

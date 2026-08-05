@@ -90,11 +90,35 @@ mcb setup --path F:\myproject --kind code
 
 ## Agent 通过 CLI 对接
 
-前提：**本机已安装 `mcb` 且在 PATH 中**（见上方「安装」）。Agent 在业务项目里只需调用 `mcb`，无需 MCP、无需把本仓加进业务仓依赖。
+前提：**本机已安装 `mcb` 且在 PATH 中**（见上方「安装」）。Agent 在业务项目里可调用 `mcb` CLI，或挂载 MCP（`mcb mcp serve`）；无需把本仓加进业务仓依赖。
 
 查询类输出为 JSON（stdout）。主入口 `search resolve` 与其它 `search *` 使用稳定信封：`ok: true/false`（见 [docs/cli-schemes.md](docs/cli-schemes.md) / `app/cli/schemes.py`）。
 
 正式 Agent Skill：[skills/mcb-resolve/SKILL.md](skills/mcb-resolve/SKILL.md)。
+
+### MCP Server（Cursor 等）
+
+查询类能力也可通过 stdio MCP 挂载（与 CLI 共用同一套服务，返回同样的 JSON 信封）：
+
+```bash
+mcb mcp serve
+# 或：poetry run python -m MCP
+```
+
+Cursor `mcp.json` 示例（把 `mcb` 换成你本机可执行路径，或 Poetry 包装）：
+
+```json
+{
+  "mcpServers": {
+    "mcb": {
+      "command": "mcb",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+工具：`doctor` / `repo_list` / `resolve`（主入口）/ `similar` / `related` / `pattern` / `api` / `dependents` / `dependencies` / `callers` / `callees`。实现见根目录 [`MCP/`](MCP/)。
 
 ### 前置条件
 
