@@ -209,6 +209,9 @@ class IncrementalScanService:
 
     @staticmethod
     async def _maybe_trigger_experience_analyze(repo: GitRepository) -> None:
+        """触发 MR 经验分析。
+        如果无法收集新条目（首次检查 job running / last_sha / has_new_entries），则跳过。
+        """
         if not settings.mr_experience_enabled:
             return
         kind = (getattr(repo, "kind", None) or RepoKind.CODE).strip().lower()
@@ -218,10 +221,11 @@ class IncrementalScanService:
             return
         try:
             if await ExperienceService.is_job_running(repo.id):
-                return
+                return  # 无新 commit，跳过
+
             last_sha = await IncrementalScanService._get_last_collected_sha(repo.id)
             if last_sha is None:
-                # 首次：回看 lookback_days 天
+                # 首次：拉最近 lookback_days 天内的 commit（最多 max_collect_per_run 条）
                 since_date = (datetime.now() - timedelta(days=settings.mr_experience_lookback_days)).date().isoformat()
                 await ExperienceService.start_analyze(
                     repo.id,
@@ -229,25 +233,29 @@ class IncrementalScanService:
                     limit=settings.mr_experience_max_collect_per_run,
                 )
                 logging.info(
-                    "增量扫描触发 MR 经验分析（首次）repo_id=%s path=%s since=%s",
+                    "增量扫描触发 MR 经验分析（首次）repo_id=%s path=%s since=%s limit=%s",
                     repo.id,
                     repo.local_path,
                     since_date,
+                    settings.mr_experience_max_collect_per_run,
                 )
-                return
-            if not GitHistorySource.has_new_entries(repo.local_path, after_sha=last_sha):
-                return
-            await ExperienceService.start_analyze(
-                repo.id,
-                after_sha=last_sha,
-                limit=settings.mr_experience_max_collect_per_run,
-            )
-            logging.info(
-                "增量扫描触发 MR 经验分析（增量）repo_id=%s path=%s after_sha=%s",
-                repo.id,
-                repo.local_path,
-                last_sha[:10],
-            )
+            else:
+                # 增量：从上次 collect SHA 开始拉最近 max_collect_per_run 条
+                if not GitHistorySource.has_new_entries(repo.local_path, after_sha=last_sha):
+                    return
+                
+                await ExperienceService.start_analyze(
+                    repo.id,
+                    after_sha=last_sha,
+                    limit=settings.mr_experience_max_collect_per_run,
+                )
+                logging.info(
+                    "增量扫描触发 MR 经验分析（增量）repo_id=%s path=%s after_sha=%s limit=%s",
+                    repo.id,
+                    repo.local_path,
+                    last_sha[:10],
+                    settings.mr_experience_max_collect_per_run,
+                )
         except Exception as e:
             logging.warning("增量 MR 经验分析触发失败 repo_id=%s error=%s", repo.id, e)
 
@@ -258,14 +266,6 @@ class IncrementalScanService:
                 select(RepoExperienceTask).where(RepoExperienceTask.repo_id == repo_id)
             )
             return task.last_collected_commit_sha if task else None
-
-    @staticmethod
-    async def _needs_experience_rescan(repo: GitRepository) -> bool:
-        last_sha = await IncrementalScanService._get_last_collected_sha(repo.id)
-        if not last_sha:
-            # 从未收集过：首次自动触发
-            return True
-        return GitHistorySource.has_new_entries(repo.local_path, after_sha=last_sha)
 
     @staticmethod
     def _count_source_files(repo_root: str, extensions: Set[str]) -> int:
